@@ -14,6 +14,9 @@ export default function ChoferDashboard() {
     producto: "",
     cantidadCargada: "",
     cantidadEntregada: "",
+    cajas: "",
+    peso: "",
+    monto: "",
     ruta: "",
   });
   const [loading, setLoading] = useState(false);
@@ -38,16 +41,19 @@ export default function ChoferDashboard() {
     setLoading(true);
     try {
       await addDoc(collection(db, "imbentario"), {
-        choferId: profile.uid,
-        choferNombre: profile.nombre,
-        vehiculo: form.vehiculo,
-        producto: form.producto,
-        cantidadCargada: Number(form.cantidadCargada),
+        choferId:          profile.uid,
+        choferNombre:      profile.nombre,
+        vehiculo:          form.vehiculo,
+        producto:          form.producto,
+        cantidadCargada:   Number(form.cantidadCargada),
         cantidadEntregada: Number(form.cantidadEntregada),
-        ruta: form.ruta,
-        timestamp: Timestamp.now(),
+        ...(form.cajas && { cajas: Number(form.cajas) }),
+        ...(form.peso  && { peso:  Number(form.peso)  }),
+        ...(form.monto && { monto: Number(form.monto) }),
+        ruta:              form.ruta,
+        timestamp:         Timestamp.now(),
       });
-      setForm({ vehiculo: "", producto: "", cantidadCargada: "", cantidadEntregada: "", ruta: "" });
+      setForm({ vehiculo: "", producto: "", cantidadCargada: "", cantidadEntregada: "", cajas: "", peso: "", monto: "", ruta: "" });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } finally {
@@ -106,8 +112,13 @@ export default function ChoferDashboard() {
               <Field label="Vehículo / Placa" value={form.vehiculo} onChange={(v) => setForm((p) => ({ ...p, vehiculo: v }))} placeholder="ABC-123" />
               <Field label="Producto" value={form.producto} onChange={(v) => setForm((p) => ({ ...p, producto: v }))} placeholder="Nombre del producto" />
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Cant. Cargada" type="number" value={form.cantidadCargada} onChange={(v) => setForm((p) => ({ ...p, cantidadCargada: v }))} placeholder="0" />
+                <Field label="Cant. Cargada"   type="number" value={form.cantidadCargada}   onChange={(v) => setForm((p) => ({ ...p, cantidadCargada: v }))}   placeholder="0" />
                 <Field label="Cant. Entregada" type="number" value={form.cantidadEntregada} onChange={(v) => setForm((p) => ({ ...p, cantidadEntregada: v }))} placeholder="0" />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Cajas"     type="number" value={form.cajas}  onChange={(v) => setForm((p) => ({ ...p, cajas: v }))}  placeholder="0" />
+                <Field label="Peso (kg)" type="number" value={form.peso}   onChange={(v) => setForm((p) => ({ ...p, peso: v }))}   placeholder="0.0" />
+                <Field label="Monto $"   type="number" value={form.monto}  onChange={(v) => setForm((p) => ({ ...p, monto: v }))}  placeholder="0" />
               </div>
               <Field label="Ruta / Destino" value={form.ruta} onChange={(v) => setForm((p) => ({ ...p, ruta: v }))} placeholder="Ruta o dirección" />
               <button

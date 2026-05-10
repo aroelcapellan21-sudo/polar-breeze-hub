@@ -15,27 +15,34 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  profile: null,
-  loading: true,
-  login: async () => {},
-  logout: async () => {},
+  user: null, profile: null, loading: true,
+  login: async () => {}, logout: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser]       = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
       if (firebaseUser) {
         const snap = await getDoc(doc(db, "usuarios", firebaseUser.uid));
         if (snap.exists()) {
-          setProfile(snap.data() as UserProfile);
+          const data = snap.data() as UserProfile;
+          // Bloquear choferes dados de baja
+          if (data.activo === false) {
+            await signOut(auth);
+            setUser(null);
+            setProfile(null);
+            setLoading(false);
+            return;
+          }
+          setProfile(data);
         }
+        setUser(firebaseUser);
       } else {
+        setUser(null);
         setProfile(null);
       }
       setLoading(false);
@@ -47,9 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password);
   };
 
-  const logout = async () => {
-    await signOut(auth);
-  };
+  const logout = async () => { await signOut(auth); };
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, login, logout }}>
