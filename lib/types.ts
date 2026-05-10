@@ -60,6 +60,16 @@ export interface WeightAlert {
   severity: "warning" | "critical";
 }
 
+// ─── FacturaScan Pro — producto individual ────────────────────────────────────
+
+export interface ProductoItem {
+  nombre:   string;
+  cantidad: number;
+  unidad?:  string;
+  peso?:    number | null;
+  precio?:  number | null;
+}
+
 // ─── Colecciones adicionales de FacturaScan ──────────────────────────────────
 
 /** Documento session/despacho — resumen de la sesión activa */
