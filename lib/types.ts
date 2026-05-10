@@ -60,6 +60,64 @@ export interface WeightAlert {
   severity: "warning" | "critical";
 }
 
+// ─── Colecciones adicionales de FacturaScan ──────────────────────────────────
+
+/** Documento session/despacho — resumen de la sesión activa */
+export interface FsSession {
+  totalDespachos?: number;
+  totalMonto?:     number;
+  totalUnidades?:  number;
+  totalPeso?:      number;
+  fecha?:          Date | { seconds: number };
+  estado?:         string;
+  despachador?:    string;
+  [key: string]:   unknown;
+}
+
+/** Colección drivers — choferes registrados en FacturaScan */
+export interface FsDriver {
+  id?:             string;
+  nombre?:         string;
+  ficha?:          string;
+  vehiculo?:       string;
+  placa?:          string;
+  totalEntregado?: number;
+  totalCargado?:   number;
+  totalPeso?:      number;
+  activo?:         boolean;
+  rutas?:          string[];
+  [key: string]:   unknown;
+}
+
+/** Colección history — registro histórico de FacturaScan */
+export interface FsHistory {
+  id?:               string;
+  tipo?:             string;   // "despacho" | "factura" | "peso" | "inventario"
+  timestamp?:        Date | { seconds: number };
+  monto?:            number;
+  producto?:         string;
+  cantidad?:         number;
+  peso?:             number;
+  choferNombre?:     string;
+  choferId?:         string;
+  despachadorNombre?: string;
+  cliente?:          string;
+  facturaNumero?:    string;
+  [key: string]:     unknown;
+}
+
+/** Documento config/main — configuración global de FacturaScan */
+export interface FsConfig {
+  nombreEmpresa?:      string;
+  maxDiferenciaPeso?:  number;
+  alertaWarning?:      number;   // % de diferencia para warning
+  alertaCritical?:     number;   // % de diferencia para crítico
+  moneda?:             string;
+  [key: string]:       unknown;
+}
+
+// ─── Semáforo ─────────────────────────────────────────────────────────────────
+
 export type Semaforo = "verde" | "amarillo" | "rojo";
 
 export function toDate(ts: Date | { seconds: number } | undefined): Date {
