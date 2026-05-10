@@ -1,23 +1,41 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { collection, addDoc, onSnapshot, query, orderBy, Timestamp, where } from "firebase/firestore";
+import { useState, useEffect, useMemo } from "react";
+import {
+  collection, addDoc, onSnapshot, query, orderBy,
+  Timestamp, where, getDoc, doc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { ImbentarioRecord } from "@/lib/types";
+import { ImbentarioRecord, PuntosConfig, PuntoProducto } from "@/lib/types";
+
+function getQuincena() {
+  const now = new Date();
+  const day = now.getDate();
+  const month = now.getMonth();
+  const year  = now.getFullYear();
+  if (day <= 15) {
+    return {
+      start: new Date(year, month, 1),
+      end:   new Date(year, month, 15, 23, 59, 59),
+      label: `1ª quincena de ${now.toLocaleDateString("es-MX", { month: "long" })} ${year}`,
+    };
+  }
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return {
+    start: new Date(year, month, 16),
+    end:   new Date(year, month, lastDay, 23, 59, 59),
+    label: `2ª quincena de ${now.toLocaleDateString("es-MX", { month: "long" })} ${year}`,
+  };
+}
 
 export default function ChoferDashboard() {
   const { profile, logout } = useAuth();
-  const [records, setRecords] = useState<ImbentarioRecord[]>([]);
+  const [records,       setRecords]       = useState<ImbentarioRecord[]>([]);
+  const [puntosConfig,  setPuntosConfig]  = useState<PuntosConfig | null>(null);
   const [form, setForm] = useState({
-    vehiculo: "",
-    producto: "",
-    cantidadCargada: "",
-    cantidadEntregada: "",
-    cajas: "",
-    peso: "",
-    monto: "",
-    ruta: "",
+    vehiculo: "", producto: "", cantidadCargada: "",
+    cantidadEntregada: "", cajas: "", peso: "", monto: "", ruta: "",
   });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -31,6 +49,10 @@ export default function ChoferDashboard() {
     );
     const unsub = onSnapshot(q, (snap) => {
       setRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ImbentarioRecord)));
+    });
+    // Load points config
+    getDoc(doc(db, "config", "puntos")).then((snap) => {
+      if (snap.exists()) setPuntosConfig(snap.data() as PuntosConfig);
     });
     return unsub;
   }, [profile]);
@@ -62,7 +84,40 @@ export default function ChoferDashboard() {
   };
 
   const totalEntregado = records.reduce((s, r) => s + (r.cantidadEntregada || 0), 0);
-  const totalCargado = records.reduce((s, r) => s + (r.cantidadCargada || 0), 0);
+  const totalCargado   = records.reduce((s, r) => s + (r.cantidadCargada || 0), 0);
+
+  // ── Quincena ─────────────────────────────────────────────────────────────────
+  const quincena = useMemo(() => getQuincena(), []);
+
+  const recQuincena = records.filter((r) => {
+    const d = r.timestamp instanceof Date ? r.timestamp
+      : new Date((r.timestamp as { seconds: number }).seconds * 1000);
+    return d >= quincena.start && d <= quincena.end;
+  });
+
+  const porProductoQ = recQuincena.reduce<Record<string, { cargado: number; entregado: number; monto: number }>>((acc, r) => {
+    if (!acc[r.producto]) acc[r.producto] = { cargado: 0, entregado: 0, monto: 0 };
+    acc[r.producto].cargado   += r.cantidadCargada ?? 0;
+    acc[r.producto].entregado += r.cantidadEntregada ?? 0;
+    acc[r.producto].monto     += r.monto ?? 0;
+    return acc;
+  }, {});
+
+  // ── Puntos quincena ───────────────────────────────────────────────────────────
+  const puntosMap: Record<string, number> = {};
+  (puntosConfig?.productos ?? []).forEach((p: PuntoProducto) => {
+    puntosMap[p.nombre.toLowerCase().trim()] = p.puntos;
+  });
+
+  const puntosTotal = recQuincena.reduce((sum, r) => {
+    const key = r.producto.toLowerCase().trim();
+    const pts  = puntosMap[key] ?? 0;
+    return sum + pts * (r.cantidadEntregada ?? 0);
+  }, 0);
+
+  const meta     = puntosConfig?.meta ?? 100;
+  const pct      = Math.min((puntosTotal / meta) * 100, 100);
+  const pctColor = pct >= 80 ? "bg-green-500" : pct >= 50 ? "bg-yellow-500" : "bg-blue-500";
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -75,15 +130,19 @@ export default function ChoferDashboard() {
               <p className="text-cyan-200 text-xs">Chofer — {profile?.nombre}</p>
             </div>
           </div>
-          <button onClick={logout} className="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg text-sm transition">
+          <button
+            onClick={logout}
+            className="bg-white/20 hover:bg-white/30 active:scale-95 px-3 py-1.5
+              rounded-lg text-sm transition-all duration-100"
+          >
             Salir
           </button>
         </div>
       </header>
 
-      <div className="max-w-3xl mx-auto px-4 py-6">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        {/* Stats globales */}
+        <div className="grid grid-cols-3 gap-3">
           <div className="bg-cyan-600 text-white rounded-xl p-4 text-center shadow">
             <p className="text-2xl font-bold">{records.length}</p>
             <p className="text-xs opacity-90">Reportes</p>
@@ -98,8 +157,73 @@ export default function ChoferDashboard() {
           </div>
         </div>
 
+        {/* ── Progreso quincena ── */}
+        <div className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold text-teal-700 text-sm">⭐ Puntos — {quincena.label}</h2>
+            <span className="text-lg font-bold text-teal-700">{puntosTotal} / {meta}</span>
+          </div>
+          <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${pctColor}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-400 text-right">{pct.toFixed(0)}% de la meta</p>
+        </div>
+
+        {/* ── Tabla de ventas quincena ── */}
+        {Object.keys(porProductoQ).length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm p-5">
+            <h3 className="font-bold text-gray-700 mb-3 text-sm">📊 Ventas de la quincena</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-gray-500 border-b">
+                    <th className="text-left pb-2 pr-3">Producto</th>
+                    <th className="text-right pb-2 pr-3">Cargado</th>
+                    <th className="text-right pb-2 pr-3">Entregado</th>
+                    <th className="text-right pb-2 pr-3">Monto</th>
+                    <th className="text-right pb-2">Puntos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {Object.entries(porProductoQ).map(([prod, dat]) => {
+                    const key = prod.toLowerCase().trim();
+                    const pts = (puntosMap[key] ?? 0) * dat.entregado;
+                    const efic = dat.cargado > 0 ? (dat.entregado / dat.cargado) * 100 : 100;
+                    return (
+                      <tr key={prod} className="hover:bg-gray-50">
+                        <td className="py-2 pr-3">
+                          <p className="font-medium text-gray-800">{prod}</p>
+                          <div className="mt-0.5 h-1 bg-gray-100 rounded-full overflow-hidden w-20">
+                            <div
+                              className={`h-full rounded-full ${efic >= 95 ? "bg-green-400" : efic >= 85 ? "bg-yellow-400" : "bg-red-400"}`}
+                              style={{ width: `${Math.min(efic, 100)}%` }}
+                            />
+                          </div>
+                        </td>
+                        <td className="py-2 pr-3 text-right text-blue-600">{dat.cargado}</td>
+                        <td className="py-2 pr-3 text-right text-green-600">{dat.entregado}</td>
+                        <td className="py-2 pr-3 text-right text-gray-600">
+                          {dat.monto > 0 ? `$${dat.monto.toLocaleString()}` : "—"}
+                        </td>
+                        <td className="py-2 text-right">
+                          <span className={`text-xs font-semibold ${pts > 0 ? "text-yellow-600" : "text-gray-300"}`}>
+                            {pts > 0 ? `⭐ ${pts}` : "—"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {success && (
-          <div className="bg-green-100 border border-green-300 text-green-700 rounded-lg px-4 py-3 mb-4 text-sm font-medium">
+          <div className="bg-green-100 border border-green-300 text-green-700 rounded-lg px-4 py-3 text-sm font-medium">
             Reporte registrado exitosamente
           </div>
         )}
@@ -124,14 +248,15 @@ export default function ChoferDashboard() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-2.5 rounded-lg font-medium transition disabled:opacity-60"
+                className="w-full bg-cyan-600 hover:bg-cyan-700 active:scale-95 text-white
+                  py-2.5 rounded-lg font-medium transition-all duration-100 disabled:opacity-60"
               >
                 {loading ? "Enviando..." : "Enviar Reporte"}
               </button>
             </form>
           </div>
 
-          {/* History */}
+          {/* Historial */}
           <div className="bg-white rounded-xl shadow-sm p-5">
             <h3 className="font-semibold text-gray-700 mb-3">Mis reportes</h3>
             <div className="space-y-3 max-h-96 overflow-y-auto">

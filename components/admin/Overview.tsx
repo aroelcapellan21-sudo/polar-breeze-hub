@@ -23,7 +23,10 @@ const SEM: Record<Semaforo, { icon: string; ring: string; bg: string; label: str
   rojo:     { icon: "🚨", ring: "ring-red-300",    bg: "bg-red-50",    label: "Crítico" },
 };
 
+type KpiModal = "choferes" | "despachos" | "facturado" | "alertas" | null;
+
 export default function Overview({ onVerChofer }: Props) {
+  const [kpiModal, setKpiModal] = useState<KpiModal>(null);
 
   // ── Listeners existentes del Hub (sin cambios) ────────────────────────────
   const [choferes, setChoferes] = useState<UserProfile[]>([]);
@@ -245,18 +248,21 @@ export default function Overview({ onVerChofer }: Props) {
           value={chofActivos}
           sub={`${choferes.length} Hub · ${fsDrivers.filter(d => d.activo !== false).length} FacturaScan`}
           color="from-purple-600 to-purple-800"
+          onClick={() => setKpiModal("choferes")}
         />
         <KpiCard
           icon="📦" label="Despachos"
           value={kpiDespachos}
           sub={`${spikinHoy.length} SPIKIN${fsSession?.totalDespachos ? ` + ${fsSession.totalDespachos} sesión` : ""}`}
           color="from-blue-500 to-blue-700"
+          onClick={() => setKpiModal("despachos")}
         />
         <KpiCard
           icon="💰" label="Facturado"
           value={`$${kpiFacturado.toLocaleString()}`}
           sub={`${facturaHoy.length} facturas${fsSession?.totalMonto ? ` + $${fsSession.totalMonto.toLocaleString()} sesión` : ""}`}
           color="from-green-500 to-emerald-700"
+          onClick={() => setKpiModal("facturado")}
         />
         {kpiPeso > 0 ? (
           <KpiCard
@@ -264,6 +270,7 @@ export default function Overview({ onVerChofer }: Props) {
             value={`${kpiPeso.toFixed(1)} kg`}
             sub={`${kpiUnidades} uds entregadas`}
             color="from-teal-500 to-teal-700"
+            onClick={() => setKpiModal("alertas")}
           />
         ) : (
           <KpiCard
@@ -271,9 +278,89 @@ export default function Overview({ onVerChofer }: Props) {
             value={alertasCrit > 0 ? alertasCrit : "OK"}
             sub={alertasCrit > 0 ? "Atención requerida" : "Sin alertas críticas"}
             color={alertasCrit > 0 ? "from-red-500 to-red-700" : "from-gray-500 to-gray-700"}
+            onClick={() => setKpiModal("alertas")}
           />
         )}
       </div>
+
+      {/* ── KPI Detail Modal ── */}
+      {kpiModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+              <h3 className="font-bold text-gray-800">
+                {kpiModal === "choferes"  && "👥 Choferes activos — detalle"}
+                {kpiModal === "despachos" && "📦 Despachos del día — detalle"}
+                {kpiModal === "facturado" && "💰 Facturado hoy — detalle"}
+                {kpiModal === "alertas"   && "⚖️ Alertas de peso — detalle"}
+              </h3>
+              <button
+                onClick={() => setKpiModal(null)}
+                className="text-gray-400 hover:text-gray-600 text-2xl active:scale-95 transition-all duration-100 leading-none"
+              >×</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {kpiModal === "choferes" && choferes.filter(c => c.activo !== false).map((c) => (
+                <div key={c.uid} className="flex items-center gap-3 px-3 py-2 bg-purple-50 rounded-lg">
+                  <div className="w-8 h-8 bg-cyan-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                    {c.nombre.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{c.nombre}</p>
+                    <p className="text-xs text-gray-400">Ficha {c.ficha ?? "—"}</p>
+                  </div>
+                  <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✅ activo</span>
+                </div>
+              ))}
+              {kpiModal === "despachos" && (
+                <>
+                  {spikinHoy.map((r) => (
+                    <div key={r.id} className="px-3 py-2 bg-blue-50 rounded-lg text-sm">
+                      <p className="font-medium text-gray-800">{r.producto}</p>
+                      <p className="text-xs text-gray-500">{r.despachadorNombre} → {r.destino} · ×{r.cantidad}</p>
+                      <p className="text-xs text-gray-400">{fmtDate(r.timestamp)}</p>
+                    </div>
+                  ))}
+                  {fsHistory.filter(h => h.tipo === "entrega_chofer").slice(0, 10).map((h) => (
+                    <div key={h.id} className="px-3 py-2 bg-orange-50 rounded-lg text-sm">
+                      <p className="font-medium text-gray-800">{h.choferNombre ?? "—"}</p>
+                      <p className="text-xs text-gray-500">{h.despachadorNombre} · FacturaScan</p>
+                      <p className="text-xs text-gray-400">{fmtDate(h.timestamp)}</p>
+                    </div>
+                  ))}
+                  {spikinHoy.length === 0 && <p className="text-gray-400 text-sm text-center py-6">Sin despachos hoy</p>}
+                </>
+              )}
+              {kpiModal === "facturado" && (
+                <>
+                  {facturaHoy.map((r) => (
+                    <div key={r.id} className="px-3 py-2 bg-green-50 rounded-lg text-sm">
+                      <div className="flex justify-between">
+                        <p className="font-medium text-gray-800">#{r.facturaNumero} — {r.cliente}</p>
+                        <p className="font-bold text-green-700">${(r.monto ?? 0).toLocaleString()}</p>
+                      </div>
+                      <p className="text-xs text-gray-400">{r.despachadorNombre} · {fmtDate(r.timestamp)}</p>
+                    </div>
+                  ))}
+                  {facturaHoy.length === 0 && <p className="text-gray-400 text-sm text-center py-6">Sin facturas hoy</p>}
+                </>
+              )}
+              {kpiModal === "alertas" && (
+                <>
+                  {alerts.map((a) => (
+                    <div key={a.id} className={`px-3 py-2 rounded-lg text-sm border ${a.severity === "critical" ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200"}`}>
+                      <p className="font-medium text-gray-800">{a.producto}</p>
+                      <p className="text-xs text-gray-600">{a.choferNombre} · {a.pesoCargado}kg → {a.pesoEntregado}kg</p>
+                      <p className="text-xs font-bold text-red-600">Diferencia: {a.diferencia.toFixed(1)}kg ({a.porcentaje.toFixed(0)}%)</p>
+                    </div>
+                  ))}
+                  {alerts.length === 0 && <p className="text-gray-400 text-sm text-center py-6">Sin alertas de peso</p>}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Sesión activa de FacturaScan ── */}
       {fsSession && (
@@ -553,17 +640,24 @@ export default function Overview({ onVerChofer }: Props) {
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 
 function KpiCard({
-  icon, label, value, sub, color,
+  icon, label, value, sub, color, onClick,
 }: {
   icon: string; label: string; value: string | number; sub: string; color: string;
+  onClick?: () => void;
 }) {
   return (
-    <div className={`bg-gradient-to-br ${color} text-white rounded-xl p-4 shadow-sm`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`bg-gradient-to-br ${color} text-white rounded-xl p-4 shadow-sm text-left
+        w-full active:scale-95 transition-transform duration-100 ${onClick ? "cursor-pointer hover:brightness-110" : "cursor-default"}`}
+    >
       <p className="text-2xl mb-1">{icon}</p>
       <p className="text-2xl font-bold leading-tight">{value}</p>
       <p className="text-xs opacity-80 mt-0.5">{label}</p>
       <p className="text-xs opacity-60 mt-0.5 truncate">{sub}</p>
-    </div>
+      {onClick && <p className="text-xs opacity-50 mt-1">Toca para ver detalle →</p>}
+    </button>
   );
 }
 

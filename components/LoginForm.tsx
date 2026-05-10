@@ -92,34 +92,36 @@ export default function LoginForm() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl shadow-black/30 p-6">
-          {/* Role buttons */}
+          {/* Role buttons — mismo tamaño, efecto punch */}
           <div className="space-y-3 mb-6">
             {ROLES.map((role) => (
               <button
                 key={role.key}
                 type="button"
                 onClick={() => handleRoleSelect(role.key)}
-                className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl border-2 transition-all duration-150 text-left
+                className={`w-full h-[72px] flex items-center gap-4 px-4 rounded-xl border-2
+                  transition-all duration-100 text-left
+                  active:scale-95 active:brightness-95
                   ${selectedRole === role.key
                     ? role.active + " " + role.border.replace("hover:", "")
                     : "border-gray-200 hover:border-gray-300 bg-white"
                   }`}
               >
-                <span className="text-3xl leading-none">{role.icon}</span>
-                <div>
+                <span className="text-3xl leading-none flex-shrink-0">{role.icon}</span>
+                <div className="flex-1">
                   <p className={`font-bold text-base tracking-wide ${selectedRole === role.key ? role.text : "text-gray-700"}`}>
                     {role.label}
                   </p>
                   <p className="text-xs text-gray-400">{role.hint}</p>
                 </div>
                 {selectedRole === role.key && (
-                  <span className={`ml-auto text-lg ${role.text}`}>✓</span>
+                  <span className={`text-lg ${role.text} flex-shrink-0`}>✓</span>
                 )}
               </button>
             ))}
           </div>
 
-          {/* Password / Ficha field — appears after role selection */}
+          {/* Password / Ficha field */}
           {selectedRole && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -132,13 +134,14 @@ export default function LoginForm() {
                   onChange={(e) => setCredential(e.target.value)}
                   required
                   autoFocus
+                  minLength={3}
                   placeholder={isChofer ? "Ej: 0042" : "••••••••"}
                   className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none text-gray-800 text-base transition
                     focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
                 />
                 {isChofer && (
                   <p className="text-xs text-gray-400 mt-1.5">
-                    Usa el número de ficha que te asignó el admin.
+                    Usa el número de ficha que te asignó el admin. Mínimo 3 dígitos.
                   </p>
                 )}
               </div>
@@ -151,9 +154,9 @@ export default function LoginForm() {
 
               <button
                 type="submit"
-                disabled={loading || !credential}
+                disabled={loading || !credential || credential.length < 3}
                 className={`w-full bg-gradient-to-r ${roleConfig?.btn} text-white py-3.5 rounded-xl font-bold text-base
-                  hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 shadow-md`}
+                  hover:opacity-90 active:scale-95 transition-all duration-100 disabled:opacity-50 shadow-md`}
               >
                 {loading ? "Entrando..." : `Entrar como ${roleConfig?.label}`}
               </button>
@@ -161,7 +164,8 @@ export default function LoginForm() {
               <button
                 type="button"
                 onClick={() => { setSelectedRole(null); setCredential(""); setError(""); }}
-                className="w-full text-sm text-gray-400 hover:text-gray-600 transition py-1"
+                className="w-full text-sm text-gray-400 hover:text-gray-600 active:scale-95
+                  transition-all duration-100 py-1"
               >
                 ← Cambiar rol
               </button>

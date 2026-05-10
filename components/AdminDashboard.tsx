@@ -6,15 +6,16 @@ import { UserProfile } from "@/lib/types";
 import Overview        from "@/components/admin/Overview";
 import GestionChoferes from "@/components/admin/GestionChoferes";
 import ChoferDetalle   from "@/components/admin/ChoferDetalle";
+import ConfigModal     from "@/components/admin/ConfigModal";
 
 type Tab = "overview" | "choferes";
 
 export default function AdminDashboard() {
   const { profile, logout } = useAuth();
-  const [tab,    setTab]    = useState<Tab>("overview");
-  const [chofer, setChofer] = useState<UserProfile | null>(null);
+  const [tab,         setTab]         = useState<Tab>("overview");
+  const [chofer,      setChofer]      = useState<UserProfile | null>(null);
+  const [showConfig,  setShowConfig]  = useState(false);
 
-  // Navega a la tab Choferes y abre el detalle de ese chofer
   const verChofer = (c: UserProfile) => {
     setChofer(c);
     setTab("choferes");
@@ -37,13 +38,13 @@ export default function AdminDashboard() {
 
           {/* Tabs */}
           <nav className="flex gap-1 flex-1">
-            <Tab
+            <NavTab
               active={tab === "overview"}
               onClick={() => { setTab("overview"); setChofer(null); }}
             >
               🏠 Overview
-            </Tab>
-            <Tab
+            </NavTab>
+            <NavTab
               active={tab === "choferes"}
               onClick={() => setTab("choferes")}
             >
@@ -53,34 +54,42 @@ export default function AdminDashboard() {
                   {chofer.nombre.split(" ")[0]}
                 </span>
               )}
-            </Tab>
+            </NavTab>
           </nav>
 
-          {/* Usuario */}
+          {/* Acciones */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => setShowConfig(true)}
+              title="Configuración"
+              className="bg-white/10 hover:bg-white/20 active:scale-95 w-8 h-8 rounded-lg
+                flex items-center justify-center text-base transition-all duration-100"
+            >
+              ⚙️
+            </button>
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium leading-tight">{profile?.nombre}</p>
               <span className="text-xs text-purple-300">Administrador</span>
             </div>
             <button
               onClick={logout}
-              className="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-xs
-                transition font-medium"
+              className="bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5
+                rounded-lg text-xs transition-all duration-100 font-medium"
             >
               Salir
             </button>
           </div>
         </div>
 
-        {/* Breadcrumb inline cuando se ve un chofer */}
+        {/* Breadcrumb */}
         {tab === "choferes" && chofer && (
           <div className="border-t border-white/10 bg-black/10">
             <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center gap-2 text-xs text-purple-200">
               <button
                 onClick={volverALista}
-                className="hover:text-white transition"
+                className="hover:text-white active:scale-95 transition-all duration-100 flex items-center gap-1"
               >
-                👥 Choferes
+                ← 👥 Choferes
               </button>
               <span className="opacity-40">/</span>
               <span className="text-white font-medium">{chofer.nombre}</span>
@@ -94,31 +103,25 @@ export default function AdminDashboard() {
 
       {/* ── Contenido ── */}
       <main className="max-w-7xl mx-auto px-4 py-5">
-
-        {tab === "overview" && (
-          <Overview onVerChofer={verChofer} />
-        )}
-
-        {tab === "choferes" && !chofer && (
-          <GestionChoferes onVerDetalle={verChofer} />
-        )}
-
-        {tab === "choferes" && chofer && (
-          <ChoferDetalle chofer={chofer} onBack={volverALista} />
-        )}
-
+        {tab === "overview" && <Overview onVerChofer={verChofer} />}
+        {tab === "choferes" && !chofer && <GestionChoferes onVerDetalle={verChofer} />}
+        {tab === "choferes" && chofer && <ChoferDetalle chofer={chofer} onBack={volverALista} />}
       </main>
+
+      {/* ── Modal Configuración ── */}
+      {showConfig && <ConfigModal onClose={() => setShowConfig(false)} />}
     </div>
   );
 }
 
-function Tab({ active, onClick, children }: {
+function NavTab({ active, onClick, children }: {
   active: boolean; onClick: () => void; children: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-100
+        active:scale-95 ${
         active
           ? "bg-white text-purple-800 shadow-sm"
           : "text-purple-200 hover:bg-white/10 hover:text-white"

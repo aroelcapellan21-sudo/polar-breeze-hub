@@ -68,6 +68,35 @@ export interface ProductoItem {
   unidad?:  string;
   peso?:    number | null;
   precio?:  number | null;
+  visto?:   "ok" | "mal" | null;
+}
+
+// ─── Talonario — registro de movimiento por producto ──────────────────────────
+
+export interface TalonarioDoc {
+  id?:               string;
+  choferId:          string;
+  choferNombre:      string;
+  choferFicha?:      string;
+  productos:         ProductoItem[];
+  observaciones?:    string;
+  tipo:              "retirada" | "agregada";
+  fuente:            "cuarto_frio" | "despacho" | "admin";
+  despachadorId:     string;
+  despachadorNombre: string;
+  timestamp:         Date | { seconds: number };
+}
+
+// ─── Puntos por producto (config/puntos) ──────────────────────────────────────
+
+export interface PuntoProducto {
+  nombre:  string;
+  puntos:  number;
+}
+
+export interface PuntosConfig {
+  productos: PuntoProducto[];
+  meta?:     number;
 }
 
 // ─── Colecciones adicionales de FacturaScan ──────────────────────────────────

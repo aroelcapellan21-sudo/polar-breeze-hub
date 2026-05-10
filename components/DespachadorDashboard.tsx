@@ -40,7 +40,8 @@ export default function DespachadorDashboard() {
                 key={t.key}
                 onClick={() => setTab(t.key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm
-                  font-medium whitespace-nowrap transition flex-shrink-0 ${
+                  font-medium whitespace-nowrap transition-all duration-100 active:scale-95
+                  flex-shrink-0 ${
                   tab === t.key
                     ? "bg-white text-blue-800 shadow-sm"
                     : "text-blue-200 hover:bg-white/10 hover:text-white"
@@ -60,8 +61,8 @@ export default function DespachadorDashboard() {
             </div>
             <button
               onClick={logout}
-              className="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-xs
-                transition font-medium"
+              className="bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5
+                rounded-lg text-xs transition-all duration-100 font-medium"
             >
               Salir
             </button>

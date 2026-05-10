@@ -2,7 +2,7 @@
 
 import { ProductoItem } from "@/lib/types";
 
-// ── ImageUploader ─────────────────────────────────────────────────────────────
+// ── ImageUploader — cámara en móvil, archivo en PC ────────────────────────────
 interface ImageUploaderProps {
   preview: string | null;
   onFile: (base64: string, mimeType: string, preview: string) => void;
@@ -33,30 +33,54 @@ export function ImageUploader({ preview, onFile, onClear }: ImageUploaderProps) 
             type="button"
             onClick={onClear}
             className="absolute top-2 right-2 bg-white rounded-full w-7 h-7 flex items-center justify-center
-              shadow text-gray-500 hover:text-red-500 text-lg leading-none"
+              shadow text-gray-500 hover:text-red-500 active:scale-95 transition-all duration-100 text-lg leading-none"
           >×</button>
         </div>
       ) : (
-        <label className="flex flex-col items-center justify-center border-2 border-dashed
-          border-blue-200 rounded-xl p-8 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition">
-          <span className="text-3xl mb-2">📷</span>
-          <span className="text-sm font-medium text-blue-600">Toca para agregar foto</span>
-          <span className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP</span>
-          <input type="file" accept="image/*" className="hidden" onChange={handleChange} />
-        </label>
+        <div className="flex gap-2">
+          {/* Cámara — en móvil abre cámara trasera, en PC abre explorador */}
+          <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed
+            border-blue-200 rounded-xl py-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50
+            active:scale-95 transition-all duration-100">
+            <span className="text-2xl mb-1">📷</span>
+            <span className="text-xs font-medium text-blue-600">Cámara</span>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleChange}
+            />
+          </label>
+          {/* Galería / Archivo */}
+          <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed
+            border-gray-200 rounded-xl py-6 cursor-pointer hover:border-blue-400 hover:bg-gray-50
+            active:scale-95 transition-all duration-100">
+            <span className="text-2xl mb-1">📁</span>
+            <span className="text-xs font-medium text-gray-500">Galería / Archivo</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleChange}
+            />
+          </label>
+        </div>
       )}
     </div>
   );
 }
 
-// ── ProductTable ──────────────────────────────────────────────────────────────
+// ── ProductTable — editable, con visto y opción de ocultar precio ─────────────
 interface ProductTableProps {
-  productos: ProductoItem[];
-  onChange:  (updated: ProductoItem[]) => void;
+  productos:  ProductoItem[];
+  onChange:   (updated: ProductoItem[]) => void;
+  showVisto?: boolean;   // default false
+  showPrecio?: boolean;  // default true
 }
 
-export function ProductTable({ productos, onChange }: ProductTableProps) {
-  const update = (i: number, field: keyof ProductoItem, value: string | number) => {
+export function ProductTable({ productos, onChange, showVisto = false, showPrecio = true }: ProductTableProps) {
+  const update = (i: number, field: keyof ProductoItem, value: string | number | null) => {
     const next = [...productos];
     next[i] = { ...next[i], [field]: value };
     onChange(next);
@@ -66,6 +90,12 @@ export function ProductTable({ productos, onChange }: ProductTableProps) {
 
   const add = () =>
     onChange([...productos, { nombre: "", cantidad: 1, unidad: "cajas" }]);
+
+  const toggleVisto = (i: number, val: "ok" | "mal") => {
+    const next = [...productos];
+    next[i] = { ...next[i], visto: next[i].visto === val ? null : val };
+    onChange(next);
+  };
 
   return (
     <div className="space-y-2">
@@ -77,6 +107,8 @@ export function ProductTable({ productos, onChange }: ProductTableProps) {
                 <th className="text-left pb-1.5 pr-2">Producto</th>
                 <th className="text-right pb-1.5 pr-2 w-20">Cant.</th>
                 <th className="text-left pb-1.5 pr-2 w-24">Unidad</th>
+                {showPrecio && <th className="text-right pb-1.5 pr-2 w-20">Precio</th>}
+                {showVisto  && <th className="pb-1.5 w-16 text-center">Visto</th>}
                 <th className="pb-1.5 w-8"></th>
               </tr>
             </thead>
@@ -113,11 +145,43 @@ export function ProductTable({ productos, onChange }: ProductTableProps) {
                       ))}
                     </select>
                   </td>
+                  {showPrecio && (
+                    <td className="py-1 pr-2">
+                      <input
+                        type="number"
+                        value={p.precio ?? ""}
+                        onChange={(e) => update(i, "precio", e.target.value ? Number(e.target.value) : null)}
+                        className="w-full px-2 py-1 border border-gray-200 rounded text-gray-800
+                          focus:ring-1 focus:ring-blue-400 outline-none text-sm text-right"
+                        placeholder="$"
+                      />
+                    </td>
+                  )}
+                  {showVisto && (
+                    <td className="py-1 pr-2">
+                      <div className="flex gap-1 justify-center">
+                        <button
+                          type="button"
+                          onClick={() => toggleVisto(i, "ok")}
+                          className={`text-lg active:scale-90 transition-transform duration-100 leading-none
+                            ${p.visto === "ok" ? "opacity-100" : "opacity-25 hover:opacity-60"}`}
+                          title="Visto bueno"
+                        >✅</button>
+                        <button
+                          type="button"
+                          onClick={() => toggleVisto(i, "mal")}
+                          className={`text-lg active:scale-90 transition-transform duration-100 leading-none
+                            ${p.visto === "mal" ? "opacity-100" : "opacity-25 hover:opacity-60"}`}
+                          title="Visto malo"
+                        >❌</button>
+                      </div>
+                    </td>
+                  )}
                   <td className="py-1">
                     <button
                       type="button"
                       onClick={() => remove(i)}
-                      className="text-gray-300 hover:text-red-400 text-lg leading-none"
+                      className="text-gray-300 hover:text-red-400 active:scale-95 transition-all duration-100 text-lg leading-none"
                     >×</button>
                   </td>
                 </tr>
@@ -131,7 +195,8 @@ export function ProductTable({ productos, onChange }: ProductTableProps) {
         type="button"
         onClick={add}
         className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs
-          text-gray-400 hover:border-blue-300 hover:text-blue-500 transition"
+          text-gray-400 hover:border-blue-300 hover:text-blue-500 active:scale-95
+          transition-all duration-100"
       >
         + Agregar producto
       </button>
@@ -152,7 +217,7 @@ export function ModeToggle({
           key={m}
           type="button"
           onClick={() => onChange(m)}
-          className={`px-4 py-1.5 rounded-md text-xs font-medium transition ${
+          className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all duration-100 active:scale-95 ${
             mode === m
               ? "bg-white text-blue-700 shadow-sm"
               : "text-gray-500 hover:text-gray-700"
@@ -177,7 +242,8 @@ export function AiButton({
       onClick={onClick}
       disabled={disabled || loading}
       className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700
-        text-white rounded-lg text-sm font-medium transition disabled:opacity-50"
+        active:scale-95 text-white rounded-lg text-sm font-medium transition-all
+        duration-100 disabled:opacity-50"
     >
       {loading ? (
         <>
@@ -188,5 +254,71 @@ export function AiButton({
         <>✨ {label}</>
       )}
     </button>
+  );
+}
+
+// ── WhatsAppPrint — campo de número + botón WA + botón imprimir ───────────────
+export function WhatsAppPrint({
+  getMessage,
+}: {
+  getMessage: () => string;
+}) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap mt-1">
+      <a
+        href="#"
+        onClick={(e) => {
+          e.preventDefault();
+          const num = prompt("Número destino (ej: 5215512345678)");
+          if (!num) return;
+          const cleaned = num.replace(/\D/g, "");
+          window.open(`https://wa.me/${cleaned}?text=${encodeURIComponent(getMessage())}`, "_blank");
+        }}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600
+          active:scale-95 text-white rounded-lg text-xs font-medium transition-all duration-100"
+      >
+        💬 WhatsApp
+      </a>
+      <button
+        type="button"
+        onClick={() => window.print()}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-600 hover:bg-gray-700
+          active:scale-95 text-white rounded-lg text-xs font-medium transition-all duration-100"
+      >
+        🖨️ Imprimir
+      </button>
+    </div>
+  );
+}
+
+// ── ProgressSteps — pasos con colores pastel ──────────────────────────────────
+export function ProgressSteps({
+  steps, current,
+}: {
+  steps: { label: string }[];
+  current: number;
+}) {
+  return (
+    <div className="flex items-center gap-1 overflow-x-auto pb-1">
+      {steps.map((s, i) => {
+        const done    = i < current;
+        const active  = i === current;
+        return (
+          <div key={i} className="flex items-center gap-1 flex-shrink-0">
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              done   ? "bg-green-100 text-green-700 border border-green-200" :
+              active ? "bg-blue-100  text-blue-700  border border-blue-300 ring-1 ring-blue-300" :
+                       "bg-gray-100  text-gray-400  border border-gray-200"
+            }`}>
+              <span>{done ? "✓" : i + 1}</span>
+              <span>{s.label}</span>
+            </div>
+            {i < steps.length - 1 && (
+              <span className={`text-xs ${done ? "text-green-400" : "text-gray-300"}`}>→</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

@@ -70,6 +70,7 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
     e.preventDefault();
     const { nombre, ficha } = form;
     if (!nombre.trim() || !ficha.trim()) return;
+    if (ficha.trim().length < 3) { flash("err", "La ficha debe tener mínimo 3 caracteres"); return; }
     setCreating(true);
     try {
       const email    = `${ficha.trim()}@chofer.polarbreeze.com`;
@@ -110,6 +111,7 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
   // ── Cambiar contraseña/ficha ─────────────────────────────────────────────────
   const handleCambiarPassword = async () => {
     if (!passwdModal || !nuevaFicha.trim()) return;
+    if (nuevaFicha.trim().length < 3) { flash("err", "Mínimo 3 caracteres"); return; }
     setChangingPw(true);
     try {
       const currentFicha = passwdModal.ficha ?? "";
@@ -178,7 +180,7 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
 
           <button
             type="submit" disabled={creating}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-lg text-sm font-semibold transition disabled:opacity-60"
+            className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
           >
             {creating ? "Creando..." : "Crear Chofer"}
           </button>
@@ -294,10 +296,12 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
               type="text"
               value={nuevaFicha}
               onChange={(e) => setNuevaFicha(e.target.value)}
-              placeholder="Nueva ficha / contraseña"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-yellow-400 mb-4"
+              placeholder="Nueva ficha (mín. 3 caracteres)"
+              minLength={3}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-yellow-400 mb-1"
               autoFocus
             />
+            <p className="text-xs text-gray-400 mb-4">Mínimo 3 caracteres</p>
             <div className="flex gap-2">
               <button
                 onClick={() => setPasswdModal(null)}
