@@ -65,9 +65,16 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
 
   useEffect(() => {
     const q = query(collection(db, "usuarios"), where("role", "==", "chofer"));
-    return onSnapshot(q, (snap) => {
-      setChoferes(snap.docs.map((d) => d.data() as UserProfile));
-    });
+    return onSnapshot(
+      q,
+      (snap) => {
+        // Always use d.id (the Firestore document path segment) as uid so that
+        // updateDoc / deleteDoc always target the correct document, regardless
+        // of whether the stored "uid" field matches the document ID.
+        setChoferes(snap.docs.map((d) => ({ uid: d.id, ...d.data() } as UserProfile)));
+      },
+      (err) => flash("err", `Error al leer choferes: ${err.message}`),
+    );
   }, []);
 
   const flash = (type: "ok" | "err", text: string) => {
@@ -114,9 +121,13 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
 
   // ── Dar de baja / reactivar ──────────────────────────────────────────────────
   const toggleActivo = async (chofer: UserProfile) => {
-    const nuevoEstado = !(chofer.activo ?? true);
-    await updateDoc(doc(db, "usuarios", chofer.uid), { activo: nuevoEstado });
-    flash("ok", `${chofer.nombre} ${nuevoEstado ? "reactivado" : "dado de baja"}`);
+    try {
+      const nuevoEstado = !(chofer.activo ?? true);
+      await updateDoc(doc(db, "usuarios", chofer.uid), { activo: nuevoEstado });
+      flash("ok", `${chofer.nombre} ${nuevoEstado ? "reactivado" : "dado de baja"}`);
+    } catch (err: unknown) {
+      flash("err", err instanceof Error ? err.message : "Error al actualizar estado");
+    }
   };
 
   // ── Cambiar contraseña/ficha ─────────────────────────────────────────────────
