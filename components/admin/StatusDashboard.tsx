@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { collection, query, limit, onSnapshot } from "firebase/firestore";
+import { ShareBar } from "@/components/shared/ShareButtons";
 import { db } from "@/lib/firebase";
 
 type ServiceStatus = "ok" | "warning" | "error" | "unknown" | "verificando";
@@ -140,6 +141,14 @@ export default function StatusDashboard() {
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : "🔄"} Verificar ahora
           </button>
+          <ShareBar getMessage={() => {
+            const fecha = new Date().toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+            const lines = [`🖥️ Estado Sistema — ${fecha}`];
+            services.forEach((s) =>
+              lines.push(`• ${s.icon} ${s.label}: ${SEM[s.check.status].label} — ${s.check.message}`)
+            );
+            return lines.join("\n");
+          }} />
         </div>
       </div>
 

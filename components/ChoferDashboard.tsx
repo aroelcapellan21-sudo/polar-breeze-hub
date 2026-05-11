@@ -8,6 +8,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ImbentarioRecord, PuntosConfig, PuntoProducto } from "@/lib/types";
+import { ShareBar } from "@/components/shared/ShareButtons";
 
 function getQuincena() {
   const now = new Date();
@@ -159,9 +160,26 @@ export default function ChoferDashboard() {
 
         {/* ── Progreso quincena ── */}
         <div className="bg-white rounded-xl shadow-sm p-5 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="font-bold text-teal-700 text-sm">⭐ Puntos — {quincena.label}</h2>
-            <span className="text-lg font-bold text-teal-700">{puntosTotal} / {meta}</span>
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-bold text-teal-700">{puntosTotal} / {meta}</span>
+              <ShareBar getMessage={() => {
+                const lines = [
+                  `📦 Mi reporte — ${profile?.nombre ?? "Chofer"}`,
+                  quincena.label,
+                  `Puntos: ${puntosTotal} / ${meta} (${pct.toFixed(0)}%)`,
+                ];
+                if (Object.keys(porProductoQ).length) {
+                  lines.push("Ventas:");
+                  Object.entries(porProductoQ).forEach(([prod, dat]) => {
+                    const pts = (puntosMap[prod.toLowerCase().trim()] ?? 0) * dat.entregado;
+                    lines.push(`  • ${prod}: ${dat.entregado}/${dat.cargado}${dat.monto > 0 ? ` — $${dat.monto.toLocaleString()}` : ""}${pts > 0 ? ` ⭐${pts}` : ""}`);
+                  });
+                }
+                return lines.join("\n");
+              }} />
+            </div>
           </div>
           <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
             <div

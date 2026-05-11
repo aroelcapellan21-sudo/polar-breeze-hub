@@ -11,6 +11,7 @@ import {
   UserProfile, ImbentarioRecord,
   calcSemaforo, Semaforo, toDate, fmtDate, ProductoItem, TalonarioDoc,
 } from "@/lib/types";
+import { ShareBar } from "@/components/shared/ShareButtons";
 import { auth } from "@/lib/firebase";
 
 interface Props {
@@ -207,7 +208,8 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
         </div>
       </div>
 
-      {/* ── Sub tabs ── */}
+      {/* ── Sub tabs + compartir ── */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
         {([
           { key: "stats",      label: "📊 Estadísticas" },
@@ -226,6 +228,24 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
             {t.label}
           </button>
         ))}
+      </div>
+      <ShareBar getMessage={() => {
+        const periodo = fechaBuscar || `últimos ${rango} días`;
+        const lines = [
+          `📦 ${chofer.nombre} — ficha ${chofer.ficha ?? "—"}`,
+          `Período: ${periodo}`,
+          `• Cargado: ${totalCargado} uds`,
+          `• Entregado: ${totalEntregado} uds`,
+          `• Diferencia: ${diferencia}`,
+        ];
+        if (totalMonto > 0) lines.push(`• Monto: $${totalMonto.toLocaleString()}`);
+        if (Object.keys(porProducto).length) {
+          lines.push("Productos:");
+          Object.entries(porProducto).forEach(([prod, d]) =>
+            lines.push(`  • ${prod}: ${d.entregado}/${d.cargado} entregado`));
+        }
+        return lines.join("\n");
+      }} />
       </div>
 
       {/* ── Stats ── */}

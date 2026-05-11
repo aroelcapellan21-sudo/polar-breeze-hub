@@ -7,6 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { UserProfile } from "@/lib/types";
+import { ShareBar } from "@/components/shared/ShareButtons";
 
 const API_KEY  = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
 const AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
@@ -182,6 +183,22 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
   };
 
   // ── Filtrado ─────────────────────────────────────────────────────────────────
+  const getWhatsAppMsg = () => {
+    const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+    const activos = choferes.filter((c) => c.activo !== false);
+    const bajas   = choferes.filter((c) => c.activo === false);
+    const lines   = [`👥 Choferes Polar Breeze — ${fecha}`];
+    if (activos.length) {
+      lines.push(`Activos (${activos.length}):`);
+      activos.forEach((c) => lines.push(`  • ${c.nombre} — ficha ${c.ficha ?? "—"}`));
+    }
+    if (bajas.length) {
+      lines.push(`Baja (${bajas.length}):`);
+      bajas.forEach((c) => lines.push(`  • ${c.nombre} — ficha ${c.ficha ?? "—"}`));
+    }
+    return lines.join("\n");
+  };
+
   const visibles = choferes.filter((c) => {
     if (filter === "activos") return c.activo !== false;
     if (filter === "baja")    return c.activo === false;
@@ -243,10 +260,11 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
 
       {/* ── Lista de choferes ── */}
       <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h2 className="text-base font-bold text-purple-700">
             👥 Choferes ({choferes.length})
           </h2>
+          <div className="flex items-center gap-2 flex-wrap">
           <div className="flex gap-1.5 text-xs">
             {(["todos", "activos", "baja"] as const).map((f) => (
               <button
@@ -261,6 +279,8 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
                 {f}
               </button>
             ))}
+          </div>
+          <ShareBar getMessage={getWhatsAppMsg} />
           </div>
         </div>
 

@@ -12,6 +12,7 @@ import {
   FsSession, FsDriver, FsHistory, FsConfig,
   calcSemaforo, Semaforo, toDate, fmtDate,
 } from "@/lib/types";
+import { ShareBar } from "@/components/shared/ShareButtons";
 
 interface Props {
   onVerChofer: (c: UserProfile) => void;
@@ -240,6 +241,21 @@ export default function Overview({ onVerChofer }: Props) {
           {fsConfig.moneda && <span className="text-gray-300">· {fsConfig.moneda}</span>}
         </div>
       )}
+
+      {/* ── Compartir ── */}
+      <div className="flex justify-end">
+        <ShareBar getMessage={() => {
+          const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+          return [
+            `📊 Resumen Admin Polar Breeze — ${fecha}`,
+            `• Choferes activos: ${chofActivos}`,
+            `• Despachos hoy: ${kpiDespachos}`,
+            `• Facturado hoy: $${kpiFacturado.toLocaleString()}`,
+            `• Alertas críticas: ${alertasCrit}`,
+            `• Peso total: ${kpiPeso.toFixed(1)} kg`,
+          ].join("\n");
+        }} />
+      </div>
 
       {/* ── KPI Cards — Hub + FacturaScan session/despacho ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { collection, doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ProductoItem, FsSession, FsDriver, calcSemaforo, toDate } from "@/lib/types";
+import { ShareBar } from "@/components/shared/ShareButtons";
 
 const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
 
@@ -103,6 +104,22 @@ export default function Comparar() {
 
   const semIcon  = { verde: "✅", amarillo: "⚠️", rojo: "🚨" }[semGlobal];
 
+  const getWhatsAppMsg = () => {
+    const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+    const lines = [
+      `⚖️ Comparativo Despacho — ${fecha}`,
+      `C.Frío: ${totalCF} · Entregado: ${totalEntr} · Diferencia: ${totalDiff}`,
+      "Productos:",
+    ];
+    filas.forEach((f) => {
+      const icon = Math.abs(f.pct) < 5 ? "✅" : Math.abs(f.pct) < 15 ? "⚠️" : "🚨";
+      const chofers = Object.entries(f.porChofer)
+        .map(([n, c]) => `${n.split(" ")[0]}:${c}`).join(" ");
+      lines.push(`${icon} ${f.nombre}: CF=${f.cuartoFrio} / Ent=${f.entregado} / Diff=${f.diferencia}${chofers ? ` (${chofers})` : ""}`);
+    });
+    return lines.join("\n");
+  };
+
   return (
     <div className="space-y-4">
       {/* ── Resumen global ── */}
@@ -142,9 +159,12 @@ export default function Comparar() {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b flex items-center justify-between">
+          <div className="px-5 py-3 border-b flex items-center justify-between flex-wrap gap-2">
             <h3 className="font-bold text-gray-800">Cuarto Frío vs. Choferes</h3>
-            <span className="text-xs text-gray-400">{filas.length} productos</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-400">{filas.length} productos</span>
+              <ShareBar getMessage={getWhatsAppMsg} />
+            </div>
           </div>
 
           <div className="overflow-x-auto">

@@ -1,6 +1,7 @@
 "use client";
 
 import { ProductoItem } from "@/lib/types";
+import { ShareBar } from "@/components/shared/ShareButtons";
 
 // ── ImageUploader — cámara en móvil, archivo en PC ────────────────────────────
 interface ImageUploaderProps {
@@ -257,38 +258,9 @@ export function AiButton({
   );
 }
 
-// ── WhatsAppPrint — campo de número + botón WA + botón imprimir ───────────────
-export function WhatsAppPrint({
-  getMessage,
-}: {
-  getMessage: () => string;
-}) {
-  return (
-    <div className="flex items-center gap-2 flex-wrap mt-1">
-      <a
-        href="#"
-        onClick={(e) => {
-          e.preventDefault();
-          const num = prompt("Número destino (ej: 5215512345678)");
-          if (!num) return;
-          const cleaned = num.replace(/\D/g, "");
-          window.open(`https://wa.me/${cleaned}?text=${encodeURIComponent(getMessage())}`, "_blank");
-        }}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600
-          active:scale-95 text-white rounded-lg text-xs font-medium transition-all duration-100"
-      >
-        💬 WhatsApp
-      </a>
-      <button
-        type="button"
-        onClick={() => window.print()}
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-600 hover:bg-gray-700
-          active:scale-95 text-white rounded-lg text-xs font-medium transition-all duration-100"
-      >
-        🖨️ Imprimir
-      </button>
-    </div>
-  );
+// ── WhatsAppPrint — delegado a ShareBar (número con memoria localStorage) ──────
+export function WhatsAppPrint({ getMessage }: { getMessage: () => string }) {
+  return <ShareBar getMessage={getMessage} className="mt-1" />;
 }
 
 // ── ProgressSteps — pasos con colores pastel ──────────────────────────────────

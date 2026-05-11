@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FsHistory, ProductoItem, toDate, fmtDate } from "@/lib/types";
+import { ShareBar } from "@/components/shared/ShareButtons";
 
 const TIPO_CFG: Record<string, { icon: string; label: string; color: string }> = {
   cuarto_frio:    { icon: "🥶", label: "Cuarto Frío",   color: "bg-blue-50   text-blue-700   border-blue-200"   },
@@ -50,10 +51,27 @@ export default function Historial() {
 
   const tipos = Array.from(new Set(records.map((r) => r.tipo).filter(Boolean))) as string[];
 
+  const getWhatsAppMsg = () => {
+    const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+    const filtroLabel = filtro === "todos" ? "todos" : (TIPO_CFG[filtro]?.label ?? filtro);
+    const lines = [`📅 Historial — ${filtroLabel} — ${fecha}`, `${filtrados.length} registros`];
+    Object.entries(porDia).slice(0, 5).forEach(([dia, regs]) => {
+      lines.push(`\n${dia}:`);
+      regs.slice(0, 3).forEach((r) => {
+        const prods = (Array.isArray(r.productos) ? (r.productos as ProductoItem[]) : [])
+          .slice(0, 3).map((p) => `${p.nombre}×${p.cantidad}`).join(", ");
+        const quien = r.choferNombre ?? r.despachadorNombre ?? "";
+        lines.push(`  • ${quien}${prods ? ` — ${prods}` : ""}`);
+      });
+      if (regs.length > 3) lines.push(`  ...y ${regs.length - 3} más`);
+    });
+    return lines.join("\n");
+  };
+
   return (
     <div className="space-y-4">
       {/* Filtros */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap">
         <FiltroBtn active={filtro === "todos"} onClick={() => setFiltro("todos")}>
           Todos ({records.length})
         </FiltroBtn>
@@ -66,6 +84,7 @@ export default function Historial() {
             </FiltroBtn>
           );
         })}
+        <ShareBar getMessage={getWhatsAppMsg} className="ml-auto" />
       </div>
 
       {Object.keys(porDia).length === 0 ? (
