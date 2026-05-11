@@ -264,7 +264,7 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
               return (
                 <div key={c.uid}
                   className={`flex items-center gap-3 p-3 rounded-lg border transition ${
-                    activo ? "border-gray-100 bg-white" : "border-gray-100 bg-gray-50 opacity-70"
+                    activo ? "border-gray-100 bg-white" : "border-gray-100 bg-gray-50"
                   }`}
                 >
                   {/* Avatar */}
@@ -290,7 +290,7 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
                   </div>
 
                   {/* Acciones */}
-                  <div className="flex gap-1.5 flex-shrink-0">
+                  <div className="flex flex-wrap gap-1.5 justify-end">
                     <button
                       onClick={() => onVerDetalle(c)}
                       className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-medium transition"
