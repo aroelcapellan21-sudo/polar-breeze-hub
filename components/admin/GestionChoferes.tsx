@@ -3,10 +3,12 @@
 import { useState, useEffect } from "react";
 import {
   collection, query, where, onSnapshot,
-  doc, setDoc, updateDoc, deleteDoc, Timestamp,
+  doc, setDoc, updateDoc, deleteDoc, getDoc, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { UserProfile } from "@/lib/types";
+import { auth } from "@/lib/firebase";
+import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
+import { UserProfile, PuntosConfig, PuntoProducto } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 
 const API_KEY  = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
@@ -64,6 +66,23 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
   const [eliminarModal, setEliminarModal] = useState<UserProfile | null>(null);
   const [eliminando,    setEliminando]    = useState(false);
 
+  // Puntos config
+  const [puntos,     setPuntos]     = useState<PuntoProducto[]>([]);
+  const [meta,       setMeta]       = useState(100);
+  const [puntosLock, setPuntosLock] = useState(true);
+  const [puntosPwd,  setPuntosPwd]  = useState("");
+  const [puntosMsg,  setPuntosMsg]  = useState<{ type: "ok"|"err"; text: string }|null>(null);
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "puntos")).then((snap) => {
+      if (snap.exists()) {
+        const pd = snap.data() as PuntosConfig;
+        setPuntos(pd.productos ?? []);
+        setMeta(pd.meta ?? 100);
+      }
+    });
+  }, []);
+
   useEffect(() => {
     const q = query(collection(db, "usuarios"), where("role", "==", "chofer"));
     return onSnapshot(
@@ -81,6 +100,32 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
   const flash = (type: "ok" | "err", text: string) => {
     setMsg({ type, text });
     setTimeout(() => setMsg(null), 4000);
+  };
+
+  const flashPuntos = (type: "ok"|"err", text: string) => {
+    setPuntosMsg({ type, text });
+    setTimeout(() => setPuntosMsg(null), 4000);
+  };
+
+  const unlockPuntos = async () => {
+    const user = auth.currentUser;
+    if (!user?.email) return;
+    try {
+      const cred = EmailAuthProvider.credential(user.email, puntosPwd);
+      await reauthenticateWithCredential(user, cred);
+      setPuntosLock(false); setPuntosPwd("");
+    } catch {
+      flashPuntos("err", "Contraseña Admin incorrecta");
+    }
+  };
+
+  const savePuntos = async () => {
+    try {
+      await setDoc(doc(db, "config", "puntos"), { productos: puntos, meta });
+      flashPuntos("ok", "Puntos guardados ✓");
+    } catch (e) {
+      flashPuntos("err", e instanceof Error ? e.message : "Error");
+    }
   };
 
   // ── Crear chofer ─────────────────────────────────────────────────────────────
@@ -358,6 +403,115 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Panel Puntos ── */}
+      <div className="lg:col-span-3 bg-white rounded-xl shadow-sm p-5">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h2 className="text-base font-bold text-yellow-700">⭐ Sistema de Puntos</h2>
+          {!puntosLock && (
+            <button
+              onClick={() => setPuntosLock(true)}
+              className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded transition"
+            >
+              🔒 Bloquear
+            </button>
+          )}
+        </div>
+        {puntosLock ? (
+          <div className="flex flex-wrap items-end gap-3 max-w-md">
+            <div className="flex-1 min-w-48">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Contraseña Admin para editar puntos</label>
+              <input
+                type="password" value={puntosPwd}
+                onChange={(e) => setPuntosPwd(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && puntosPwd && unlockPuntos()}
+                placeholder="Contraseña Admin"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-400"
+              />
+            </div>
+            <button
+              onClick={unlockPuntos} disabled={!puntosPwd}
+              className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+            >
+              🔓 Desbloquear
+            </button>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Meta de puntos por quincena</label>
+                <input
+                  type="number" value={meta}
+                  onChange={(e) => setMeta(Number(e.target.value))}
+                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm text-right outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+              </div>
+              <p className="text-xs text-gray-400">
+                Los choferes acumulan puntos por cada unidad entregada según el producto. Los puntos se muestran en su panel personal cada quincena.
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-700">Puntos por producto</p>
+                <button
+                  onClick={() => setPuntos((p) => [...p, { nombre: "", puntos: 1 }])}
+                  className="text-xs text-yellow-600 hover:text-yellow-700 font-medium"
+                >
+                  + Agregar
+                </button>
+              </div>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {puntos.map((p, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      value={p.nombre}
+                      onChange={(e) => {
+                        const next = [...puntos];
+                        next[i] = { ...next[i], nombre: e.target.value };
+                        setPuntos(next);
+                      }}
+                      placeholder="Producto"
+                      className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm outline-none focus:ring-1 focus:ring-yellow-400"
+                    />
+                    <input
+                      type="number" value={p.puntos}
+                      onChange={(e) => {
+                        const next = [...puntos];
+                        next[i] = { ...next[i], puntos: Number(e.target.value) };
+                        setPuntos(next);
+                      }}
+                      className="w-20 px-2 py-1.5 border border-gray-200 rounded text-sm text-right outline-none focus:ring-1 focus:ring-yellow-400"
+                    />
+                    <span className="text-xs text-gray-400">pts</span>
+                    <button
+                      onClick={() => setPuntos((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="text-gray-300 hover:text-red-400 text-lg leading-none"
+                    >×</button>
+                  </div>
+                ))}
+                {puntos.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-3">Sin productos configurados</p>
+                )}
+              </div>
+            </div>
+            <div className="md:col-span-2 flex items-center gap-3">
+              <button
+                onClick={savePuntos}
+                className="px-5 py-2.5 bg-yellow-500 hover:bg-yellow-600 active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100"
+              >
+                ⭐ Guardar Puntos
+              </button>
+              {puntosMsg && (
+                <span className={`text-sm px-3 py-1.5 rounded-lg ${
+                  puntosMsg.type === "ok" ? "bg-green-50 text-green-700 border border-green-200"
+                                         : "bg-red-50 text-red-700 border border-red-200"
+                }`}>{puntosMsg.text}</span>
+              )}
+            </div>
           </div>
         )}
       </div>

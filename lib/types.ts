@@ -68,6 +68,7 @@ export interface ProductoItem {
   unidad?:  string;
   peso?:    number | null;
   precio?:  number | null;
+  puntos?:  number | null;
   visto?:   "ok" | "mal" | null;
 }
 

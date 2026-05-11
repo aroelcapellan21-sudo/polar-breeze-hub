@@ -10,6 +10,11 @@ import { useAuth } from "@/lib/auth-context";
 import { ImbentarioRecord, PuntosConfig, PuntoProducto } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 
+// today's midnight for filtering
+function getTodayStart() {
+  const d = new Date(); d.setHours(0, 0, 0, 0); return d;
+}
+
 function getQuincena() {
   const now = new Date();
   const day = now.getDate();
@@ -41,6 +46,13 @@ export default function ChoferDashboard() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // Restablecer state
+  const [showReset,    setShowReset]    = useState(false);
+  const [resetPwd,     setResetPwd]     = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMsg,     setResetMsg]     = useState<{ type: "ok"|"err"; text: string }|null>(null);
+  const [todayOnly,    setTodayOnly]    = useState(false);
+
   useEffect(() => {
     if (!profile) return;
     const q = query(
@@ -57,6 +69,31 @@ export default function ChoferDashboard() {
     });
     return unsub;
   }, [profile]);
+
+  const handleReset = async () => {
+    if (!resetPwd) return;
+    setResetLoading(true);
+    try {
+      const cfgSnap = await getDoc(doc(db, "config", "main"));
+      const storedPwd = cfgSnap.exists() ? cfgSnap.data()?.resetPassword : null;
+      if (!storedPwd || storedPwd !== resetPwd) {
+        setResetMsg({ type: "err", text: "Clave de Restablecer incorrecta" });
+        setTimeout(() => setResetMsg(null), 3000);
+        setResetLoading(false);
+        return;
+      }
+      setTodayOnly(false);
+      setForm({ vehiculo: "", producto: "", cantidadCargada: "", cantidadEntregada: "", cajas: "", peso: "", monto: "", ruta: "" });
+      setSuccess(false);
+      setResetMsg({ type: "ok", text: "Vista restablecida ✓ — historial conservado en Firebase" });
+      setResetPwd("");
+      setTimeout(() => { setShowReset(false); setResetMsg(null); }, 2000);
+    } catch (e) {
+      setResetMsg({ type: "err", text: e instanceof Error ? e.message : "Error" });
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,6 +168,13 @@ export default function ChoferDashboard() {
               <p className="text-cyan-200 text-xs">Chofer — {profile?.nombre}</p>
             </div>
           </div>
+          <button
+            onClick={() => { setShowReset(true); setResetPwd(""); setResetMsg(null); }}
+            className="bg-white/20 hover:bg-white/30 active:scale-95 px-2 py-1.5
+              rounded-lg text-xs transition-all duration-100 font-medium"
+          >
+            🔄 Restablecer
+          </button>
           <button
             onClick={logout}
             className="bg-white/20 hover:bg-white/30 active:scale-95 px-3 py-1.5
@@ -309,6 +353,51 @@ export default function ChoferDashboard() {
           </div>
         </div>
       </div>
+      {/* ── Modal Restablecer ── */}
+      {showReset && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="text-center">
+              <p className="text-3xl mb-2">🔄</p>
+              <h3 className="font-bold text-gray-800 text-lg">Restablecer vista</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Limpia el formulario y la vista del día.<br />
+                <strong>Tus reportes en Firebase se conservan.</strong>
+              </p>
+            </div>
+            <input
+              type="password" value={resetPwd} autoFocus
+              onChange={(e) => setResetPwd(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && resetPwd && handleReset()}
+              placeholder="Clave de Restablecer"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-cyan-400"
+            />
+            {resetMsg && (
+              <div className={`text-sm px-3 py-2 rounded-lg text-center ${
+                resetMsg.type === "ok"
+                  ? "bg-green-50 text-green-700 border border-green-200"
+                  : "bg-red-50 text-red-700 border border-red-200"
+              }`}>{resetMsg.text}</div>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowReset(false); setResetPwd(""); setResetMsg(null); }}
+                disabled={resetLoading}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleReset}
+                disabled={resetLoading || !resetPwd}
+                className="flex-1 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 text-white text-sm font-bold transition-all duration-100 disabled:opacity-60"
+              >
+                {resetLoading ? "Restableciendo..." : "Restablecer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

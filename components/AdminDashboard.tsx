@@ -38,20 +38,22 @@ export default function AdminDashboard() {
           </div>
 
           {/* Tabs */}
-          <nav className="flex gap-1 flex-1">
+          <nav className="flex gap-1 flex-1 overflow-x-auto scrollbar-none">
             <NavTab
               active={tab === "overview"}
               onClick={() => { setTab("overview"); setChofer(null); }}
             >
-              🏠 Overview
+              <span>🏠</span>
+              <span className="hidden sm:inline">Overview</span>
             </NavTab>
             <NavTab
               active={tab === "choferes"}
               onClick={() => setTab("choferes")}
             >
-              👥 Choferes
+              <span>👥</span>
+              <span className="hidden sm:inline">Choferes</span>
               {chofer && (
-                <span className="ml-1.5 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
+                <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded-full hidden sm:inline">
                   {chofer.nombre.split(" ")[0]}
                 </span>
               )}
@@ -60,7 +62,8 @@ export default function AdminDashboard() {
               active={tab === "estado"}
               onClick={() => { setTab("estado"); setChofer(null); }}
             >
-              🖥️ Estado
+              <span>🖥️</span>
+              <span className="hidden sm:inline">Estado</span>
             </NavTab>
           </nav>
 
@@ -89,23 +92,34 @@ export default function AdminDashboard() {
         </div>
 
         {/* Breadcrumb */}
-        {tab === "choferes" && chofer && (
-          <div className="border-t border-white/10 bg-black/10">
-            <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center gap-2 text-xs text-purple-200">
-              <button
-                onClick={volverALista}
-                className="hover:text-white active:scale-95 transition-all duration-100 flex items-center gap-1"
-              >
-                ← 👥 Choferes
-              </button>
-              <span className="opacity-40">/</span>
-              <span className="text-white font-medium">{chofer.nombre}</span>
-              {chofer.ficha && (
-                <span className="opacity-60">· ficha {chofer.ficha}</span>
-              )}
-            </div>
+        <div className="border-t border-white/10 bg-black/10">
+          <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center gap-2 text-xs text-purple-200 overflow-x-auto">
+            {tab === "overview" && (
+              <span className="text-white font-medium">🏠 Overview — resumen general del sistema</span>
+            )}
+            {tab === "estado" && (
+              <span className="text-white font-medium">🖥️ Estado — salud de servicios · acceso exclusivo del dueño</span>
+            )}
+            {tab === "choferes" && !chofer && (
+              <span className="text-white font-medium">👥 Choferes — gestión, inventario y sistema de puntos</span>
+            )}
+            {tab === "choferes" && chofer && (
+              <>
+                <button
+                  onClick={volverALista}
+                  className="hover:text-white active:scale-95 transition-all duration-100 flex items-center gap-1 whitespace-nowrap"
+                >
+                  ← 👥 Choferes
+                </button>
+                <span className="opacity-40">/</span>
+                <span className="text-white font-medium whitespace-nowrap">{chofer.nombre}</span>
+                {chofer.ficha && (
+                  <span className="opacity-60 whitespace-nowrap">· ficha {chofer.ficha}</span>
+                )}
+              </>
+            )}
           </div>
-        )}
+        </div>
       </header>
 
       {/* ── Contenido ── */}
@@ -128,8 +142,8 @@ function NavTab({ active, onClick, children }: {
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-100
-        active:scale-95 ${
+      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium
+        transition-all duration-100 active:scale-95 whitespace-nowrap flex-shrink-0 ${
         active
           ? "bg-white text-purple-800 shadow-sm"
           : "text-purple-200 hover:bg-white/10 hover:text-white"

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { reauthenticateWithCredential, EmailAuthProvider, updatePassword } from "firebase/auth";
-import { FsConfig, PuntosConfig, PuntoProducto } from "@/lib/types";
+import { FsConfig } from "@/lib/types";
 
 const API_KEY  = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
 const AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
@@ -25,7 +25,7 @@ async function restUpdatePassword(idToken: string, newPassword: string) {
   return r.json() as Promise<{ error?: { message: string } }>;
 }
 
-type Section = "passwords" | "config" | "telegram" | "puntos";
+type Section = "passwords" | "config" | "telegram";
 
 export default function ConfigModal({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<Section>("passwords");
@@ -50,11 +50,11 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
   const [tgLock,  setTgLock]  = useState(true);
   const [tgPwd,   setTgPwd]   = useState("");
 
-  // ── Puntos ───────────────────────────────────────────────────────────────────
-  const [puntos, setPuntos]   = useState<PuntoProducto[]>([]);
-  const [meta,   setMeta]     = useState(100);
-  const [puntosLock, setPuntosLock] = useState(true);
-  const [puntosPwd,  setPuntosPwd]  = useState("");
+  // ── Reset password ───────────────────────────────────────────────────────────
+  const [resetLock,  setResetLock]  = useState(true);
+  const [resetPwd,   setResetPwd]   = useState("");
+  const [resetNew,   setResetNew]   = useState("");
+  const [resetNew2,  setResetNew2]  = useState("");
 
   const flash = (type: "ok" | "err", text: string) => {
     setMsg({ type, text });
@@ -70,12 +70,6 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
         setCfg(data);
         if (data.telegramToken) setTgToken(data.telegramToken as string);
         if (data.telegramChatId) setTgChat(data.telegramChatId as string);
-      }
-      const pSnap = await getDoc(doc(db, "config", "puntos"));
-      if (pSnap.exists()) {
-        const pd = pSnap.data() as PuntosConfig;
-        setPuntos(pd.productos ?? []);
-        setMeta(pd.meta ?? 100);
       }
     }
     load();
@@ -150,33 +144,35 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  // ── Unlock puntos config ─────────────────────────────────────────────────────
-  const unlockPuntos = async () => {
+  // ── Reset password ───────────────────────────────────────────────────────────
+  const unlockReset = async () => {
     const user = auth.currentUser;
     if (!user?.email) return;
     try {
-      const cred = EmailAuthProvider.credential(user.email, puntosPwd);
+      const cred = EmailAuthProvider.credential(user.email, resetPwd);
       await reauthenticateWithCredential(user, cred);
-      setPuntosLock(false); setPuntosPwd("");
+      setResetLock(false); setResetPwd("");
     } catch {
       flash("err", "Contraseña Admin incorrecta");
     }
   };
 
-  const savePuntos = async () => {
+  const saveResetPassword = async () => {
+    if (resetNew.length < 3) { flash("err", "Mínimo 3 caracteres"); return; }
+    if (resetNew !== resetNew2) { flash("err", "Las contraseñas no coinciden"); return; }
     try {
-      await setDoc(doc(db, "config", "puntos"), { productos: puntos, meta });
-      flash("ok", "Puntos guardados ✓");
+      await setDoc(doc(db, "config", "main"), { resetPassword: resetNew }, { merge: true });
+      flash("ok", "Clave de Restablecer guardada ✓");
+      setResetNew(""); setResetNew2("");
     } catch (e) {
       flash("err", e instanceof Error ? e.message : "Error");
     }
   };
 
   const SECTIONS: { key: Section; label: string; icon: string }[] = [
-    { key: "passwords", label: "Contraseñas",  icon: "🔑" },
-    { key: "config",    label: "Config",        icon: "🏢" },
-    { key: "telegram",  label: "Telegram",      icon: "🤖" },
-    { key: "puntos",    label: "Puntos",        icon: "⭐" },
+    { key: "passwords", label: "Contraseñas", icon: "🔑" },
+    { key: "config",    label: "Config",       icon: "🏢" },
+    { key: "telegram",  label: "Telegram",     icon: "🤖" },
   ];
 
   return (
@@ -236,6 +232,41 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
                 loading={pwLoading}
                 onSave={handleDesPw}
               />
+              {/* Clave de Restablecer */}
+              <div className="border border-gray-100 rounded-xl p-4 space-y-3">
+                <p className="font-semibold text-gray-700 text-sm">🔄 Clave de Restablecer</p>
+                <p className="text-xs text-gray-500">
+                  Esta clave permite usar el botón Restablecer en las páginas de Despachador y Chofer para limpiar la vista del día.
+                </p>
+                {resetLock ? (
+                  <>
+                    <input
+                      type="password" value={resetPwd}
+                      onChange={(e) => setResetPwd(e.target.value)}
+                      placeholder="Tu contraseña Admin para desbloquear"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+                    />
+                    <button
+                      onClick={unlockReset} disabled={!resetPwd || pwLoading}
+                      className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+                    >
+                      🔓 Desbloquear
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Field label="Nueva clave de Restablecer (mín. 3)" value={resetNew} onChange={setResetNew} type="password" placeholder="••••••" />
+                    <Field label="Confirmar clave" value={resetNew2} onChange={setResetNew2} type="password" placeholder="••••••" />
+                    <button
+                      onClick={saveResetPassword}
+                      disabled={!resetNew || !resetNew2 || resetNew.length < 3}
+                      className="w-full bg-green-600 hover:bg-green-700 active:scale-95 text-white py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+                    >
+                      💾 Guardar clave de Restablecer
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           )}
 
@@ -305,82 +336,6 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {/* ── Puntos ── */}
-          {section === "puntos" && (
-            <div className="space-y-4">
-              {puntosLock ? (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-500">Ingresa tu contraseña Admin para editar puntos por producto.</p>
-                  <input
-                    type="password" value={puntosPwd} onChange={(e) => setPuntosPwd(e.target.value)}
-                    placeholder="Contraseña Admin"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
-                  />
-                  <button
-                    onClick={unlockPuntos} disabled={!puntosPwd}
-                    className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white
-                      py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
-                  >
-                    🔓 Desbloquear
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Field label="Meta de puntos por quincena" type="number"
-                    value={String(meta)} onChange={(v) => setMeta(Number(v))} />
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-medium text-gray-700">Puntos por producto</p>
-                      <button
-                        onClick={() => setPuntos((p) => [...p, { nombre: "", puntos: 1 }])}
-                        className="text-xs text-purple-600 hover:text-purple-700 font-medium"
-                      >
-                        + Agregar
-                      </button>
-                    </div>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {puntos.map((p, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <input
-                            value={p.nombre}
-                            onChange={(e) => {
-                              const next = [...puntos];
-                              next[i] = { ...next[i], nombre: e.target.value };
-                              setPuntos(next);
-                            }}
-                            placeholder="Producto"
-                            className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm outline-none focus:ring-1 focus:ring-purple-400"
-                          />
-                          <input
-                            type="number"
-                            value={p.puntos}
-                            onChange={(e) => {
-                              const next = [...puntos];
-                              next[i] = { ...next[i], puntos: Number(e.target.value) };
-                              setPuntos(next);
-                            }}
-                            className="w-20 px-2 py-1.5 border border-gray-200 rounded text-sm text-right outline-none focus:ring-1 focus:ring-purple-400"
-                          />
-                          <span className="text-xs text-gray-400">pts</span>
-                          <button
-                            onClick={() => setPuntos((prev) => prev.filter((_, idx) => idx !== i))}
-                            className="text-gray-300 hover:text-red-400 text-lg"
-                          >×</button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <button
-                    onClick={savePuntos}
-                    className="w-full bg-yellow-500 hover:bg-yellow-600 active:scale-95 text-white
-                      py-2.5 rounded-lg text-sm font-semibold transition-all duration-100"
-                  >
-                    ⭐ Guardar Puntos
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
 
         </div>
 

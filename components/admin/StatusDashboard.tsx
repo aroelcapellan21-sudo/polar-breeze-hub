@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { collection, query, limit, onSnapshot } from "firebase/firestore";
+import { collection, query, limit, onSnapshot, doc, getDoc, setDoc } from "firebase/firestore";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { db } from "@/lib/firebase";
 
@@ -39,28 +39,93 @@ export default function StatusDashboard() {
   const [data,      setData]      = useState<StatusData | null>(null);
   const [loading,   setLoading]   = useState(true);
   const [lastCheck, setLastCheck] = useState<Date | null>(null);
+  const [fbClient,  setFbClient]  = useState<ServiceStatus>("verificando");
 
-  // Firebase: client-side connection monitor via Firestore listener
-  const [fbClient, setFbClient] = useState<ServiceStatus>("verificando");
+  // ── Owner password ────────────────────────────────────────────────────────────
+  const [ownerLocked,   setOwnerLocked]   = useState(true);
+  const [ownerPwd,      setOwnerPwd]      = useState("");
+  const [ownerPwdNew,   setOwnerPwdNew]   = useState("");
+  const [ownerPwdNew2,  setOwnerPwdNew2]  = useState("");
+  const [ownerPwdSet,   setOwnerPwdSet]   = useState<boolean | null>(null);
+  const [ownerChangePw, setOwnerChangePw] = useState(false);
+  const [ownerMsg,      setOwnerMsg]      = useState<{ type: "ok"|"err"; text: string }|null>(null);
+  const [ownerLoading,  setOwnerLoading]  = useState(false);
 
+  useEffect(() => {
+    // Timeout fallback: if Firestore takes >5s, show lock screen anyway
+    const timeout = setTimeout(() => setOwnerPwdSet((prev) => prev ?? false), 5000);
+
+    getDoc(doc(db, "config", "owner"))
+      .then((snap) => {
+        setOwnerPwdSet(snap.exists() && !!snap.data()?.password);
+      })
+      .catch(() => {
+        setOwnerPwdSet(false);
+      })
+      .finally(() => clearTimeout(timeout));
+  }, []);
+
+  const flashOwner = (type: "ok"|"err", text: string) => {
+    setOwnerMsg({ type, text });
+    setTimeout(() => setOwnerMsg(null), 4000);
+  };
+
+  const verifyOwner = async () => {
+    if (!ownerPwd) return;
+    setOwnerLoading(true);
+    try {
+      const snap = await getDoc(doc(db, "config", "owner"));
+      if (snap.exists() && snap.data()?.password === ownerPwd) {
+        setOwnerLocked(false); setOwnerPwd("");
+      } else {
+        flashOwner("err", "Contraseña del dueño incorrecta");
+      }
+    } catch { flashOwner("err", "Error al verificar"); }
+    finally { setOwnerLoading(false); }
+  };
+
+  const saveOwnerPassword = async () => {
+    if (ownerPwdNew.length < 4) { flashOwner("err", "Mínimo 4 caracteres"); return; }
+    if (ownerPwdNew !== ownerPwdNew2) { flashOwner("err", "Las contraseñas no coinciden"); return; }
+    setOwnerLoading(true);
+    try {
+      await setDoc(doc(db, "config", "owner"), { password: ownerPwdNew }, { merge: true });
+      setOwnerPwdSet(true); setOwnerPwdNew(""); setOwnerPwdNew2("");
+      flashOwner("ok", "Contraseña del dueño establecida ✓");
+      setTimeout(() => { setOwnerLocked(false); setOwnerMsg(null); }, 1500);
+    } catch (e) { flashOwner("err", e instanceof Error ? e.message : "Error"); }
+    finally { setOwnerLoading(false); }
+  };
+
+  const changeOwnerPassword = async () => {
+    if (!ownerPwd) { flashOwner("err", "Ingresa la contraseña actual"); return; }
+    if (ownerPwdNew.length < 4) { flashOwner("err", "Mínimo 4 caracteres"); return; }
+    if (ownerPwdNew !== ownerPwdNew2) { flashOwner("err", "Las contraseñas no coinciden"); return; }
+    setOwnerLoading(true);
+    try {
+      const snap = await getDoc(doc(db, "config", "owner"));
+      if (!snap.exists() || snap.data()?.password !== ownerPwd) {
+        flashOwner("err", "Contraseña actual incorrecta");
+        setOwnerLoading(false); return;
+      }
+      await setDoc(doc(db, "config", "owner"), { password: ownerPwdNew }, { merge: true });
+      setOwnerPwd(""); setOwnerPwdNew(""); setOwnerPwdNew2(""); setOwnerChangePw(false);
+      flashOwner("ok", "Contraseña del dueño actualizada ✓");
+    } catch (e) { flashOwner("err", e instanceof Error ? e.message : "Error"); }
+    finally { setOwnerLoading(false); }
+  };
+
+  // ── Firebase connection monitor ───────────────────────────────────────────────
   useEffect(() => {
     const timer = setTimeout(() => {
       setFbClient((p) => p === "verificando" ? "error" : p);
     }, 10000);
-
     const unsub = onSnapshot(
       query(collection(db, "usuarios"), limit(1)),
       { includeMetadataChanges: true },
-      (snap) => {
-        clearTimeout(timer);
-        setFbClient(snap.metadata.fromCache ? "warning" : "ok");
-      },
-      () => {
-        clearTimeout(timer);
-        setFbClient("error");
-      }
+      (snap) => { clearTimeout(timer); setFbClient(snap.metadata.fromCache ? "warning" : "ok"); },
+      () => { clearTimeout(timer); setFbClient("error"); }
     );
-
     return () => { unsub(); clearTimeout(timer); };
   }, []);
 
@@ -69,14 +134,10 @@ export default function StatusDashboard() {
     try {
       const res = await fetch("/api/status");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json() as StatusData;
-      setData(json);
+      setData(await res.json() as StatusData);
       setLastCheck(new Date());
-    } catch {
-      // keep previous data if any
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* keep previous */ }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -85,7 +146,87 @@ export default function StatusDashboard() {
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
-  // Merge server Firebase status with client-side real-time status
+  // ── Loading owner config ──────────────────────────────────────────────────────
+  if (ownerPwdSet === null) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <span className="w-6 h-6 border-2 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // ── Lock screen ───────────────────────────────────────────────────────────────
+  if (ownerLocked) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm space-y-4">
+          <div className="text-center">
+            <p className="text-5xl mb-3">👑</p>
+            <h2 className="font-bold text-gray-800 text-xl">Sección Estado</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {ownerPwdSet
+                ? "Acceso exclusivo del dueño del sistema"
+                : "Primera vez — establece tu contraseña del dueño"}
+            </p>
+          </div>
+
+          {ownerPwdSet ? (
+            <>
+              <input
+                type="password" value={ownerPwd} autoFocus
+                onChange={(e) => setOwnerPwd(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && ownerPwd && verifyOwner()}
+                placeholder="Contraseña del dueño"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+              />
+              <button
+                onClick={verifyOwner} disabled={!ownerPwd || ownerLoading}
+                className="w-full bg-purple-700 hover:bg-purple-800 active:scale-95 text-white py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+              >
+                {ownerLoading ? "Verificando..." : "🔓 Entrar"}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+                Esta clave es <strong>diferente</strong> a la del Admin. Solo el dueño la conoce y puede cambiarla desde aquí.
+              </p>
+              <input
+                type="password" value={ownerPwdNew} autoFocus
+                onChange={(e) => setOwnerPwdNew(e.target.value)}
+                placeholder="Nueva contraseña del dueño (mín. 4 car.)"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+              />
+              <input
+                type="password" value={ownerPwdNew2}
+                onChange={(e) => setOwnerPwdNew2(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveOwnerPassword()}
+                placeholder="Confirmar contraseña"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+              />
+              <button
+                onClick={saveOwnerPassword} disabled={!ownerPwdNew || !ownerPwdNew2 || ownerLoading}
+                className="w-full bg-purple-700 hover:bg-purple-800 active:scale-95 text-white py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+              >
+                {ownerLoading ? "Guardando..." : "👑 Establecer contraseña"}
+              </button>
+            </>
+          )}
+
+          {ownerMsg && (
+            <div className={`text-sm px-3 py-2 rounded-lg text-center ${
+              ownerMsg.type === "ok" ? "bg-green-50 text-green-700 border border-green-200"
+                                    : "bg-red-50 text-red-700 border border-red-200"
+            }`}>
+              {ownerMsg.text}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Unlocked dashboard ────────────────────────────────────────────────────────
   const fbStatus: Check = {
     status:  fbClient,
     message: fbClient === "ok"          ? "Conectado (tiempo real)"
@@ -97,10 +238,10 @@ export default function StatusDashboard() {
   };
 
   const services: { key: string; icon: string; label: string; check: Check }[] = [
-    { key: "firebase",  icon: "🔥", label: "Firebase",       check: fbStatus },
-    { key: "anthropic", icon: "🤖", label: "Anthropic AI",   check: data?.anthropic ?? { status: "verificando", message: "Verificando..." } },
-    { key: "telegram",  icon: "✈️", label: "Telegram Bot",   check: data?.telegram  ?? { status: "verificando", message: "Verificando..." } },
-    { key: "vercel",    icon: "▲",  label: "Vercel Deploy",  check: data?.vercel    ?? { status: "verificando", message: "Verificando..." } },
+    { key: "firebase",  icon: "🔥", label: "Firebase",     check: fbStatus },
+    { key: "anthropic", icon: "🤖", label: "Anthropic AI", check: data?.anthropic ?? { status: "verificando", message: "Verificando..." } },
+    { key: "telegram",  icon: "✈️", label: "Telegram Bot", check: data?.telegram  ?? { status: "verificando", message: "Verificando..." } },
+    { key: "vercel",    icon: "▲",  label: "Vercel Deploy", check: data?.vercel   ?? { status: "verificando", message: "Verificando..." } },
   ];
 
   const overallStatus: ServiceStatus = services.some(s => s.check.status === "error")
@@ -117,40 +258,94 @@ export default function StatusDashboard() {
       {/* ── Encabezado ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="font-bold text-gray-800 text-lg">Estado del Sistema</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-bold text-gray-800 text-lg">Estado del Sistema</h2>
+            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+              👑 Dueño
+            </span>
+          </div>
           {lastCheck && (
             <p className="text-xs text-gray-400 mt-0.5">
               Última verificación: {lastCheck.toLocaleTimeString("es-MX")} · actualiza cada 60s
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium
-            ${SEM[overallStatus].badge}`}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium ${SEM[overallStatus].badge}`}>
             <span className={`w-2.5 h-2.5 rounded-full ${SEM[overallStatus].dot}`} />
             {ICON[overallStatus]} Estado general: {SEM[overallStatus].label}
           </div>
           <button
-            onClick={fetchStatus}
-            disabled={loading}
+            onClick={fetchStatus} disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700
-              active:scale-95 text-white rounded-lg text-sm font-medium transition-all
-              duration-100 disabled:opacity-60"
+              active:scale-95 text-white rounded-lg text-sm font-medium transition-all duration-100 disabled:opacity-60"
           >
-            {loading ? (
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : "🔄"} Verificar ahora
+            {loading
+              ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : "🔄"
+            } Verificar ahora
           </button>
           <ShareBar getMessage={() => {
             const fecha = new Date().toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
             const lines = [`🖥️ Estado Sistema — ${fecha}`];
-            services.forEach((s) =>
-              lines.push(`• ${s.icon} ${s.label}: ${SEM[s.check.status].label} — ${s.check.message}`)
-            );
+            services.forEach((s) => lines.push(`• ${s.icon} ${s.label}: ${SEM[s.check.status].label} — ${s.check.message}`));
             return lines.join("\n");
           }} />
+          <button
+            onClick={() => { setOwnerChangePw(!ownerChangePw); setOwnerPwd(""); setOwnerPwdNew(""); setOwnerPwdNew2(""); }}
+            className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 active:scale-95 text-purple-700 rounded-lg text-xs font-medium transition"
+          >
+            🔑 Cambiar clave
+          </button>
         </div>
       </div>
+
+      {/* ── Change owner password ── */}
+      {ownerChangePw && (
+        <div className="bg-purple-50 border border-purple-200 rounded-xl p-5 space-y-3 max-w-md">
+          <p className="font-semibold text-purple-800 text-sm">🔑 Cambiar contraseña del dueño</p>
+          <input
+            type="password" value={ownerPwd}
+            onChange={(e) => setOwnerPwd(e.target.value)}
+            placeholder="Contraseña actual"
+            className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+            autoFocus
+          />
+          <input
+            type="password" value={ownerPwdNew}
+            onChange={(e) => setOwnerPwdNew(e.target.value)}
+            placeholder="Nueva contraseña (mín. 4 car.)"
+            className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+          />
+          <input
+            type="password" value={ownerPwdNew2}
+            onChange={(e) => setOwnerPwdNew2(e.target.value)}
+            placeholder="Confirmar nueva contraseña"
+            className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setOwnerChangePw(false); setOwnerPwd(""); setOwnerPwdNew(""); setOwnerPwdNew2(""); }}
+              className="flex-1 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={changeOwnerPassword}
+              disabled={ownerLoading || !ownerPwd || ownerPwdNew.length < 4 || !ownerPwdNew2}
+              className="flex-1 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold transition disabled:opacity-60"
+            >
+              {ownerLoading ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
+          {ownerMsg && (
+            <div className={`text-sm px-3 py-2 rounded-lg ${
+              ownerMsg.type === "ok" ? "bg-green-50 text-green-700 border border-green-200"
+                                    : "bg-red-50 text-red-700 border border-red-200"
+            }`}>{ownerMsg.text}</div>
+          )}
+        </div>
+      )}
 
       {/* ── Cards de servicios ── */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -160,8 +355,7 @@ export default function StatusDashboard() {
             <div key={key} className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${
               check.status === "ok"      ? "border-green-400" :
               check.status === "warning" ? "border-yellow-400" :
-              check.status === "error"   ? "border-red-400" :
-                                          "border-gray-300"
+              check.status === "error"   ? "border-red-400" : "border-gray-300"
             }`}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -173,19 +367,14 @@ export default function StatusDashboard() {
               <p className={`text-sm font-medium mb-0.5 ${
                 check.status === "ok"      ? "text-green-700" :
                 check.status === "warning" ? "text-yellow-700" :
-                check.status === "error"   ? "text-red-700" :
-                                            "text-gray-500"
+                check.status === "error"   ? "text-red-700" : "text-gray-500"
               }`}>
                 {ICON[check.status]} {check.message}
               </p>
               {check.detail && (
-                <p className="text-xs text-gray-400 truncate" title={check.detail}>
-                  {check.detail}
-                </p>
+                <p className="text-xs text-gray-400 truncate" title={check.detail}>{check.detail}</p>
               )}
-              {check.ms != null && (
-                <p className="text-xs text-gray-300 mt-1">{check.ms}ms</p>
-              )}
+              {check.ms != null && <p className="text-xs text-gray-300 mt-1">{check.ms}ms</p>}
             </div>
           );
         })}
@@ -198,11 +387,8 @@ export default function StatusDashboard() {
           <div className="grid sm:grid-cols-2 gap-2">
             {data.envVars.map(({ name, label, required, set }) => (
               <div key={name} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border ${
-                set
-                  ? "bg-green-50 border-green-100"
-                  : required
-                  ? "bg-red-50 border-red-100"
-                  : "bg-gray-50 border-gray-100"
+                set ? "bg-green-50 border-green-100"
+                    : required ? "bg-red-50 border-red-100" : "bg-gray-50 border-gray-100"
               }`}>
                 <span className="text-base">{set ? "✅" : required ? "🚨" : "⚪"}</span>
                 <div className="flex-1 min-w-0">

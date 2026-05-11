@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   collection, query, where, orderBy, onSnapshot,
-  doc, getDoc, setDoc,
+  doc, getDoc, setDoc, addDoc, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
@@ -41,6 +41,9 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
   const [invLoading, setInvLoading] = useState(false);
   const [invMsg,     setInvMsg]     = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [editEntregas, setEditEntregas] = useState<ProductoItem[]>([]);
+
+  // Product detail modal
+  const [selectedProd, setSelectedProd] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(
@@ -138,6 +141,20 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
         uid: chofer.uid, nombre: chofer.nombre, ficha: chofer.ficha ?? "",
         entregas: editEntregas, updatedAt: new Date(), activo: true,
       }, { merge: true });
+
+      // Talonario: log admin inventory edit
+      await addDoc(collection(db, "talonario"), {
+        choferId:          chofer.uid,
+        choferNombre:      chofer.nombre,
+        choferFicha:       chofer.ficha ?? "",
+        productos:         editEntregas,
+        tipo:              "agregada",
+        fuente:            "admin",
+        despachadorId:     "admin",
+        despachadorNombre: "Admin",
+        timestamp:         Timestamp.now(),
+      });
+
       setDriverEntregas([...editEntregas]);
       setInvMsg({ type: "ok", text: "Inventario actualizado ✓" });
     } catch (e) {
@@ -280,10 +297,17 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
                     const efic = dat.cargado > 0 ? (dat.entregado / dat.cargado) * 100 : 100;
                     const sem: Semaforo = efic >= 95 ? "verde" : efic >= 85 ? "amarillo" : "rojo";
                     return (
-                      <div key={prod} className="border border-gray-100 rounded-lg p-3">
+                      <button
+                        key={prod}
+                        onClick={() => setSelectedProd(prod)}
+                        className="w-full text-left border border-gray-100 rounded-lg p-3 hover:border-purple-300 hover:bg-purple-50 active:scale-[0.99] transition-all duration-100 group"
+                      >
                         <div className="flex justify-between items-center mb-1.5">
-                          <p className="font-medium text-sm text-gray-800">{prod}</p>
-                          <span className="text-lg">{SEMAFORO_CFG[sem].icon}</span>
+                          <p className="font-medium text-sm text-gray-800 group-hover:text-purple-700">{prod}</p>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-lg">{SEMAFORO_CFG[sem].icon}</span>
+                            <span className="text-xs text-gray-400 group-hover:text-purple-500">Ver detalle →</span>
+                          </div>
                         </div>
                         <div className="flex gap-4 text-xs text-gray-500">
                           <span>Carg: <strong>{dat.cargado}</strong></span>
@@ -297,7 +321,7 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
                             style={{ width: `${Math.min(efic, 100)}%` }}
                           />
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -427,6 +451,102 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
         </div>
       )}
 
+      {/* ── Modal detalle por producto ── */}
+      {selectedProd && (() => {
+        const dat = porProducto[selectedProd];
+        if (!dat) return null;
+        const efic = dat.cargado > 0 ? (dat.entregado / dat.cargado) * 100 : 100;
+        const sem: Semaforo = efic >= 95 ? "verde" : efic >= 85 ? "amarillo" : "rojo";
+        const registrosProd = recientes.filter((r) => r.producto === selectedProd);
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedProd(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+                <div>
+                  <h2 className="font-bold text-gray-800 text-lg">{selectedProd}</h2>
+                  <p className="text-xs text-gray-500">{chofer.nombre} · {registrosProd.length} registros</p>
+                </div>
+                <button onClick={() => setSelectedProd(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95">×</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                {/* KPIs */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-blue-50 rounded-xl p-3 text-center">
+                    <p className="text-xl font-bold text-blue-700">{dat.cargado}</p>
+                    <p className="text-xs text-blue-500">Cargado</p>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-3 text-center">
+                    <p className="text-xl font-bold text-green-700">{dat.entregado}</p>
+                    <p className="text-xs text-green-500">Entregado</p>
+                  </div>
+                  <div className={`rounded-xl p-3 text-center ${SEMAFORO_CFG[sem].bg}`}>
+                    <p className={`text-xl font-bold ${SEMAFORO_CFG[sem].color}`}>{efic.toFixed(0)}%</p>
+                    <p className={`text-xs ${SEMAFORO_CFG[sem].color} opacity-75`}>Eficiencia</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-gray-50 rounded-xl p-3 text-center">
+                    <p className="text-lg font-bold text-gray-700">{dat.cargado - dat.entregado}</p>
+                    <p className="text-xs text-gray-400">Diferencia</p>
+                  </div>
+                  {dat.cajas > 0 && (
+                    <div className="bg-cyan-50 rounded-xl p-3 text-center">
+                      <p className="text-lg font-bold text-cyan-700">{dat.cajas}</p>
+                      <p className="text-xs text-cyan-500">Cajas</p>
+                    </div>
+                  )}
+                  {dat.peso > 0 && (
+                    <div className="bg-purple-50 rounded-xl p-3 text-center">
+                      <p className="text-lg font-bold text-purple-700">{dat.peso.toFixed(1)}</p>
+                      <p className="text-xs text-purple-500">Peso (kg)</p>
+                    </div>
+                  )}
+                  {dat.monto > 0 && (
+                    <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                      <p className="text-lg font-bold text-emerald-700">${dat.monto.toLocaleString()}</p>
+                      <p className="text-xs text-emerald-500">Monto</p>
+                    </div>
+                  )}
+                </div>
+                {/* Barra eficiencia */}
+                <div>
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>{SEMAFORO_CFG[sem].icon} {SEMAFORO_CFG[sem].label}</span>
+                    <span>{dat.veces} viaje{dat.veces !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${sem === "verde" ? "bg-green-400" : sem === "amarillo" ? "bg-yellow-400" : "bg-red-400"}`}
+                      style={{ width: `${Math.min(efic, 100)}%` }}
+                    />
+                  </div>
+                </div>
+                {/* Registros individuales */}
+                {registrosProd.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-gray-600 mb-2">Registros individuales</p>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {registrosProd.map((r) => {
+                        const diff = (r.cantidadCargada ?? 0) - (r.cantidadEntregada ?? 0);
+                        return (
+                          <div key={r.id} className="flex items-center gap-3 text-xs border border-gray-100 rounded-lg px-3 py-2">
+                            <span className="text-gray-400 flex-shrink-0">{fmtDate(r.timestamp)}</span>
+                            <span className="text-blue-600 font-medium">{r.cantidadCargada} carg.</span>
+                            <span className="text-green-600 font-medium">{r.cantidadEntregada} entr.</span>
+                            {diff !== 0 && <span className={`font-semibold ${diff > 0 ? "text-orange-500" : "text-gray-400"}`}>+{diff}</span>}
+                            {r.ruta && <span className="text-gray-400 truncate ml-auto">{r.ruta}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Inventario (drivers collection) ── */}
       {subTab === "inventario" && (
         <div className="bg-white rounded-xl shadow-sm p-5">
@@ -453,33 +573,65 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
                 <p className="text-gray-400 text-sm text-center py-6">Sin inventario registrado en FacturaScan</p>
               ) : (
                 <div className="space-y-2">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-gray-400 border-b">
+                        <th className="text-left pb-1.5 pr-2">Producto</th>
+                        <th className="text-right pb-1.5 pr-2 w-20">Cant.</th>
+                        <th className="text-right pb-1.5 pr-2 w-24">Precio</th>
+                        <th className="text-right pb-1.5 pr-2 w-20">Puntos</th>
+                        <th className="pb-1.5 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
                   {editEntregas.map((p, i) => (
-                    <div key={i} className="flex items-center gap-2">
+                    <tr key={i}>
+                      <td className="py-1 pr-2">
                       <input
                         value={p.nombre}
                         onChange={(e) => updateEdit(i, "nombre", e.target.value)}
-                        className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm outline-none focus:ring-1 focus:ring-purple-400"
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm outline-none focus:ring-1 focus:ring-purple-400"
                         placeholder="Producto"
                       />
+                      </td>
+                      <td className="py-1 pr-2">
                       <input
                         type="number"
                         value={p.cantidad}
                         onChange={(e) => updateEdit(i, "cantidad", Number(e.target.value))}
-                        className="w-20 px-2 py-1.5 border border-gray-200 rounded text-sm text-right outline-none focus:ring-1 focus:ring-purple-400"
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm text-right outline-none focus:ring-1 focus:ring-purple-400"
                       />
+                      </td>
+                      <td className="py-1 pr-2">
                       <input
                         type="number"
                         value={p.precio ?? ""}
                         onChange={(e) => updateEdit(i, "precio", e.target.value ? Number(e.target.value) : 0)}
-                        className="w-24 px-2 py-1.5 border border-gray-200 rounded text-sm text-right outline-none focus:ring-1 focus:ring-purple-400"
-                        placeholder="Precio"
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm text-right outline-none focus:ring-1 focus:ring-purple-400"
+                        placeholder="$"
                       />
+                      </td>
+                      <td className="py-1 pr-2">
+                      <input
+                        type="number"
+                        value={p.puntos ?? ""}
+                        onChange={(e) => updateEdit(i, "puntos", e.target.value ? Number(e.target.value) : 0)}
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm text-right outline-none focus:ring-1 focus:ring-yellow-400"
+                        placeholder="pts"
+                      />
+                      </td>
+                      <td className="py-1">
                       <button
                         onClick={() => setEditEntregas((prev) => prev.filter((_, idx) => idx !== i))}
                         className="text-gray-300 hover:text-red-400 text-lg"
                       >×</button>
-                    </div>
+                      </td>
+                    </tr>
                   ))}
+                    </tbody>
+                  </table>
+                </div>
                   <button
                     onClick={() => setEditEntregas((p) => [...p, { nombre: "", cantidad: 1, unidad: "cajas" }])}
                     className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs text-gray-400 hover:border-purple-300 hover:text-purple-500 transition"
