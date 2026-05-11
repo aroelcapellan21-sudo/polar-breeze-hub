@@ -74,7 +74,8 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
     setCreating(true);
     try {
       const email    = `${ficha.trim()}@chofer.polarbreeze.com`;
-      const password = ficha.trim();
+      // Firebase Auth requires ≥6 chars; pad with leading zeros so short fichas work
+      const password = ficha.trim().padStart(6, "0");
 
       let data = await authSignUp(email, password);
 
@@ -117,10 +118,10 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
       const currentFicha = passwdModal.ficha ?? "";
       const email        = passwdModal.email;
 
-      const signInData = await authSignIn(email, currentFicha);
+      const signInData = await authSignIn(email, currentFicha.padStart(6, "0"));
       if (signInData.error) throw new Error(`No se pudo autenticar: ${signInData.error.message}`);
 
-      await authUpdatePassword(signInData.idToken!, nuevaFicha.trim());
+      await authUpdatePassword(signInData.idToken!, nuevaFicha.trim().padStart(6, "0"));
       await updateDoc(doc(db, "usuarios", passwdModal.uid), { ficha: nuevaFicha.trim() });
 
       flash("ok", `Ficha/contraseña de ${passwdModal.nombre} actualizada`);

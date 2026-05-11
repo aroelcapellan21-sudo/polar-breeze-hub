@@ -68,7 +68,9 @@ export default function LoginForm() {
       const email = isChofer
         ? `${credential.trim()}@chofer.polarbreeze.com`
         : roleConfig.email;
-      await login(email, credential);
+      // Chofer passwords are stored padded to ≥6 chars (Firebase Auth minimum)
+      const password = isChofer ? credential.trim().padStart(6, "0") : credential;
+      await login(email, password);
     } catch {
       const msg = isChofer
         ? "Ficha no reconocida. Verifica el número."
