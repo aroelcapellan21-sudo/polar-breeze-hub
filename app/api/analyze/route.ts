@@ -38,6 +38,22 @@ function extractJSON(text: string): unknown {
   return JSON.parse(match[0]);
 }
 
+async function notifyTelegram(message: string) {
+  try {
+    const token   = process.env.TELEGRAM_BOT_TOKEN;
+    const chatIds = (process.env.TELEGRAM_CHAT_IDS ?? process.env.TELEGRAM_CHAT_ID ?? "")
+      .split(",").map(s => s.trim()).filter(Boolean);
+    if (!token || chatIds.length === 0) return;
+    const text = `🚨 *Polar Breeze Hub — API Anthropic*\n\`\`\`\n${message.slice(0, 500)}\n\`\`\`\n_${new Date().toLocaleString("es-MX")}_`;
+    await Promise.all(chatIds.map(chatId =>
+      fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown" }),
+      })
+    ));
+  } catch { /* silent */ }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as {
@@ -81,6 +97,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(parsed);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error desconocido";
+    await notifyTelegram(`/api/analyze falló: ${msg}`);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -11,9 +11,22 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Deploy to Vercel
+        id: deploy
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: "--prod"
+
+      - name: Notify Telegram on failure
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          CHAT_IDS="6533031969 6578945006"
+          MSG="🏗️ *Polar Breeze Hub — Build fallido*%0ACommit: \`${{ github.sha }}\`%0ARama: \`${{ github.ref_name }}\`%0AActuado por: ${{ github.actor }}%0A_$( date -u '+%Y-%m-%d %H:%M UTC' )_"
+          for CHAT_ID in $CHAT_IDS; do
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d "chat_id=${CHAT_ID}&text=${MSG}&parse_mode=Markdown" > /dev/null
+          done

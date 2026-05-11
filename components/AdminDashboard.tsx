@@ -7,8 +7,9 @@ import Overview        from "@/components/admin/Overview";
 import GestionChoferes from "@/components/admin/GestionChoferes";
 import ChoferDetalle   from "@/components/admin/ChoferDetalle";
 import ConfigModal     from "@/components/admin/ConfigModal";
+import StatusDashboard from "@/components/admin/StatusDashboard";
 
-type Tab = "overview" | "choferes";
+type Tab = "overview" | "choferes" | "estado";
 
 export default function AdminDashboard() {
   const { profile, logout } = useAuth();
@@ -54,6 +55,12 @@ export default function AdminDashboard() {
                   {chofer.nombre.split(" ")[0]}
                 </span>
               )}
+            </NavTab>
+            <NavTab
+              active={tab === "estado"}
+              onClick={() => { setTab("estado"); setChofer(null); }}
+            >
+              🖥️ Estado
             </NavTab>
           </nav>
 
@@ -106,6 +113,7 @@ export default function AdminDashboard() {
         {tab === "overview" && <Overview onVerChofer={verChofer} />}
         {tab === "choferes" && !chofer && <GestionChoferes onVerDetalle={verChofer} />}
         {tab === "choferes" && chofer && <ChoferDetalle chofer={chofer} onBack={volverALista} />}
+        {tab === "estado" && <StatusDashboard />}
       </main>
 
       {/* ── Modal Configuración ── */}
