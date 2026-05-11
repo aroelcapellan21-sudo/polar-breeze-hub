@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import {
   collection, query, where, onSnapshot,
-  doc, setDoc, updateDoc, Timestamp,
+  doc, setDoc, updateDoc, deleteDoc, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { UserProfile } from "@/lib/types";
@@ -41,6 +41,14 @@ async function authUpdatePassword(idToken: string, newPassword: string) {
   return r.json();
 }
 
+async function authDelete(idToken: string) {
+  const r = await fetch(`${AUTH_URL}:delete?key=${API_KEY}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+  });
+  return r.json() as Promise<{ error?: { message: string } }>;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function GestionChoferes({ onVerDetalle }: Props) {
@@ -52,6 +60,8 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
   const [nuevaFicha, setNuevaFicha]   = useState("");
   const [changingPw, setChangingPw]   = useState(false);
   const [filter, setFilter] = useState<"todos" | "activos" | "baja">("todos");
+  const [eliminarModal, setEliminarModal] = useState<UserProfile | null>(null);
+  const [eliminando,    setEliminando]    = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "usuarios"), where("role", "==", "chofer"));
@@ -132,6 +142,31 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
       flash("err", message);
     } finally {
       setChangingPw(false);
+    }
+  };
+
+  // ── Eliminar chofer (baja + Firestore + Auth) ────────────────────────────────
+  const handleEliminar = async () => {
+    if (!eliminarModal) return;
+    setEliminando(true);
+    try {
+      // Try to sign in as the chofer to obtain an idToken for Auth deletion
+      const signInData = await authSignIn(
+        eliminarModal.email,
+        (eliminarModal.ficha ?? "").padStart(6, "0"),
+      );
+      if (signInData.idToken) {
+        await authDelete(signInData.idToken);
+      }
+      // Always remove from Firestore regardless of Auth outcome
+      await deleteDoc(doc(db, "usuarios", eliminarModal.uid));
+      flash("ok", `${eliminarModal.nombre} eliminado completamente`);
+      setEliminarModal(null);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error desconocido";
+      flash("err", message);
+    } finally {
+      setEliminando(false);
     }
   };
 
@@ -279,6 +314,15 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
                     >
                       {activo ? "Dar baja" : "Reactivar"}
                     </button>
+                    {!activo && (
+                      <button
+                        onClick={() => setEliminarModal(c)}
+                        className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-lg text-xs font-medium transition-all duration-100"
+                        title="Eliminar permanentemente"
+                      >
+                        🗑️
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -286,6 +330,38 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── Modal confirmar eliminación ── */}
+      {eliminarModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <p className="text-3xl text-center mb-3">🗑️</p>
+            <h3 className="font-bold text-gray-800 text-center mb-1">Eliminar chofer</h3>
+            <p className="text-sm text-gray-500 text-center mb-1">
+              <strong>{eliminarModal.nombre}</strong> · ficha {eliminarModal.ficha}
+            </p>
+            <p className="text-xs text-red-600 text-center mb-5">
+              Se borrará de Firebase Auth y Firestore. Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEliminarModal(null)}
+                disabled={eliminando}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEliminar}
+                disabled={eliminando}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white text-sm font-bold transition-all duration-100 disabled:opacity-60"
+              >
+                {eliminando ? "Eliminando..." : "Sí, eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal cambiar contraseña ── */}
       {passwdModal && (
