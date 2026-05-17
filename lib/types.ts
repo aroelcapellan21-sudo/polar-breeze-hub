@@ -156,6 +156,19 @@ export interface FsConfig {
   [key: string]:       unknown;
 }
 
+// ─── Inventario Loker — ledger inmutable de movimientos ───────────────────────
+
+export interface MovimientoLoker {
+  id?: string;
+  tipo: "entrada_interior" | "devolucion_chofer" | "salida_despacho" | "merma" | "ajuste";
+  producto_id: string;
+  nombre: string;
+  cantidad: number;   // positivo = entrada, negativo = salida
+  responsable: string;
+  timestamp: Date | { seconds: number };
+  notas?: string;
+}
+
 // ─── Semáforo ─────────────────────────────────────────────────────────────────
 
 export type Semaforo = "verde" | "amarillo" | "rojo";

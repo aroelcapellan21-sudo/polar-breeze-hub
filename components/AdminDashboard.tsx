@@ -8,8 +8,9 @@ import GestionChoferes from "@/components/admin/GestionChoferes";
 import ChoferDetalle   from "@/components/admin/ChoferDetalle";
 import ConfigModal     from "@/components/admin/ConfigModal";
 import StatusDashboard from "@/components/admin/StatusDashboard";
+import Inventario      from "@/components/admin/Inventario";
 
-type Tab = "overview" | "choferes" | "estado";
+type Tab = "overview" | "choferes" | "inventario" | "estado";
 
 export default function AdminDashboard() {
   const { profile, logout } = useAuth();
@@ -59,6 +60,13 @@ export default function AdminDashboard() {
               )}
             </NavTab>
             <NavTab
+              active={tab === "inventario"}
+              onClick={() => { setTab("inventario"); setChofer(null); }}
+            >
+              <span>📦</span>
+              <span className="hidden sm:inline">Inventario</span>
+            </NavTab>
+            <NavTab
               active={tab === "estado"}
               onClick={() => { setTab("estado"); setChofer(null); }}
             >
@@ -97,6 +105,9 @@ export default function AdminDashboard() {
             {tab === "overview" && (
               <span className="text-white font-medium">🏠 Overview — resumen general del sistema</span>
             )}
+            {tab === "inventario" && (
+              <span className="text-white font-medium">📦 Inventario — loker · entradas y movimientos</span>
+            )}
             {tab === "estado" && (
               <span className="text-white font-medium">🖥️ Estado — salud de servicios · acceso exclusivo del dueño</span>
             )}
@@ -127,6 +138,7 @@ export default function AdminDashboard() {
         {tab === "overview" && <Overview onVerChofer={verChofer} />}
         {tab === "choferes" && !chofer && <GestionChoferes onVerDetalle={verChofer} />}
         {tab === "choferes" && chofer && <ChoferDetalle chofer={chofer} onBack={volverALista} />}
+        {tab === "inventario" && <Inventario />}
         {tab === "estado" && <StatusDashboard />}
       </main>
 
