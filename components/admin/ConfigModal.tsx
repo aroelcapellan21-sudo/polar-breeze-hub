@@ -285,6 +285,24 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
                   value={String(cfg.alertaCritical ?? 15)}
                   onChange={(v) => setCfg((p) => ({ ...p, alertaCritical: Number(v) }))} />
               </div>
+
+              {/* WhatsApp Bot */}
+              <div className="border border-gray-100 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="font-semibold text-gray-700 text-sm">📱 WhatsApp Bot — Chofer</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Número al que el chofer envía su reporte diario. Formato internacional sin espacios,
+                    ej. <code className="bg-gray-100 px-1 rounded">521XXXXXXXXXX</code>
+                  </p>
+                </div>
+                <Field
+                  label="Número de WhatsApp"
+                  value={(cfg.whatsappBot as string) ?? ""}
+                  onChange={(v) => setCfg((p) => ({ ...p, whatsappBot: v }))}
+                  placeholder="521XXXXXXXXXX"
+                />
+              </div>
+
               <button
                 onClick={saveConfig}
                 disabled={cfgLoad}
