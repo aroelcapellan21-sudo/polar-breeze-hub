@@ -6,7 +6,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { MovimientoLoker, toDate, fmtDate } from "@/lib/types";
+import { MovimientoLoker, toDate, fmtDate, toProductoId } from "@/lib/types";
 
 // ─── Config de tipos ──────────────────────────────────────────────────────────
 
@@ -23,10 +23,6 @@ type TipoLoker = MovimientoLoker["tipo"];
 const TIPOS_ORDEN: TipoLoker[] = [
   "entrada_interior", "devolucion_chofer", "salida_despacho", "merma", "ajuste",
 ];
-
-function toProductoId(nombre: string): string {
-  return nombre.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_áéíóúñü]/g, "");
-}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -339,10 +335,19 @@ export default function Inventario() {
                               {m.cantidad > 0 ? "+" : ""}{m.cantidad}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 mt-0.5">
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             <span className="text-xs text-gray-400">{m.responsable}</span>
                             <span className="text-gray-200">·</span>
                             <span className="text-xs text-gray-400">{fmtDate(m.timestamp)}</span>
+                            {m.choferNombre && (
+                              <>
+                                <span className="text-gray-200">·</span>
+                                <span className="text-xs bg-cyan-50 text-cyan-700 border border-cyan-200
+                                  px-1.5 py-0.5 rounded-full font-medium">
+                                  → {m.choferNombre}
+                                </span>
+                              </>
+                            )}
                           </div>
                           {m.notas && (
                             <p className="text-xs text-gray-500 mt-1 italic truncate">

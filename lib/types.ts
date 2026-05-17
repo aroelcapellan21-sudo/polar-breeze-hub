@@ -167,6 +167,13 @@ export interface MovimientoLoker {
   responsable: string;
   timestamp: Date | { seconds: number };
   notas?: string;
+  // poblados en salida_despacho y devolucion_chofer
+  choferId?: string;
+  choferNombre?: string;
+}
+
+export function toProductoId(nombre: string): string {
+  return nombre.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_áéíóúñü]/g, "");
 }
 
 // ─── Semáforo ─────────────────────────────────────────────────────────────────

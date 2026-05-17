@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react";
 import {
   collection, query, where, onSnapshot,
-  doc, setDoc, addDoc, updateDoc, increment, Timestamp, getDoc,
+  doc, setDoc, addDoc, updateDoc, increment, Timestamp, getDoc, getDocs,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { ProductoItem, UserProfile, FsDriver, FsSession } from "@/lib/types";
+import { ProductoItem, UserProfile, FsDriver, FsSession, MovimientoLoker, toProductoId } from "@/lib/types";
 import {
   ImageUploader, ProductTable, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
@@ -42,6 +42,7 @@ export default function Choferes({ onChoferSelect }: Props) {
   const [analizando,    setAnalizando]    = useState(false);
   const [guardando,     setGuardando]     = useState(false);
   const [msg,           setMsg]           = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [stockAlerta,   setStockAlerta]   = useState<{ nombre: string; necesita: number; disponible: number }[] | null>(null);
 
   // Confrontar modal
   const [showConfronta,  setShowConfronta]  = useState(false);
@@ -68,6 +69,7 @@ export default function Choferes({ onChoferSelect }: Props) {
 
   const resetEntrada = () => {
     setPreview(null); setImgData(null); setTexto(""); setProductos([]); setObservaciones("");
+    setStockAlerta(null);
   };
 
   const selectChofer = (c: UserProfile) => {
@@ -103,7 +105,33 @@ export default function Choferes({ onChoferSelect }: Props) {
   const guardar = async () => {
     if (!profile || !sel || productos.length === 0) return;
     setGuardando(true);
+    setStockAlerta(null);
     try {
+      // ── Verificar stock en loker ────────────────────────────────────────────
+      const lokerSnap = await getDocs(collection(db, "movimientos_loker"));
+      const saldoMap  = new Map<string, number>();
+      lokerSnap.docs.forEach((d) => {
+        const m    = d.data() as MovimientoLoker;
+        const prev = saldoMap.get(m.producto_id) ?? 0;
+        saldoMap.set(m.producto_id, prev + m.cantidad);
+      });
+
+      const faltantes = productos
+        .filter((p) => (p.cantidad ?? 0) > 0)
+        .map((p) => ({
+          nombre:     p.nombre,
+          necesita:   p.cantidad ?? 0,
+          disponible: saldoMap.get(toProductoId(p.nombre)) ?? 0,
+        }))
+        .filter((f) => f.disponible < f.necesita);
+
+      if (faltantes.length > 0) {
+        setStockAlerta(faltantes);
+        setGuardando(false);
+        return;
+      }
+
+      // ── Guardar despacho (flujo existente) ─────────────────────────────────
       const totalEntregado = productos.reduce((s, p) => s + (p.cantidad ?? 0), 0);
       const totalMonto     = productos.reduce((s, p) => s + ((p.precio ?? 0) * (p.cantidad ?? 0)), 0);
 
@@ -145,6 +173,22 @@ export default function Choferes({ onChoferSelect }: Props) {
         cliente:           sel.nombre, monto: totalMonto,
         timestamp:         Timestamp.now(), estado: "procesada",
       });
+
+      // ── Registrar salidas en loker (una entrada por producto) ───────────────
+      const notaBase = `Despacho → ${sel.nombre}${sel.ficha ? ` · ficha ${sel.ficha}` : ""}`;
+      for (const p of productos) {
+        await addDoc(collection(db, "movimientos_loker"), {
+          tipo:         "salida_despacho",
+          producto_id:  toProductoId(p.nombre),
+          nombre:       p.nombre,
+          cantidad:     -(p.cantidad ?? 0),
+          responsable:  profile.nombre,
+          choferId:     sel.uid,
+          choferNombre: sel.nombre,
+          timestamp:    Timestamp.now(),
+          notas:        notaBase,
+        });
+      }
 
       flash("ok", `Entrega de ${sel.nombre} guardada — ${totalEntregado} unidades`);
       resetEntrada();
@@ -397,6 +441,39 @@ export default function Choferes({ onChoferSelect }: Props) {
             </>
           )}
 
+          {/* ── Alerta de stock insuficiente ── */}
+          {stockAlerta && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-red-700 font-semibold text-sm">
+                  ⚠️ Stock insuficiente en el loker
+                </span>
+                <button
+                  onClick={() => setStockAlerta(null)}
+                  className="text-red-400 hover:text-red-600 text-xl leading-none active:scale-95"
+                >×</button>
+              </div>
+              <div className="space-y-1 mb-2">
+                {stockAlerta.map((f) => (
+                  <div
+                    key={f.nombre}
+                    className="flex items-center justify-between text-xs bg-white
+                      border border-red-200 rounded-lg px-2.5 py-1.5"
+                  >
+                    <span className="text-red-800 font-medium truncate mr-2">{f.nombre}</span>
+                    <span className="text-red-600 flex-shrink-0 whitespace-nowrap">
+                      necesita&nbsp;{f.necesita} · disponible&nbsp;{f.disponible}
+                      <span className="ml-1 font-bold">({f.disponible - f.necesita})</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-red-500">
+                Registra entradas en Inventario › Loker (Admin) antes de despachar.
+              </p>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={guardar}
@@ -404,7 +481,7 @@ export default function Choferes({ onChoferSelect }: Props) {
             className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white
               rounded-xl font-semibold transition-all duration-100 disabled:opacity-50"
           >
-            {guardando ? "Guardando..." : `💾 Guardar entrega${sel ? ` — ${sel.nombre}` : ""}`}
+            {guardando ? "Verificando stock…" : `💾 Guardar entrega${sel ? ` — ${sel.nombre}` : ""}`}
           </button>
 
           {productos.length > 0 && sel && (
