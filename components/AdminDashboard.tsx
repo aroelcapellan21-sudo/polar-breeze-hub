@@ -8,9 +8,10 @@ import GestionChoferes from "@/components/admin/GestionChoferes";
 import ChoferDetalle   from "@/components/admin/ChoferDetalle";
 import ConfigModal     from "@/components/admin/ConfigModal";
 import StatusDashboard from "@/components/admin/StatusDashboard";
-import Inventario      from "@/components/admin/Inventario";
+import Inventario          from "@/components/admin/Inventario";
+import InformesHistorial  from "@/components/admin/InformesHistorial";
 
-type Tab = "overview" | "choferes" | "inventario" | "estado";
+type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes";
 
 export default function AdminDashboard() {
   const { profile, logout } = useAuth();
@@ -73,6 +74,13 @@ export default function AdminDashboard() {
               <span>🖥️</span>
               <span className="hidden sm:inline">Estado</span>
             </NavTab>
+            <NavTab
+              active={tab === "informes"}
+              onClick={() => { setTab("informes"); setChofer(null); }}
+            >
+              <span>📋</span>
+              <span className="hidden sm:inline">Informes</span>
+            </NavTab>
           </nav>
 
           {/* Acciones */}
@@ -111,6 +119,9 @@ export default function AdminDashboard() {
             {tab === "estado" && (
               <span className="text-white font-medium">🖥️ Estado — salud de servicios · acceso exclusivo del dueño</span>
             )}
+            {tab === "informes" && (
+              <span className="text-white font-medium">📋 Informes — cierres del día por fecha</span>
+            )}
             {tab === "choferes" && !chofer && (
               <span className="text-white font-medium">👥 Choferes — gestión, inventario y sistema de puntos</span>
             )}
@@ -140,6 +151,7 @@ export default function AdminDashboard() {
         {tab === "choferes" && chofer && <ChoferDetalle chofer={chofer} onBack={volverALista} />}
         {tab === "inventario" && <Inventario />}
         {tab === "estado" && <StatusDashboard />}
+        {tab === "informes" && <InformesHistorial />}
       </main>
 
       {/* ── Modal Configuración ── */}

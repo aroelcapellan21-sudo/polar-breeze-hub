@@ -7,18 +7,20 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { UserProfile } from "@/lib/types";
-import CuartoFrio from "@/components/despachador/CuartoFrio";
-import Choferes   from "@/components/despachador/Choferes";
-import Comparar   from "@/components/despachador/Comparar";
-import Historial  from "@/components/despachador/Historial";
+import CuartoFrio    from "@/components/despachador/CuartoFrio";
+import Choferes      from "@/components/despachador/Choferes";
+import Comparar      from "@/components/despachador/Comparar";
+import Historial     from "@/components/despachador/Historial";
+import InformeCierre from "@/components/despachador/InformeCierre";
 
-type Tab = "cuartofrio" | "choferes" | "comparar" | "historial";
+type Tab = "cuartofrio" | "choferes" | "comparar" | "historial" | "cierre";
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: "cuartofrio", icon: "🥶", label: "Cuarto Frío" },
   { key: "choferes",   icon: "🚛", label: "Choferes"    },
   { key: "comparar",   icon: "⚖️", label: "Comparar"    },
   { key: "historial",  icon: "📅", label: "Historial"   },
+  { key: "cierre",     icon: "📋", label: "Cierre"      },
 ];
 
 export default function DespachadorDashboard() {
@@ -153,6 +155,7 @@ export default function DespachadorDashboard() {
               {tab === "choferes"   && "Choferes — facturas por entrega"}
               {tab === "comparar"   && "Comparar — cuarto frío vs. choferes en tiempo real"}
               {tab === "historial"  && "Historial — registros del día por tipo"}
+              {tab === "cierre"     && "Cierre — informe final del día de despacho"}
             </button>
             {/* Chofer breadcrumb */}
             {tab === "choferes" && selChofer && (
@@ -182,6 +185,7 @@ export default function DespachadorDashboard() {
         )}
         {tab === "comparar"   && <Comparar />}
         {tab === "historial"  && <Historial />}
+        {tab === "cierre"     && <InformeCierre />}
       </main>
 
       {/* ── Modal Restablecer ── */}
