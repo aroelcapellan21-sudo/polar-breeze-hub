@@ -161,12 +161,15 @@ export interface FsConfig {
 export interface MovimientoLoker {
   id?: string;
   tipo: "entrada_interior" | "devolucion_chofer" | "salida_despacho" | "merma" | "ajuste";
+  categoria?: "retiro_despacho" | "agregado_1" | "agregado_0";
+  generaPuntos?: boolean;
   producto_id: string;
   nombre: string;
   cantidad: number;   // positivo = entrada, negativo = salida
   responsable: string;
   timestamp: Date | { seconds: number };
   notas?: string;
+  motivo?: string;
   // poblados en salida_despacho y devolucion_chofer
   choferId?: string;
   choferNombre?: string;

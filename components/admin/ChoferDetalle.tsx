@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import {
   UserProfile, ImbentarioRecord,
-  calcSemaforo, Semaforo, toDate, fmtDate, ProductoItem, TalonarioDoc,
+  calcSemaforo, Semaforo, toDate, fmtDate, ProductoItem, TalonarioDoc, MovimientoLoker,
 } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { auth } from "@/lib/firebase";
@@ -25,11 +25,12 @@ const SEMAFORO_CFG: Record<Semaforo, { icon: string; label: string; color: strin
   rojo:     { icon: "🚨", label: "Diferencias críticas", color: "text-red-700",   bg: "bg-red-50    border-red-200" },
 };
 
-type SubTab = "stats" | "talonario" | "inventario";
+type SubTab = "stats" | "talonario" | "inventario" | "extras";
 
 export default function ChoferDetalle({ chofer, onBack }: Props) {
-  const [records,    setRecords]    = useState<ImbentarioRecord[]>([]);
-  const [talonarios, setTalonarios] = useState<TalonarioDoc[]>([]);
+  const [records,       setRecords]       = useState<ImbentarioRecord[]>([]);
+  const [talonarios,    setTalonarios]    = useState<TalonarioDoc[]>([]);
+  const [extrasChofer,  setExtrasChofer]  = useState<(MovimientoLoker & { id: string })[]>([]);
   const [driverEntregas, setDriverEntregas] = useState<ProductoItem[]>([]);
   const [rango,      setRango]      = useState<7 | 15 | 30>(15);
   const [fechaBuscar, setFechaBuscar] = useState("");
@@ -56,9 +57,17 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
       where("choferId", "==", chofer.uid),
       orderBy("timestamp", "desc")
     );
+    const q3 = query(collection(db, "movimientos_loker"), where("choferId", "==", chofer.uid));
     const u1 = onSnapshot(q,  (snap) => setRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ImbentarioRecord))));
     const u2 = onSnapshot(q2, (snap) => setTalonarios(snap.docs.map((d) => ({ id: d.id, ...d.data() } as TalonarioDoc))));
-    return () => { u1(); u2(); };
+    const u3 = onSnapshot(q3, (snap) => {
+      const docs = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as MovimientoLoker & { id: string } & { categoria?: string }))
+        .filter((d) => !!(d as { categoria?: string }).categoria)
+        .sort((a, b) => toDate(b.timestamp).getTime() - toDate(a.timestamp).getTime());
+      setExtrasChofer(docs as (MovimientoLoker & { id: string })[]);
+    });
+    return () => { u1(); u2(); u3(); };
   }, [chofer.uid]);
 
   // Load driver entregas
@@ -229,9 +238,10 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-2">
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
         {([
-          { key: "stats",      label: "📊 Estadísticas" },
+          { key: "stats",      label: "📊 Stats" },
           { key: "talonario",  label: "📋 Talonario" },
           { key: "inventario", label: "📦 Inventario" },
+          { key: "extras",     label: "⭐ Extras" },
         ] as { key: SubTab; label: string }[]).map((t) => (
           <button
             key={t.key}
@@ -450,6 +460,77 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
           )}
         </div>
       )}
+
+      {/* ── Extras ── */}
+      {subTab === "extras" && (() => {
+        const extrasRecientes = extrasChofer.filter((r) => {
+          const d = toDate(r.timestamp);
+          if (fechaBuscar) {
+            return d >= new Date(fechaBuscar + "T00:00:00") && d <= new Date(fechaBuscar + "T23:59:59");
+          }
+          return d >= cutoff;
+        });
+        const retirosExt = extrasRecientes.filter((e) => (e as { categoria?: string }).categoria === "retiro_despacho");
+        const agr1Ext    = extrasRecientes.filter((e) => (e as { categoria?: string }).categoria === "agregado_1");
+        const agr0Ext    = extrasRecientes.filter((e) => (e as { categoria?: string }).categoria === "agregado_0");
+
+        const renderLista = (items: (MovimientoLoker & { id: string })[], colorRow: string, badge?: string) =>
+          items.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">Sin registros en este período</p>
+          ) : (
+            <div className="space-y-1.5">
+              {items.map((r) => (
+                <div key={r.id} className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${colorRow}`}>
+                  <span className="text-gray-400 text-xs flex-shrink-0 w-24">{fmtDate(r.timestamp)}</span>
+                  <span className="font-medium flex-1 truncate">{r.nombre}</span>
+                  <span className="font-bold flex-shrink-0">{r.cantidad > 0 ? `+${r.cantidad}` : `×${Math.abs(r.cantidad)}`}</span>
+                  {badge && <span className="text-xs bg-white/60 px-1.5 py-0.5 rounded flex-shrink-0">{badge}</span>}
+                  {(r as { motivo?: string }).motivo && (
+                    <span className="text-gray-400 text-xs truncate max-w-[100px]">{(r as { motivo?: string }).motivo}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+
+        return (
+          <div className="space-y-4">
+            {/* Resumen */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-orange-50 rounded-xl p-3 text-center">
+                <p className="text-xl font-bold text-orange-700">{retirosExt.reduce((s, r) => s + r.cantidad, 0)}</p>
+                <p className="text-xs text-orange-500">Retirados</p>
+              </div>
+              <div className="bg-green-50 rounded-xl p-3 text-center">
+                <p className="text-xl font-bold text-green-700">{agr1Ext.reduce((s, r) => s + Math.abs(r.cantidad), 0)}</p>
+                <p className="text-xs text-green-500">Agr. c/puntos</p>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 text-center">
+                <p className="text-xl font-bold text-slate-600">{agr0Ext.reduce((s, r) => s + Math.abs(r.cantidad), 0)}</p>
+                <p className="text-xs text-slate-400">Agr. s/puntos</p>
+              </div>
+            </div>
+
+            {/* Retirados */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <h4 className="font-bold text-orange-700 text-sm mb-3">📦 Productos Retirados ({retirosExt.length})</h4>
+              {renderLista(retirosExt, "bg-orange-50 text-orange-800")}
+            </div>
+
+            {/* Agregado 1 */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <h4 className="font-bold text-green-700 text-sm mb-3">✅ Agregado 1 — Con Puntos ({agr1Ext.length})</h4>
+              {renderLista(agr1Ext, "bg-green-50 text-green-800", "⭐ pts")}
+            </div>
+
+            {/* Agregado 0 */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <h4 className="font-bold text-slate-600 text-sm mb-3">⚪ Agregado 0 — Sin Puntos ({agr0Ext.length})</h4>
+              {renderLista(agr0Ext, "bg-slate-50 text-slate-700", "Sin pts")}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Modal detalle por producto ── */}
       {selectedProd && (() => {

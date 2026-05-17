@@ -23,6 +23,15 @@ const STEPS = [
 
 const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
 
+interface ExtraLoker {
+  id: string;
+  nombre: string;
+  cantidad: number;
+  motivo?: string;
+  categoria: "retiro_despacho" | "agregado_1" | "agregado_0";
+  timestamp: Date | { seconds: number };
+}
+
 interface Props {
   onChoferSelect?: (c: UserProfile | null) => void;
 }
@@ -44,6 +53,18 @@ export default function Choferes({ onChoferSelect }: Props) {
   const [msg,           setMsg]           = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [stockAlerta,   setStockAlerta]   = useState<{ nombre: string; necesita: number; disponible: number }[] | null>(null);
 
+  // ─── Extras por factura ──────────────────────────────────────────────────────
+  const [extrasHoy,    setExtrasHoy]    = useState<ExtraLoker[]>([]);
+  const [retiroForm,   setRetiroForm]   = useState({ nombre: "", cantidad: 1, nota: "" });
+  const [agr1Form,     setAgr1Form]     = useState({ nombre: "", cantidad: 1, nota: "" });
+  const [agr0Form,     setAgr0Form]     = useState({ nombre: "", cantidad: 1, nota: "" });
+  const [openRetiros,  setOpenRetiros]  = useState(false);
+  const [openAgr1,     setOpenAgr1]     = useState(false);
+  const [openAgr0,     setOpenAgr0]     = useState(false);
+  const [savingRetiro, setSavingRetiro] = useState(false);
+  const [savingAgr1,   setSavingAgr1]   = useState(false);
+  const [savingAgr0,   setSavingAgr0]   = useState(false);
+
   // Confrontar modal
   const [showConfronta,  setShowConfronta]  = useState(false);
 
@@ -62,6 +83,28 @@ export default function Choferes({ onChoferSelect }: Props) {
     return () => { uChof(); uDrv(); uSess(); };
   }, []);
 
+  // Cargar extras de hoy para el chofer seleccionado
+  useEffect(() => {
+    if (!sel) { setExtrasHoy([]); return; }
+    const q = query(collection(db, "movimientos_loker"), where("choferId", "==", sel.uid));
+    const unsub = onSnapshot(q, (snap) => {
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+      const docs: ExtraLoker[] = [];
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        if (!data.categoria) return;
+        const ts = data.timestamp?.seconds
+          ? new Date(data.timestamp.seconds * 1000)
+          : data.timestamp instanceof Date ? data.timestamp : new Date(0);
+        if (ts < hoy) return;
+        docs.push({ id: d.id, nombre: data.nombre, cantidad: data.cantidad,
+          motivo: data.motivo, categoria: data.categoria, timestamp: data.timestamp });
+      });
+      setExtrasHoy(docs);
+    });
+    return () => unsub();
+  }, [sel?.uid]);
+
   const flash = (type: "ok" | "err", text: string) => {
     setMsg({ type, text });
     setTimeout(() => setMsg(null), 4000);
@@ -70,6 +113,10 @@ export default function Choferes({ onChoferSelect }: Props) {
   const resetEntrada = () => {
     setPreview(null); setImgData(null); setTexto(""); setProductos([]); setObservaciones("");
     setStockAlerta(null);
+    setRetiroForm({ nombre: "", cantidad: 1, nota: "" });
+    setAgr1Form({ nombre: "", cantidad: 1, nota: "" });
+    setAgr0Form({ nombre: "", cantidad: 1, nota: "" });
+    setOpenRetiros(false); setOpenAgr1(false); setOpenAgr0(false);
   };
 
   const selectChofer = (c: UserProfile) => {
@@ -199,6 +246,61 @@ export default function Choferes({ onChoferSelect }: Props) {
     }
   };
 
+  const guardarExtra = async (
+    categoria: "retiro_despacho" | "agregado_1" | "agregado_0",
+    form: { nombre: string; cantidad: number; nota: string }
+  ) => {
+    if (!profile || !sel || !form.nombre.trim() || form.cantidad <= 0) return;
+    const setSaving = categoria === "retiro_despacho" ? setSavingRetiro
+                    : categoria === "agregado_1"       ? setSavingAgr1
+                    :                                    setSavingAgr0;
+    setSaving(true);
+    const esRetiro = categoria === "retiro_despacho";
+    const nota     = form.nota.trim();
+    try {
+      // Stock check para salidas
+      if (!esRetiro) {
+        const lokerSnap = await getDocs(collection(db, "movimientos_loker"));
+        const pid    = toProductoId(form.nombre);
+        const saldo  = lokerSnap.docs.reduce((s, d) => {
+          const m = d.data() as MovimientoLoker;
+          return m.producto_id === pid ? s + m.cantidad : s;
+        }, 0);
+        if (saldo < form.cantidad) {
+          flash("err", `Stock insuficiente — ${form.nombre}: disponible ${saldo}`);
+          setSaving(false);
+          return;
+        }
+      }
+      await addDoc(collection(db, "movimientos_loker"), {
+        tipo:         esRetiro ? "devolucion_chofer" : "salida_despacho",
+        categoria,
+        ...(categoria !== "retiro_despacho" && { generaPuntos: categoria === "agregado_1" }),
+        producto_id:  toProductoId(form.nombre),
+        nombre:       form.nombre.trim(),
+        cantidad:     esRetiro ? form.cantidad : -(form.cantidad),
+        responsable:  profile.nombre,
+        choferId:     sel.uid,
+        choferNombre: sel.nombre,
+        timestamp:    Timestamp.now(),
+        ...(nota && { motivo: nota }),
+        notas: esRetiro
+          ? `Retiro despacho${nota ? `: ${nota}` : ""}`
+          : categoria === "agregado_1"
+            ? `Agregado c/puntos${nota ? `: ${nota}` : ""}`
+            : `Agregado s/puntos${nota ? `: ${nota}` : ""}`,
+      });
+      if (categoria === "retiro_despacho") setRetiroForm({ nombre: "", cantidad: 1, nota: "" });
+      else if (categoria === "agregado_1") setAgr1Form({ nombre: "", cantidad: 1, nota: "" });
+      else                                 setAgr0Form({ nombre: "", cantidad: 1, nota: "" });
+      flash("ok", `${esRetiro ? "Retiro" : "Agregado"} registrado — ${form.nombre.trim()}`);
+    } catch (e) {
+      flash("err", e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const driverMap: Record<string, FsDriver> = {};
   drivers.forEach((d) => { if (d.id) driverMap[d.id] = d; });
 
@@ -256,6 +358,10 @@ export default function Choferes({ onChoferSelect }: Props) {
       confrontaFilas.push({ nombre: nombreReal, cf: 0, entr: entregaMap[key], diff: -entregaMap[key] });
     }
   });
+
+  const retiros = extrasHoy.filter((e) => e.categoria === "retiro_despacho");
+  const agr1    = extrasHoy.filter((e) => e.categoria === "agregado_1");
+  const agr0    = extrasHoy.filter((e) => e.categoria === "agregado_0");
 
   const selDriver = sel ? driverMap[sel.uid] : null;
   const selEntregas: ProductoItem[] = Array.isArray(selDriver?.entregas)
@@ -489,6 +595,213 @@ export default function Choferes({ onChoferSelect }: Props) {
           )}
         </div>
       </div>
+
+      {/* ── Secciones extras por factura ── */}
+      {sel && (
+        <div className="space-y-3">
+
+          {/* PRODUCTOS RETIRADOS */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-orange-100">
+            <button
+              onClick={() => setOpenRetiros(!openRetiros)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left bg-orange-50 hover:bg-orange-100 transition-colors active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-bold text-orange-700">📦 PRODUCTOS RETIRADOS</span>
+                <span className="text-xs text-orange-400 hidden sm:inline">loker sube · devolucion_chofer</span>
+                {retiros.length > 0 && (
+                  <span className="bg-orange-200 text-orange-700 text-xs px-1.5 py-0.5 rounded-full font-bold">
+                    {retiros.length}
+                  </span>
+                )}
+              </div>
+              <span className="text-orange-400 text-xs ml-2 flex-shrink-0">{openRetiros ? "▲" : "▼"}</span>
+            </button>
+            {openRetiros && (
+              <div className="p-4 space-y-3">
+                {retiros.length > 0 && (
+                  <div className="space-y-1.5">
+                    {retiros.map((r) => (
+                      <div key={r.id} className="flex items-center gap-2 text-sm bg-orange-50 rounded-lg px-3 py-2">
+                        <span className="font-medium text-orange-800 flex-1 truncate">{r.nombre}</span>
+                        <span className="text-orange-600 font-bold flex-shrink-0">+{r.cantidad}</span>
+                        {r.motivo && <span className="text-gray-400 text-xs truncate max-w-[120px]">{r.motivo}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Producto"
+                      value={retiroForm.nombre}
+                      onChange={(e) => setRetiroForm((f) => ({ ...f, nombre: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-300"
+                    />
+                    <input
+                      type="number" min={1}
+                      placeholder="Cant."
+                      value={retiroForm.cantidad}
+                      onChange={(e) => setRetiroForm((f) => ({ ...f, cantidad: Math.max(1, Number(e.target.value)) }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-300"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Motivo del retiro"
+                    value={retiroForm.nota}
+                    onChange={(e) => setRetiroForm((f) => ({ ...f, nota: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                  <button
+                    onClick={() => guardarExtra("retiro_despacho", retiroForm)}
+                    disabled={savingRetiro || !retiroForm.nombre.trim()}
+                    className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-50"
+                  >
+                    {savingRetiro ? "Guardando…" : "↩ Registrar retiro"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* AGREGADO 1 — Con Puntos */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-green-100">
+            <button
+              onClick={() => setOpenAgr1(!openAgr1)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left bg-green-50 hover:bg-green-100 transition-colors active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-bold text-green-700">✅ AGREGADO 1 — Con Puntos</span>
+                <span className="text-xs text-green-400 hidden sm:inline">loker baja · cuenta en beneficios</span>
+                {agr1.length > 0 && (
+                  <span className="bg-green-200 text-green-700 text-xs px-1.5 py-0.5 rounded-full font-bold">
+                    {agr1.length}
+                  </span>
+                )}
+              </div>
+              <span className="text-green-400 text-xs ml-2 flex-shrink-0">{openAgr1 ? "▲" : "▼"}</span>
+            </button>
+            {openAgr1 && (
+              <div className="p-4 space-y-3">
+                {agr1.length > 0 && (
+                  <div className="space-y-1.5">
+                    {agr1.map((r) => (
+                      <div key={r.id} className="flex items-center gap-2 text-sm bg-green-50 rounded-lg px-3 py-2">
+                        <span className="font-medium text-green-800 flex-1 truncate">{r.nombre}</span>
+                        <span className="text-green-600 font-bold flex-shrink-0">×{Math.abs(r.cantidad)}</span>
+                        {r.motivo && <span className="text-gray-400 text-xs truncate max-w-[120px]">{r.motivo}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Producto"
+                      value={agr1Form.nombre}
+                      onChange={(e) => setAgr1Form((f) => ({ ...f, nombre: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-300"
+                    />
+                    <input
+                      type="number" min={1}
+                      placeholder="Cant."
+                      value={agr1Form.cantidad}
+                      onChange={(e) => setAgr1Form((f) => ({ ...f, cantidad: Math.max(1, Number(e.target.value)) }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-300"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Descripción"
+                    value={agr1Form.nota}
+                    onChange={(e) => setAgr1Form((f) => ({ ...f, nota: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-300"
+                  />
+                  <button
+                    onClick={() => guardarExtra("agregado_1", agr1Form)}
+                    disabled={savingAgr1 || !agr1Form.nombre.trim()}
+                    className="w-full py-2.5 bg-green-600 hover:bg-green-700 active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-50"
+                  >
+                    {savingAgr1 ? "Guardando…" : "⭐ Registrar Agregado 1"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* AGREGADO 0 — Sin Puntos */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200">
+            <button
+              onClick={() => setOpenAgr0(!openAgr0)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left bg-slate-50 hover:bg-slate-100 transition-colors active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-bold text-slate-600">⚪ AGREGADO 0 — Sin Puntos</span>
+                <span className="text-xs text-slate-400 hidden sm:inline">loker baja · solo informativo</span>
+                {agr0.length > 0 && (
+                  <span className="bg-slate-200 text-slate-600 text-xs px-1.5 py-0.5 rounded-full font-bold">
+                    {agr0.length}
+                  </span>
+                )}
+              </div>
+              <span className="text-slate-400 text-xs ml-2 flex-shrink-0">{openAgr0 ? "▲" : "▼"}</span>
+            </button>
+            {openAgr0 && (
+              <div className="p-4 space-y-3">
+                {agr0.length > 0 && (
+                  <div className="space-y-1.5">
+                    {agr0.map((r) => (
+                      <div key={r.id} className="flex items-center gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2">
+                        <span className="font-medium text-slate-700 flex-1 truncate">{r.nombre}</span>
+                        <span className="text-slate-500 font-bold flex-shrink-0">×{Math.abs(r.cantidad)}</span>
+                        <span className="text-xs bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded flex-shrink-0">Sin pts</span>
+                        {r.motivo && <span className="text-gray-400 text-xs truncate max-w-[80px]">{r.motivo}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Producto"
+                      value={agr0Form.nombre}
+                      onChange={(e) => setAgr0Form((f) => ({ ...f, nombre: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-slate-300"
+                    />
+                    <input
+                      type="number" min={1}
+                      placeholder="Cant."
+                      value={agr0Form.cantidad}
+                      onChange={(e) => setAgr0Form((f) => ({ ...f, cantidad: Math.max(1, Number(e.target.value)) }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-slate-300"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Descripción"
+                    value={agr0Form.nota}
+                    onChange={(e) => setAgr0Form((f) => ({ ...f, nota: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-slate-300"
+                  />
+                  <p className="text-xs text-slate-400">⚠️ No cuenta en puntos ni beneficios del chofer.</p>
+                  <button
+                    onClick={() => guardarExtra("agregado_0", agr0Form)}
+                    disabled={savingAgr0 || !agr0Form.nombre.trim()}
+                    className="w-full py-2.5 bg-slate-500 hover:bg-slate-600 active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-50"
+                  >
+                    {savingAgr0 ? "Guardando…" : "○ Registrar Agregado 0"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
 
       {/* ── Modal Confrontar ── */}
       {showConfronta && (
