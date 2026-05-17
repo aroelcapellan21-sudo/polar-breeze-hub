@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ImbentarioRecord, PuntosConfig, PuntoProducto } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
+import SobrantesChofer from "@/components/chofer/SobrantesChofer";
 
 // today's midnight for filtering
 function getTodayStart() {
@@ -186,6 +187,9 @@ export default function ChoferDashboard() {
       </header>
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        {/* ── Sobrantes del día ── */}
+        <SobrantesChofer />
+
         {/* Stats globales */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-cyan-600 text-white rounded-xl p-4 text-center shadow">

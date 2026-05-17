@@ -8,6 +8,30 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { MovimientoLoker, toDate, fmtDate, toProductoId } from "@/lib/types";
 
+// ─── Tipos para resumen de choferes ───────────────────────────────────────────
+
+interface ResumenChofer {
+  choferId:     string;
+  choferNombre: string;
+  productos: {
+    pid:        string;
+    nombre:     string;
+    despachado: number;
+    sobrante:   number;
+    vendido:    number;
+  }[];
+  totalDespachado: number;
+  totalSobrante:   number;
+  totalVendido:    number;
+  reportado:       boolean; // si ya registró devolucion_chofer hoy
+}
+
+function getTodayStart() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 // ─── Config de tipos ──────────────────────────────────────────────────────────
 
 const TIPO_CFG = {
@@ -41,7 +65,8 @@ export default function Inventario() {
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg]             = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  const [saldoAbierto, setSaldoAbierto] = useState(true);
+  const [saldoAbierto,    setSaldoAbierto]    = useState(true);
+  const [chofersAbierto, setChofersAbierto]  = useState(true);
 
   // ── Listener tiempo real ────────────────────────────────────────────────────
   useEffect(() => {
@@ -66,6 +91,70 @@ export default function Inventario() {
       map.set(m.producto_id, { nombre: m.nombre, saldo: prev.saldo + m.cantidad });
     }
     return Array.from(map.values()).sort((a, b) => b.saldo - a.saldo);
+  }, [movimientos]);
+
+  // ── Resumen de sobrantes por chofer (hoy) ──────────────────────────────────
+  const resumenChoferes = useMemo((): ResumenChofer[] => {
+    const todayStart = getTodayStart();
+    const movHoy = movimientos.filter((m) => toDate(m.timestamp) >= todayStart);
+
+    // Agrupar por chofer: acumular despachado y sobrante
+    const mapaChoferes = new Map<string, {
+      nombre: string;
+      despachadoProd: Map<string, { nombre: string; cantidad: number }>;
+      sobranteProd:   Map<string, { nombre: string; cantidad: number }>;
+    }>();
+
+    for (const m of movHoy) {
+      if (!m.choferId || !m.choferNombre) continue;
+      if (m.tipo !== "salida_despacho" && m.tipo !== "devolucion_chofer") continue;
+
+      if (!mapaChoferes.has(m.choferId)) {
+        mapaChoferes.set(m.choferId, {
+          nombre:         m.choferNombre,
+          despachadoProd: new Map(),
+          sobranteProd:   new Map(),
+        });
+      }
+      const ch = mapaChoferes.get(m.choferId)!;
+
+      if (m.tipo === "salida_despacho") {
+        const prev = ch.despachadoProd.get(m.producto_id) ?? { nombre: m.nombre, cantidad: 0 };
+        ch.despachadoProd.set(m.producto_id, {
+          nombre:   m.nombre,
+          cantidad: prev.cantidad + Math.abs(m.cantidad),
+        });
+      } else {
+        const prev = ch.sobranteProd.get(m.producto_id) ?? { nombre: m.nombre, cantidad: 0 };
+        ch.sobranteProd.set(m.producto_id, {
+          nombre:   m.nombre,
+          cantidad: prev.cantidad + m.cantidad,
+        });
+      }
+    }
+
+    return Array.from(mapaChoferes.entries()).map(([choferId, data]) => {
+      const productos = Array.from(data.despachadoProd.entries()).map(([pid, d]) => {
+        const sob     = data.sobranteProd.get(pid)?.cantidad ?? 0;
+        const vendido = d.cantidad - sob;
+        return { pid, nombre: d.nombre, despachado: d.cantidad, sobrante: sob, vendido };
+      });
+
+      const totalDespachado = productos.reduce((s, p) => s + p.despachado, 0);
+      const totalSobrante   = productos.reduce((s, p) => s + p.sobrante,   0);
+      const totalVendido    = productos.reduce((s, p) => s + p.vendido,     0);
+      const reportado       = data.sobranteProd.size > 0;
+
+      return {
+        choferId,
+        choferNombre: data.nombre,
+        productos,
+        totalDespachado,
+        totalSobrante,
+        totalVendido,
+        reportado,
+      };
+    }).sort((a, b) => a.choferNombre.localeCompare(b.choferNombre));
   }, [movimientos]);
 
   // ── Guardar movimiento ──────────────────────────────────────────────────────
@@ -164,6 +253,145 @@ export default function Inventario() {
           </div>
         )}
       </div>
+
+      {/* ── Sobrantes por chofer (hoy) ───────────────────────────────────────── */}
+      {resumenChoferes.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <button
+            onClick={() => setChofersAbierto((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3
+              bg-gradient-to-r from-teal-50 to-teal-100 hover:from-teal-100
+              hover:to-teal-150 transition-colors duration-100"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🚚</span>
+              <span className="font-semibold text-teal-900 text-sm">
+                Sobrantes choferes — hoy
+              </span>
+              <span className="text-xs bg-teal-200 text-teal-800 px-2 py-0.5 rounded-full">
+                {resumenChoferes.length} {resumenChoferes.length === 1 ? "chofer" : "choferes"}
+              </span>
+              {resumenChoferes.some((c) => !c.reportado) && (
+                <span className="text-xs bg-red-100 text-red-700 border border-red-200
+                  px-2 py-0.5 rounded-full font-medium animate-pulse">
+                  ⏳ pendientes
+                </span>
+              )}
+            </div>
+            <span className="text-teal-600 text-sm">{chofersAbierto ? "▲" : "▼"}</span>
+          </button>
+
+          {chofersAbierto && (
+            <div className="divide-y divide-gray-50">
+              {resumenChoferes.map((ch) => {
+                const alerta = !ch.reportado || ch.productos.some((p) => p.vendido < 0);
+                return (
+                  <div key={ch.choferId} className={`p-4 ${alerta ? "bg-red-50/40" : ""}`}>
+                    {/* Cabecera del chofer */}
+                    <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-gray-800">
+                          {ch.choferNombre}
+                        </span>
+                        {!ch.reportado ? (
+                          <span className="text-xs bg-amber-100 text-amber-700 border
+                            border-amber-200 px-2 py-0.5 rounded-full font-medium">
+                            ⏳ Sin sobrantes
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-green-100 text-green-700 border
+                            border-green-200 px-2 py-0.5 rounded-full font-medium">
+                            ✅ Reportado
+                          </span>
+                        )}
+                        {alerta && ch.reportado && (
+                          <span className="text-xs bg-red-100 text-red-700 border
+                            border-red-200 px-2 py-0.5 rounded-full font-medium">
+                            🚨 Inconsistencia
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Totales del chofer */}
+                      <div className="flex gap-3 text-xs text-center">
+                        <div>
+                          <p className="text-gray-400">Despachado</p>
+                          <p className="font-bold text-cyan-700">{ch.totalDespachado}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Sobrante</p>
+                          <p className="font-bold text-blue-600">{ch.totalSobrante}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400">Vendido</p>
+                          <p className={`font-bold ${
+                            ch.totalVendido < 0 ? "text-red-600" : "text-green-700"
+                          }`}>
+                            {ch.totalVendido}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tabla de productos */}
+                    <div className="overflow-x-auto rounded-lg border border-gray-100">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-gray-50 text-gray-500">
+                            <th className="text-left px-3 py-2 font-medium">Producto</th>
+                            <th className="text-right px-3 py-2 font-medium">Despachado</th>
+                            <th className="text-right px-3 py-2 font-medium">Sobrante</th>
+                            <th className="text-right px-3 py-2 font-medium">Vendido</th>
+                            <th className="text-center px-3 py-2 font-medium">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {ch.productos.map((p) => {
+                            const prodAlerta = p.vendido < 0 || p.sobrante > p.despachado;
+                            const sinReporte = !ch.reportado;
+                            return (
+                              <tr
+                                key={p.pid}
+                                className={prodAlerta ? "bg-red-50" : "hover:bg-gray-50/50"}
+                              >
+                                <td className="px-3 py-2 font-medium text-gray-700 max-w-[140px] truncate">
+                                  {p.nombre}
+                                </td>
+                                <td className="px-3 py-2 text-right text-cyan-700 font-semibold">
+                                  {p.despachado}
+                                </td>
+                                <td className="px-3 py-2 text-right text-blue-600 font-semibold">
+                                  {sinReporte ? <span className="text-gray-300">—</span> : p.sobrante}
+                                </td>
+                                <td className={`px-3 py-2 text-right font-semibold ${
+                                  sinReporte ? "text-gray-300"
+                                  : prodAlerta ? "text-red-600"
+                                  : "text-green-700"
+                                }`}>
+                                  {sinReporte ? "—" : p.vendido}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  {sinReporte ? (
+                                    <span className="text-amber-500">⏳</span>
+                                  ) : prodAlerta ? (
+                                    <span className="text-red-500">🚨</span>
+                                  ) : (
+                                    <span className="text-green-500">✅</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Layout 2 columnas en pantallas grandes ───────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
