@@ -8,7 +8,7 @@ import {
 import { db } from "@/lib/firebase";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import {
-  UserProfile, ImbentarioRecord,
+  UserProfile, ImbentarioRecord, InventarioBaseItem,
   calcSemaforo, Semaforo, toDate, fmtDate, ProductoItem, TalonarioDoc, MovimientoLoker,
 } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
@@ -32,6 +32,7 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
   const [talonarios,    setTalonarios]    = useState<TalonarioDoc[]>([]);
   const [extrasChofer,  setExtrasChofer]  = useState<(MovimientoLoker & { id: string })[]>([]);
   const [driverEntregas, setDriverEntregas] = useState<ProductoItem[]>([]);
+  const [invBase,        setInvBase]        = useState<InventarioBaseItem[]>([]);
   const [rango,      setRango]      = useState<7 | 15 | 30>(15);
   const [fechaBuscar, setFechaBuscar] = useState("");
   const [subTab,     setSubTab]     = useState<SubTab>("stats");
@@ -71,17 +72,28 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
     return () => { u1(); u2(); u3(); };
   }, [chofer.uid]);
 
-  // Load driver entregas
+  // Load driver entregas + inventario_base
   useEffect(() => {
+    // Seed inmediato desde el prop (ya tiene inventario_base de usuarios/{uid})
+    if (Array.isArray(chofer.inventario_base) && chofer.inventario_base.length > 0) {
+      setInvBase(chofer.inventario_base as InventarioBaseItem[]);
+    }
+
     getDoc(doc(db, "drivers", chofer.uid)).then((snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        const entregas = Array.isArray(data.entregas) ? (data.entregas as ProductoItem[]) : [];
-        setDriverEntregas(entregas);
-        setEditEntregas(JSON.parse(JSON.stringify(entregas)));
+      if (!snap.exists()) return;
+      const data = snap.data();
+
+      // entregas (FacturaScan editable)
+      const entregas = Array.isArray(data.entregas) ? (data.entregas as ProductoItem[]) : [];
+      setDriverEntregas(entregas);
+      setEditEntregas(JSON.parse(JSON.stringify(entregas)));
+
+      // inventario_base desde drivers (tiene prioridad sobre el prop)
+      if (Array.isArray(data.inventario_base) && data.inventario_base.length > 0) {
+        setInvBase(data.inventario_base as InventarioBaseItem[]);
       }
     });
-  }, [chofer.uid]);
+  }, [chofer.uid, chofer.inventario_base]);
 
   // Filtrar por rango de días o por fecha exacta
   const cutoff = new Date();
@@ -809,7 +821,68 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
         );
       })()}
 
-      {/* ── Inventario (drivers collection) ── */}
+      {/* ── Inventario base (read-only) ── */}
+      {subTab === "inventario" && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 bg-gradient-to-r from-violet-50 to-violet-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-violet-900 text-sm">📋 Inventario base asignado</h3>
+                <p className="text-xs text-violet-600 mt-0.5">18/05/2026 · solo lectura</p>
+              </div>
+              {invBase.length > 0 && (
+                <div className="text-right">
+                  <p className="text-lg font-bold text-violet-700">
+                    {invBase.reduce((s, p) => s + p.cantidad, 0)}
+                  </p>
+                  <p className="text-xs text-violet-500">uds total</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {invBase.length === 0 ? (
+            <div className="px-5 py-6 text-center">
+              <p className="text-2xl mb-2">📋</p>
+              <p className="text-sm text-gray-400">Sin inventario base registrado</p>
+              <p className="text-xs text-gray-300 mt-1">
+                Ejecuta seed-inventario-base para cargar los datos.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-violet-50/60 text-violet-700 border-b border-violet-100">
+                    <th className="text-left px-4 py-2.5 font-semibold">Producto</th>
+                    <th className="text-right px-4 py-2.5 font-semibold w-20">Cant.</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {invBase.map((p, i) => (
+                    <tr key={i} className="hover:bg-violet-50/30">
+                      <td className="px-4 py-2 text-gray-700 font-medium">{p.nombre}</td>
+                      <td className="px-4 py-2 text-right font-bold text-violet-700">{p.cantidad}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-violet-50/60 border-t border-violet-100 font-bold text-xs">
+                    <td className="px-4 py-2 text-violet-700">
+                      Total — {invBase.length} productos
+                    </td>
+                    <td className="px-4 py-2 text-right text-violet-700">
+                      {invBase.reduce((s, p) => s + p.cantidad, 0)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Inventario FacturaScan (editable) ── */}
       {subTab === "inventario" && (
         <div className="bg-white rounded-xl shadow-sm p-5">
           <h3 className="font-bold text-gray-700 mb-4">📦 Inventario FacturaScan</h3>

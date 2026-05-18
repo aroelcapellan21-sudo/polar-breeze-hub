@@ -1,5 +1,11 @@
 export type UserRole = "admin" | "despachador" | "chofer" | "encargado";
 
+export interface InventarioBaseItem {
+  nombre:      string;
+  producto_id: string;
+  cantidad:    number;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -9,6 +15,8 @@ export interface UserProfile {
   telefono?: string;
   activo?: boolean;
   createdAt: Date;
+  inventario_base?:    InventarioBaseItem[];
+  inventarioBaseDate?: Date | { seconds: number };
 }
 
 export interface SpikinScanRecord {
