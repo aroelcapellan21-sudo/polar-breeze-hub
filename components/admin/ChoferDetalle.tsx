@@ -63,37 +63,42 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
     const u1 = onSnapshot(q,  (snap) => setRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ImbentarioRecord))));
     const u2 = onSnapshot(q2, (snap) => setTalonarios(snap.docs.map((d) => ({ id: d.id, ...d.data() } as TalonarioDoc))));
     const u3 = onSnapshot(q3, (snap) => {
-      const docs = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() } as MovimientoLoker & { id: string } & { categoria?: string }))
+      const allMovs = snap.docs.map(
+        (d) => ({ id: d.id, ...d.data() } as MovimientoLoker & { id: string }),
+      );
+
+      // Extras (tienen campo categoria)
+      const extras = allMovs
         .filter((d) => !!(d as { categoria?: string }).categoria)
         .sort((a, b) => toDate(b.timestamp).getTime() - toDate(a.timestamp).getTime());
-      setExtrasChofer(docs as (MovimientoLoker & { id: string })[]);
+      setExtrasChofer(extras);
+
+      // Inventario base — todos los movimientos tipo entrada_consignacion_inicial
+      // sin ningún filtro de fecha para capturar datos históricos
+      const baseMap = new Map<string, InventarioBaseItem>();
+      for (const m of allMovs) {
+        if (m.tipo !== "entrada_consignacion_inicial") continue;
+        const prev = baseMap.get(m.producto_id) ?? {
+          nombre: m.nombre, producto_id: m.producto_id, cantidad: 0,
+        };
+        baseMap.set(m.producto_id, { ...prev, cantidad: prev.cantidad + m.cantidad });
+      }
+      const baseList = Array.from(baseMap.values()).sort((a, b) => b.cantidad - a.cantidad);
+      setInvBase(baseList);
     });
     return () => { u1(); u2(); u3(); };
   }, [chofer.uid]);
 
-  // Load driver entregas + inventario_base
+  // Load driver entregas (FacturaScan editable)
   useEffect(() => {
-    // Seed inmediato desde el prop (ya tiene inventario_base de usuarios/{uid})
-    if (Array.isArray(chofer.inventario_base) && chofer.inventario_base.length > 0) {
-      setInvBase(chofer.inventario_base as InventarioBaseItem[]);
-    }
-
     getDoc(doc(db, "drivers", chofer.uid)).then((snap) => {
       if (!snap.exists()) return;
       const data = snap.data();
-
-      // entregas (FacturaScan editable)
       const entregas = Array.isArray(data.entregas) ? (data.entregas as ProductoItem[]) : [];
       setDriverEntregas(entregas);
       setEditEntregas(JSON.parse(JSON.stringify(entregas)));
-
-      // inventario_base desde drivers (tiene prioridad sobre el prop)
-      if (Array.isArray(data.inventario_base) && data.inventario_base.length > 0) {
-        setInvBase(data.inventario_base as InventarioBaseItem[]);
-      }
     });
-  }, [chofer.uid, chofer.inventario_base]);
+  }, [chofer.uid]);
 
   // Filtrar por rango de días o por fecha exacta
   const cutoff = new Date();
