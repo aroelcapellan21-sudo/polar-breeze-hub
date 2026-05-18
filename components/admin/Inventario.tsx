@@ -82,6 +82,14 @@ export default function Inventario() {
   const [chofersAbierto, setChofersAbierto] = useState(true);
   const [movAbierto,     setMovAbierto]     = useState(false);
 
+  // Modal
+  type InvModal =
+    | { type: "stat"; key: "loker" | "despachado" | "vendido" | "facturado" }
+    | { type: "producto"; pid: string; nombre: string }
+    | { type: "chofer"; ch: ResumenChofer }
+    | null;
+  const [invModal, setInvModal] = useState<InvModal>(null);
+
   // Timestamps estables (solo se calculan una vez por montaje)
   const todayStart = useMemo(() => getTodayStart(), []);
   const todayTs    = useMemo(() => Timestamp.fromDate(todayStart), [todayStart]);
@@ -305,23 +313,25 @@ export default function Inventario() {
           <div className="p-4 space-y-4">
             {/* Stats 2×2 en móvil, 4 en escritorio */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard icon="📦" label="En loker"       value={dashboard.totalEnLoker}    color="purple" />
-              <StatCard icon="🚚" label="Despachado hoy" value={dashboard.totalDespachado} color="orange" />
+              <StatCard icon="📦" label="En loker"       value={dashboard.totalEnLoker}    color="purple"
+                onClick={() => setInvModal({ type: "stat", key: "loker" })} />
+              <StatCard icon="🚚" label="Despachado hoy" value={dashboard.totalDespachado} color="orange"
+                onClick={() => setInvModal({ type: "stat", key: "despachado" })} />
               <StatCard
                 icon="✅"
                 label="Vendido hoy"
                 value={dashboard.chofersReportados === 0 ? "—" : dashboard.totalVendido}
                 color="green"
                 sub={dashboard.chofersReportados === 0 ? "sin reportes" : undefined}
+                onClick={() => setInvModal({ type: "stat", key: "vendido" })}
               />
               <StatCard
                 icon="💰"
                 label="Facturado hoy"
-                value={dashboard.hayPrecios
-                  ? `$${dashboard.moneyHoy.toLocaleString("es-MX")}`
-                  : "—"}
+                value={dashboard.hayPrecios ? `$${dashboard.moneyHoy.toLocaleString("es-MX")}` : "—"}
                 color="yellow"
                 sub={!dashboard.hayPrecios ? "sin precios" : undefined}
+                onClick={() => setInvModal({ type: "stat", key: "facturado" })}
               />
             </div>
 
@@ -354,17 +364,18 @@ export default function Inventario() {
                 {/* Chips por chofer */}
                 <div className="flex gap-1.5 flex-wrap">
                   {resumenChoferes.map((ch) => (
-                    <span
+                    <button
                       key={ch.choferId}
+                      onClick={() => setInvModal({ type: "chofer", ch })}
                       title={`${ch.choferNombre} — Despachado: ${ch.totalDespachado} | Vendido: ${ch.totalVendido}`}
-                      className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
+                      className={`text-xs px-2.5 py-1 rounded-full border font-medium active:scale-95 transition-all duration-100 ${
                         ch.reportado
-                          ? "bg-green-100 text-green-700 border-green-200"
-                          : "bg-amber-100 text-amber-700 border-amber-200"
+                          ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
+                          : "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200"
                       }`}
                     >
                       {ch.reportado ? "✅" : "⏳"} {ch.choferNombre.split(" ")[0]}
-                    </span>
+                    </button>
                   ))}
                 </div>
 
@@ -449,9 +460,10 @@ export default function Inventario() {
                   const haySobrante = p.sobranteHoy > 0;
 
                   return (
-                    <div
+                    <button
                       key={p.pid}
-                      className={`px-4 py-3 transition-colors ${negativo ? "bg-red-50/50" : ""}`}
+                      onClick={() => setInvModal({ type: "producto", pid: p.pid, nombre: p.nombre })}
+                      className={`w-full px-4 py-3 transition-colors text-left active:scale-[0.99] hover:bg-gray-50/80 ${negativo ? "bg-red-50/50" : ""}`}
                     >
                       <div className="flex items-center justify-between gap-3">
                         {/* Ícono + nombre */}
@@ -501,7 +513,7 @@ export default function Inventario() {
                           )}
                         </div>
                       )}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -828,6 +840,174 @@ export default function Inventario() {
           </div>
         </div>
       </div>
+
+      {/* ── Modal global ── */}
+      {invModal !== null && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setInvModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+              <h3 className="font-bold text-gray-800">
+                {invModal.type === "stat" && invModal.key === "loker"      && "📦 Stock en el loker"}
+                {invModal.type === "stat" && invModal.key === "despachado" && "🚚 Despachado hoy"}
+                {invModal.type === "stat" && invModal.key === "vendido"    && "✅ Vendido hoy"}
+                {invModal.type === "stat" && invModal.key === "facturado"  && "💰 Facturado hoy"}
+                {invModal.type === "producto" && `📊 Historial — ${invModal.nombre}`}
+                {invModal.type === "chofer"   && `🚛 ${invModal.ch.choferNombre}`}
+              </h3>
+              <button onClick={() => setInvModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95 transition-all">×</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+
+              {/* Stat: loker */}
+              {invModal.type === "stat" && invModal.key === "loker" && (
+                saldoConDetalle.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-8">Sin productos en el loker aún</p>
+                ) : saldoConDetalle.map((p) => (
+                  <div key={p.pid} className={`flex justify-between items-center px-3 py-2 rounded-xl border text-sm ${p.saldo < 0 ? "bg-red-50 border-red-200" : p.saldo === 0 ? "bg-amber-50 border-amber-200" : "bg-green-50 border-green-100"}`}>
+                    <span className="font-medium text-gray-800">{p.nombre}</span>
+                    <span className={`font-bold ${p.saldo < 0 ? "text-red-700" : p.saldo === 0 ? "text-amber-600" : "text-green-700"}`}>
+                      {p.saldo > 0 ? "+" : ""}{p.saldo}
+                    </span>
+                  </div>
+                ))
+              )}
+
+              {/* Stat: despachado */}
+              {invModal.type === "stat" && invModal.key === "despachado" && (
+                saldoConDetalle.filter(p => p.despachHoy > 0).length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-8">Sin despachos registrados hoy</p>
+                ) : saldoConDetalle.filter(p => p.despachHoy > 0).map((p) => (
+                  <div key={p.pid} className="flex justify-between items-center px-3 py-2 rounded-xl border border-orange-100 bg-orange-50 text-sm">
+                    <span className="font-medium text-gray-800">{p.nombre}</span>
+                    <span className="font-bold text-orange-700">{p.despachHoy} uds</span>
+                  </div>
+                ))
+              )}
+
+              {/* Stat: vendido */}
+              {invModal.type === "stat" && invModal.key === "vendido" && (
+                resumenChoferes.filter(c => c.reportado).length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-3xl mb-2">⏳</p>
+                    <p className="text-sm text-gray-500 font-medium">Sin reportes de sobrantes aún</p>
+                    <p className="text-xs text-gray-400 mt-1">Los choferes deben reportar sus sobrantes para ver lo vendido</p>
+                  </div>
+                ) : resumenChoferes.filter(c => c.reportado).map((ch) => (
+                  <div key={ch.choferId} className="border border-green-100 rounded-xl p-3 bg-green-50">
+                    <p className="text-sm font-semibold text-gray-800 mb-2">{ch.choferNombre} <span className="text-xs font-normal text-green-600">· vendido: {ch.totalVendido}</span></p>
+                    <div className="space-y-1">
+                      {ch.productos.map(p => (
+                        <div key={p.pid} className="flex justify-between text-xs text-gray-600">
+                          <span>{p.nombre}</span>
+                          <span className="font-semibold">{p.vendido} vend. / {p.despachado} desp.</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {/* Stat: facturado */}
+              {invModal.type === "stat" && invModal.key === "facturado" && (() => {
+                const items = talonarioHoy
+                  .filter(t => t.tipo === "retirada")
+                  .flatMap(t => t.productos.filter(p => p.precio != null && p.precio! > 0).map(p => ({
+                    chofer: t.choferNombre, nombre: p.nombre,
+                    cantidad: p.cantidad ?? 0, precio: p.precio!,
+                    subtotal: p.precio! * (p.cantidad ?? 0),
+                  })));
+                return items.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-3xl mb-2">💰</p>
+                    <p className="text-sm text-gray-500 font-medium">Sin precios configurados hoy</p>
+                    <p className="text-xs text-gray-400 mt-1">Asigna precios al registrar talonarios para ver el facturado</p>
+                  </div>
+                ) : (
+                  <>
+                    {items.map((it, i) => (
+                      <div key={i} className="flex items-center justify-between border border-gray-100 rounded-xl px-3 py-2 text-sm">
+                        <div>
+                          <p className="font-medium text-gray-800">{it.nombre}</p>
+                          <p className="text-xs text-gray-400">{it.chofer} · {it.cantidad} × ${it.precio.toLocaleString()}</p>
+                        </div>
+                        <span className="font-bold text-green-700">${it.subtotal.toLocaleString()}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
+                      <span className="font-bold text-green-700">Total</span>
+                      <span className="font-bold text-green-700">${dashboard.moneyHoy.toLocaleString("es-MX")}</span>
+                    </div>
+                  </>
+                );
+              })()}
+
+              {/* Producto: historial de movimientos */}
+              {invModal.type === "producto" && (() => {
+                const movProd = movimientos.filter(m => m.producto_id === invModal.pid).slice(0, 50);
+                return movProd.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-8">Sin movimientos para este producto</p>
+                ) : movProd.map((m) => {
+                  const cfg = TIPO_CFG[m.tipo] ?? TIPO_CFG.ajuste;
+                  return (
+                    <div key={m.id} className={`flex items-center justify-between text-sm px-3 py-2 rounded-xl border ${cfg.bg} ${cfg.border}`}>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-medium ${cfg.text}`}>{cfg.label}</p>
+                        <p className="text-xs text-gray-500 truncate">{m.responsable} {m.choferNombre ? `→ ${m.choferNombre}` : ""}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-2">
+                        <p className={`font-bold ${m.cantidad > 0 ? "text-green-700" : "text-red-600"}`}>
+                          {m.cantidad > 0 ? "+" : ""}{m.cantidad}
+                        </p>
+                        <p className="text-xs text-gray-400">{fmtDate(m.timestamp)}</p>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+
+              {/* Chofer: detalle sobrantes */}
+              {invModal.type === "chofer" && (() => {
+                const ch = invModal.ch;
+                return (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-cyan-50 rounded-xl p-3 text-center">
+                        <p className="text-xl font-bold text-cyan-700">{ch.totalDespachado}</p>
+                        <p className="text-xs text-cyan-500">Despachado</p>
+                      </div>
+                      <div className="bg-blue-50 rounded-xl p-3 text-center">
+                        <p className="text-xl font-bold text-blue-700">{ch.reportado ? ch.totalSobrante : "—"}</p>
+                        <p className="text-xs text-blue-500">Sobrante</p>
+                      </div>
+                      <div className="bg-green-50 rounded-xl p-3 text-center">
+                        <p className="text-xl font-bold text-green-700">{ch.reportado ? ch.totalVendido : "—"}</p>
+                        <p className="text-xs text-green-500">Vendido</p>
+                      </div>
+                    </div>
+                    {!ch.reportado && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                        <p className="text-sm font-medium text-amber-700">⏳ Sin sobrantes reportados</p>
+                      </div>
+                    )}
+                    <div className="space-y-1.5">
+                      {ch.productos.map(p => (
+                        <div key={p.pid} className="flex items-center justify-between text-xs border border-gray-100 rounded-lg px-3 py-2">
+                          <span className="font-medium text-gray-800">{p.nombre}</span>
+                          <div className="flex gap-3 text-right">
+                            <span className="text-cyan-700">{p.despachado} desp.</span>
+                            {ch.reportado && <span className="text-green-700 font-semibold">{p.vendido} vend.</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -835,13 +1015,14 @@ export default function Inventario() {
 // ─── StatCard ─────────────────────────────────────────────────────────────────
 
 function StatCard({
-  icon, label, value, color, sub,
+  icon, label, value, color, sub, onClick,
 }: {
-  icon:   string;
-  label:  string;
-  value:  number | string;
-  color:  "purple" | "orange" | "green" | "yellow";
-  sub?:   string;
+  icon:    string;
+  label:   string;
+  value:   number | string;
+  color:   "purple" | "orange" | "green" | "yellow";
+  sub?:    string;
+  onClick?: () => void;
 }) {
   const bg = {
     purple: "from-purple-500 to-purple-700",
@@ -851,11 +1032,11 @@ function StatCard({
   }[color];
 
   return (
-    <div className={`rounded-xl p-3.5 text-white bg-gradient-to-br ${bg} shadow-sm`}>
+    <button onClick={onClick} className={`w-full rounded-xl p-3.5 text-white bg-gradient-to-br ${bg} shadow-sm text-left active:scale-95 transition-all duration-100 hover:brightness-110`}>
       <p className="text-xl leading-none mb-1">{icon}</p>
       <p className="text-lg font-bold leading-tight">{value}</p>
       <p className="text-xs opacity-80 mt-0.5 leading-tight">{label}</p>
       {sub && <p className="text-xs opacity-60 italic leading-tight">{sub}</p>}
-    </div>
+    </button>
   );
 }

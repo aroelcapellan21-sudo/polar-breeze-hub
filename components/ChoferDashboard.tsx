@@ -38,6 +38,9 @@ export default function ChoferDashboard() {
   const [waLoading,    setWaLoading]    = useState(false);
   const [waErr,        setWaErr]        = useState<string | null>(null);
 
+  type ChoferModal = "semaforo" | "puntos" | "monto" | { pid: string; nombre: string } | null;
+  const [modal, setModal] = useState<ChoferModal>(null);
+
   const todayStart = useMemo(() => getTodayStart(), []);
 
   useEffect(() => {
@@ -106,6 +109,22 @@ export default function ChoferDashboard() {
   const meta = puntosConfig?.meta ?? 100;
   const pct  = Math.min((puntosTotal / meta) * 100, 100);
 
+  const puntosDetalle = useMemo(() => {
+    const recQ = records.filter((r) => {
+      const d = toDate(r.timestamp);
+      return d >= quincena.start && d <= quincena.end;
+    });
+    const map: Record<string, { nombre: string; cantidad: number; pts: number; total: number }> = {};
+    recQ.forEach((r) => {
+      const key = r.producto.toLowerCase().trim();
+      const p   = puntosMap[key] ?? 0;
+      if (!map[key]) map[key] = { nombre: r.producto, cantidad: 0, pts: p, total: 0 };
+      map[key].cantidad += r.cantidadEntregada ?? 0;
+      map[key].total    += p * (r.cantidadEntregada ?? 0);
+    });
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  }, [records, quincena, puntosMap]);
+
   // ── Estado del día ───────────────────────────────────────────────────────────
   const movHoy = useMemo(
     () => movimientos.filter((m) => toDate(m.timestamp) >= todayStart),
@@ -155,7 +174,7 @@ export default function ChoferDashboard() {
     });
     return Array.from(despMap.entries()).map(([pid, { nombre, desp }]) => {
       const sobrante = sobrMap.get(pid) ?? 0;
-      return { pid, nombre, sobrante, vendido: desp - sobrante };
+      return { pid, nombre, desp, sobrante, vendido: desp - sobrante };
     });
   }, [movHoy]);
 
@@ -288,10 +307,13 @@ export default function ChoferDashboard() {
       <div className="max-w-lg mx-auto px-4 py-5 space-y-4 pb-8">
 
         {/* 1. Semáforo */}
-        <SemaforoCard semaforo={semaforo} fecha={fechaHoy} />
+        <SemaforoCard semaforo={semaforo} fecha={fechaHoy} onClick={() => setModal("semaforo")} />
 
         {/* 2. Puntos quincena */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <button
+          onClick={() => setModal("puntos")}
+          className="w-full bg-white rounded-xl shadow-sm border border-gray-200 p-4 active:scale-95 transition-all duration-100 text-left hover:shadow-md"
+        >
           <div className="flex items-center justify-between mb-3">
             <span className="font-semibold text-sm text-gray-800">⭐ Puntos — {quincena.label}</span>
             <span className="font-bold text-teal-700">
@@ -306,8 +328,8 @@ export default function ChoferDashboard() {
               style={{ width: `${pct}%` }}
             />
           </div>
-          <p className="text-xs text-gray-400 mt-1.5 text-right">{pct.toFixed(0)}% de la meta</p>
-        </div>
+          <p className="text-xs text-gray-400 mt-1.5 text-right">{pct.toFixed(0)}% de la meta · Toca para desglose ›</p>
+        </button>
 
         {/* 3. Despacho del día */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -319,29 +341,42 @@ export default function ChoferDashboard() {
               {yaReporto ? "✅ Reportado" : "⏳ Pendiente"}
             </span>
           </div>
-          <ul className="divide-y divide-gray-50">
+          <div className="divide-y divide-gray-50">
             {despachados.map(({ pid, nombre }) => (
-              <li key={pid} className="px-4 py-2.5 flex items-center justify-between">
+              <button
+                key={pid}
+                onClick={() => setModal({ pid, nombre })}
+                className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 active:scale-[0.99] transition-all duration-100 text-left"
+              >
                 <span className="text-sm text-gray-700 font-medium">{nombre}</span>
-                <span className="text-base leading-none">
-                  {productosConSobrante.has(pid) ? "✅" : "⏳"}
-                </span>
-              </li>
+                <div className="flex items-center gap-2">
+                  <span className="text-base leading-none">
+                    {productosConSobrante.has(pid) ? "✅" : "⏳"}
+                  </span>
+                  <span className="text-gray-300 text-sm">›</span>
+                </div>
+              </button>
             ))}
-          </ul>
+          </div>
         </div>
 
         {/* 4. Monto estimado */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex items-center justify-between">
+        <button
+          onClick={() => setModal("monto")}
+          className="w-full bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex items-center justify-between active:scale-95 transition-all duration-100 hover:shadow-md text-left"
+        >
           <span className="font-semibold text-sm text-gray-800">💰 Monto estimado</span>
-          {montoHoy.hayPrecios ? (
-            <span className="font-bold text-lg text-gray-900">
-              ${montoHoy.total.toLocaleString("es-MX")}
-            </span>
-          ) : (
-            <span className="text-sm text-gray-400">—</span>
-          )}
-        </div>
+          <div className="flex items-center gap-2">
+            {montoHoy.hayPrecios ? (
+              <span className="font-bold text-lg text-gray-900">
+                ${montoHoy.total.toLocaleString("es-MX")}
+              </span>
+            ) : (
+              <span className="text-sm text-gray-400">— Toca para ver</span>
+            )}
+            <span className="text-gray-300 text-sm">›</span>
+          </div>
+        </button>
 
         {/* Formulario de sobrantes — solo cuando hay pendiente */}
         {!yaReporto && <SobrantesChofer />}
@@ -383,6 +418,151 @@ export default function ChoferDashboard() {
         )}
 
       </div>
+
+      {/* ── Modal global ── */}
+      {modal !== null && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4"
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+              <h3 className="font-bold text-gray-800">
+                {modal === "semaforo" ? "🚦 Estado del semáforo"
+                 : modal === "puntos" ? `⭐ Puntos — ${quincena.label}`
+                 : modal === "monto"  ? "💰 Monto estimado"
+                 : `📦 ${typeof modal === "object" ? modal.nombre : ""}`}
+              </h3>
+              <button
+                onClick={() => setModal(null)}
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95 transition-all"
+              >×</button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3">
+
+              {/* Semáforo */}
+              {modal === "semaforo" && (
+                <div className="space-y-3">
+                  {(Object.entries(SEMAFORO_CFG) as [SemaforoColor, typeof SEMAFORO_CFG[SemaforoColor]][]).map(([key, cfg]) => (
+                    <div key={key} className={`flex items-center gap-3 p-3 rounded-xl border ${
+                      semaforo === key ? `${cfg.border} ${cfg.bg}` : "border-gray-100 bg-gray-50"
+                    }`}>
+                      <div className={`w-4 h-4 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                      <div className="flex-1">
+                        <p className={`text-sm font-semibold ${semaforo === key ? cfg.text : "text-gray-500"}`}>{cfg.label}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {key === "verde"    ? "Sobrantes entregados · día completado ✓"
+                           : key === "amarillo" ? "Despacho activo · sobrantes pendientes de reportar"
+                           :                     "Sin despacho registrado hoy"}
+                        </p>
+                      </div>
+                      {semaforo === key && <span className="text-xs font-bold text-purple-600 flex-shrink-0">← Actual</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Puntos */}
+              {modal === "puntos" && (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center bg-teal-50 border border-teal-200 rounded-xl px-4 py-3">
+                    <span className="text-sm font-bold text-teal-700">Total quincena</span>
+                    <span className="text-lg font-bold text-teal-700">{puntosTotal} / {meta} pts</span>
+                  </div>
+                  {puntosDetalle.length === 0 ? (
+                    <div className="text-center py-6">
+                      <p className="text-3xl mb-2">⭐</p>
+                      <p className="text-sm text-gray-500 font-medium">Sin entregas con puntos en esta quincena</p>
+                      <p className="text-xs text-gray-400 mt-1">Los puntos se configuran en Admin → Configuración</p>
+                    </div>
+                  ) : puntosDetalle.map((d, i) => (
+                    <div key={i} className="flex items-center justify-between border border-gray-100 rounded-xl px-3 py-2.5">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{d.nombre}</p>
+                        <p className="text-xs text-gray-400">{d.cantidad} uds × {d.pts} pts/ud</p>
+                      </div>
+                      <span className="font-bold text-teal-700">+{d.total} pts</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Producto individual */}
+              {typeof modal === "object" && modal !== null && "pid" in modal && (() => {
+                const prod     = reporteCompleto.find((r) => r.pid === (modal as {pid:string}).pid);
+                const reportado = productosConSobrante.has((modal as {pid:string}).pid);
+                return (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-blue-50 rounded-xl p-3 text-center">
+                        <p className="text-2xl font-bold text-blue-700">{prod?.desp ?? 0}</p>
+                        <p className="text-xs text-blue-500 mt-0.5">Despachado</p>
+                      </div>
+                      <div className="bg-teal-50 rounded-xl p-3 text-center">
+                        <p className="text-2xl font-bold text-teal-700">{reportado ? (prod?.sobrante ?? 0) : "—"}</p>
+                        <p className="text-xs text-teal-500 mt-0.5">Sobrante</p>
+                      </div>
+                      <div className="bg-green-50 rounded-xl p-3 text-center">
+                        <p className="text-2xl font-bold text-green-700">{reportado ? (prod?.vendido ?? 0) : "—"}</p>
+                        <p className="text-xs text-green-500 mt-0.5">Vendido</p>
+                      </div>
+                    </div>
+                    {!reportado && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                        <p className="text-sm font-medium text-amber-700">⏳ Sobrante pendiente</p>
+                        <p className="text-xs text-amber-500 mt-0.5">Registra tus sobrantes para ver los números finales</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Monto */}
+              {modal === "monto" && (() => {
+                const talHoy = talonarios.filter((t) => toDate(t.timestamp) >= todayStart && t.tipo === "retirada");
+                const items  = talHoy.flatMap((t) =>
+                  t.productos
+                    .filter((p) => p.precio != null && p.precio! > 0)
+                    .map((p) => ({
+                      nombre: p.nombre, cantidad: p.cantidad ?? 0,
+                      precio: p.precio!, subtotal: p.precio! * (p.cantidad ?? 0),
+                    }))
+                );
+                return items.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-3xl mb-2">💰</p>
+                    <p className="text-sm text-gray-500 font-medium">Sin precios configurados</p>
+                    <p className="text-xs text-gray-400 mt-1">El despachador asigna precios al registrar tu talonario</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {items.map((it, i) => (
+                      <div key={i} className="flex items-center justify-between border border-gray-100 rounded-xl px-3 py-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{it.nombre}</p>
+                          <p className="text-xs text-gray-400">{it.cantidad} × ${it.precio.toLocaleString()}</p>
+                        </div>
+                        <span className="font-bold text-green-700">${it.subtotal.toLocaleString()}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                      <span className="font-bold text-green-700">Total estimado</span>
+                      <span className="font-bold text-green-700">${montoHoy.total.toLocaleString("es-MX")}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -395,15 +575,19 @@ const SEMAFORO_CFG = {
   rojo:     { dot: "bg-red-500",   ring: "ring-4 ring-red-200",    bg: "bg-red-50",    border: "border-red-200",    text: "text-red-600",    label: "Sin actividad hoy" },
 } as const;
 
-function SemaforoCard({ semaforo, fecha }: { semaforo: SemaforoColor; fecha: string }) {
+function SemaforoCard({ semaforo, fecha, onClick }: { semaforo: SemaforoColor; fecha: string; onClick?: () => void }) {
   const cfg = SEMAFORO_CFG[semaforo];
   return (
-    <div className={`rounded-xl border-2 ${cfg.bg} ${cfg.border} p-4 flex items-center gap-4`}>
+    <button
+      onClick={onClick}
+      className={`w-full rounded-xl border-2 ${cfg.bg} ${cfg.border} p-4 flex items-center gap-4 active:scale-95 transition-all duration-100 text-left hover:shadow-md`}
+    >
       <div className={`w-11 h-11 rounded-full flex-shrink-0 ${cfg.dot} ${cfg.ring}`} />
-      <div>
+      <div className="flex-1">
         <p className={`font-bold text-base ${cfg.text}`}>{cfg.label}</p>
         <p className="text-xs text-gray-400 mt-0.5 capitalize">{fecha}</p>
       </div>
-    </div>
+      <span className="text-gray-300 text-lg flex-shrink-0">›</span>
+    </button>
   );
 }

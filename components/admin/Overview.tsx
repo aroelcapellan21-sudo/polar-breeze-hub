@@ -26,8 +26,16 @@ const SEM: Record<Semaforo, { icon: string; ring: string; bg: string; label: str
 
 type KpiModal = "choferes" | "despachos" | "facturado" | "alertas" | null;
 
+type HistItem = {
+  key: string; ts: Date; label: string;
+  top: string; sub: string; source: "facturascan" | "hub-sp" | "hub-fac" | "hub-imb";
+};
+
+type ItemModal = { type: "alerta"; data: WeightAlert } | { type: "hist"; data: HistItem } | { type: "feed"; top: string; sub: string } | null;
+
 export default function Overview({ onVerChofer }: Props) {
   const [kpiModal, setKpiModal] = useState<KpiModal>(null);
+  const [itemModal, setItemModal] = useState<ItemModal>(null);
 
   // ── Listeners existentes del Hub (sin cambios) ────────────────────────────
   const [choferes, setChoferes] = useState<UserProfile[]>([]);
@@ -150,11 +158,6 @@ export default function Overview({ onVerChofer }: Props) {
   }, [choferes, fsDrivers]);
 
   // ── Historial cruzado: combina history de FacturaScan + feeds del Hub ───
-  type HistItem = {
-    key: string; ts: Date; label: string;
-    top: string; sub: string; source: "facturascan" | "hub-sp" | "hub-fac" | "hub-imb";
-  };
-
   const historialCruzado = useMemo((): HistItem[] => {
     const items: HistItem[] = [];
 
@@ -548,9 +551,10 @@ export default function Overview({ onVerChofer }: Props) {
           <h3 className="font-bold text-red-600 mb-3">⚖️ Polar Breeze Weight — Alertas</h3>
           <div className="space-y-2 max-h-44 overflow-y-auto">
             {alerts.map((a) => (
-              <div
+              <button
                 key={a.id}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${
+                onClick={() => setItemModal({ type: "alerta", data: a })}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left active:scale-[0.99] transition-all duration-100 hover:shadow-sm ${
                   a.severity === "critical"
                     ? "bg-red-50 border-red-200"
                     : "bg-yellow-50 border-yellow-200"
@@ -569,7 +573,7 @@ export default function Overview({ onVerChofer }: Props) {
                   </p>
                 </div>
                 <span className="text-xs text-gray-400 flex-shrink-0">{fmtDate(a.timestamp)}</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -600,7 +604,7 @@ export default function Overview({ onVerChofer }: Props) {
             {historialCruzado.map((item) => {
               const sc = SOURCE_CFG[item.source];
               return (
-                <div key={item.key} className="flex items-start gap-3 px-5 py-2.5 hover:bg-gray-50">
+                <button key={item.key} onClick={() => setItemModal({ type: "hist", data: item })} className="w-full flex items-start gap-3 px-5 py-2.5 hover:bg-gray-50 active:scale-[0.99] transition-all duration-100 text-left">
                   <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${sc.dot}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -614,7 +618,7 @@ export default function Overview({ onVerChofer }: Props) {
                   <span className="text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
                     {fmtDate(item.ts)}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -625,6 +629,7 @@ export default function Overview({ onVerChofer }: Props) {
       <div className="grid lg:grid-cols-3 gap-4">
         <Feed
           title="📦 SPIKINSCAN" accent="blue" badgeHoy={spikinHoy.length}
+          onClickItem={(top, sub) => setItemModal({ type: "feed", top, sub })}
           items={spikin.slice(0, 20).map((r) => ({
             key:     r.id!, top: r.producto,
             sub:     `${r.despachadorNombre} → ${r.destino} · ×${r.cantidad}`,
@@ -633,6 +638,7 @@ export default function Overview({ onVerChofer }: Props) {
         />
         <Feed
           title="🧾 FACTURASCAN" accent="indigo" badgeHoy={facturaHoy.length}
+          onClickItem={(top, sub) => setItemModal({ type: "feed", top, sub })}
           items={factura.slice(0, 20).map((r) => ({
             key:     r.id!, top: `#${r.facturaNumero} — ${r.cliente}`,
             sub:     `$${(r.monto ?? 0).toLocaleString()} · ${r.despachadorNombre}`,
@@ -641,6 +647,7 @@ export default function Overview({ onVerChofer }: Props) {
         />
         <Feed
           title="🚚 IMBENTARIO" accent="cyan" badgeHoy={imbHoy.length}
+          onClickItem={(top, sub) => setItemModal({ type: "feed", top, sub })}
           items={imb.slice(0, 20).map((r) => ({
             key:     r.id!, top: r.choferNombre,
             sub:     `${r.producto} · ${r.cantidadEntregada}/${r.cantidadCargada} uds · ${r.ruta}`,
@@ -648,6 +655,66 @@ export default function Overview({ onVerChofer }: Props) {
           }))}
         />
       </div>
+
+      {/* ── Item detail modal ── */}
+      {itemModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setItemModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h3 className="font-bold text-gray-800">
+                {itemModal.type === "alerta" && (itemModal.data.severity === "critical" ? "🚨 Alerta crítica" : "⚠️ Alerta de peso")}
+                {itemModal.type === "hist"   && "📋 Detalle de registro"}
+                {itemModal.type === "feed"   && "📋 Detalle de registro"}
+              </h3>
+              <button onClick={() => setItemModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95">×</button>
+            </div>
+            <div className="p-5 space-y-3">
+              {itemModal.type === "alerta" && (() => {
+                const a = itemModal.data;
+                return (
+                  <>
+                    <div className={`rounded-xl p-4 border ${a.severity === "critical" ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200"}`}>
+                      <p className="font-bold text-gray-800 text-lg">{a.producto}</p>
+                      <p className="text-sm text-gray-600 mt-1">{a.choferNombre}</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-blue-50 rounded-xl p-3 text-center">
+                        <p className="text-lg font-bold text-blue-700">{a.pesoCargado} kg</p>
+                        <p className="text-xs text-blue-500">Cargado</p>
+                      </div>
+                      <div className="bg-green-50 rounded-xl p-3 text-center">
+                        <p className="text-lg font-bold text-green-700">{a.pesoEntregado} kg</p>
+                        <p className="text-xs text-green-500">Entregado</p>
+                      </div>
+                      <div className="bg-red-50 rounded-xl p-3 text-center">
+                        <p className="text-lg font-bold text-red-700">{a.diferencia.toFixed(1)} kg</p>
+                        <p className="text-xs text-red-500">{a.porcentaje.toFixed(0)}% dif.</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400">{fmtDate(a.timestamp)}</p>
+                  </>
+                );
+              })()}
+              {(itemModal.type === "hist" || itemModal.type === "feed") && (() => {
+                const top = itemModal.type === "hist" ? itemModal.data.top : itemModal.top;
+                const sub = itemModal.type === "hist" ? itemModal.data.sub : itemModal.sub;
+                const label = itemModal.type === "hist" ? itemModal.data.label : "";
+                const ts    = itemModal.type === "hist" ? itemModal.data.ts   : null;
+                return (
+                  <div className="space-y-3">
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <p className="font-bold text-gray-800">{top}</p>
+                      {label && <span className="text-xs text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded-full mt-1 inline-block">{label}</span>}
+                      <p className="text-sm text-gray-500 mt-2">{sub}</p>
+                    </div>
+                    {ts && <p className="text-xs text-gray-400">{fmtDate(ts)}</p>}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
@@ -688,8 +755,9 @@ type FeedItem = {
   ts: Date | { seconds: number } | undefined; isToday: boolean;
 };
 
-function Feed({ title, accent, badgeHoy, items }: {
+function Feed({ title, accent, badgeHoy, items, onClickItem }: {
   title: string; accent: string; badgeHoy: number; items: FeedItem[];
+  onClickItem?: (top: string, sub: string) => void;
 }) {
   const c = ACCENT[accent];
   return (
@@ -704,7 +772,7 @@ function Feed({ title, accent, badgeHoy, items }: {
         {items.length === 0 ? (
           <p className="text-center text-gray-400 text-sm py-10">Sin registros</p>
         ) : items.map((item) => (
-          <div key={item.key} className={`px-4 py-2.5 ${item.isToday ? "" : "opacity-50"}`}>
+          <button key={item.key} onClick={() => onClickItem?.(item.top, item.sub)} className={`w-full px-4 py-2.5 text-left active:scale-[0.99] transition-all duration-100 hover:bg-gray-50 ${item.isToday ? "" : "opacity-50"}`}>
             <div className="flex items-start gap-2">
               <span className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${c.dot}`} />
               <div className="flex-1 min-w-0">
@@ -713,7 +781,7 @@ function Feed({ title, accent, badgeHoy, items }: {
               </div>
               <span className="text-xs text-gray-400 whitespace-nowrap">{fmtDate(item.ts)}</span>
             </div>
-          </div>
+          </button>
         ))}
       </div>
       <div className="px-4 py-2 border-t flex items-center gap-1.5">

@@ -45,6 +45,7 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
 
   // Product detail modal
   const [selectedProd, setSelectedProd] = useState<string | null>(null);
+  const [detalleModal, setDetalleModal] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(
@@ -279,21 +280,22 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
       {subTab === "stats" && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <StatCard label="Unidades cargadas"   value={totalCargado}   icon="📥" color="bg-blue-50 text-blue-700" />
-            <StatCard label="Unidades entregadas" value={totalEntregado} icon="📤" color="bg-green-50 text-green-700" />
-            <StatCard label="Diferencia"          value={diferencia}     icon="⚡" color={diferencia > 0 ? "bg-orange-50 text-orange-700" : "bg-gray-50 text-gray-600"} />
-            <StatCard label="Cajas"               value={totalCajas || "—"} icon="📦" color="bg-cyan-50 text-cyan-700" />
-            <StatCard label="Peso total (kg)"     value={totalPeso ? totalPeso.toFixed(1) : "—"} icon="⚖️" color="bg-purple-50 text-purple-700" />
+            <StatCard label="Unidades cargadas"   value={totalCargado}   icon="📥" color="bg-blue-50 text-blue-700"    onClick={() => setDetalleModal("cargado")} />
+            <StatCard label="Unidades entregadas" value={totalEntregado} icon="📤" color="bg-green-50 text-green-700"  onClick={() => setDetalleModal("entregado")} />
+            <StatCard label="Diferencia"          value={diferencia}     icon="⚡" color={diferencia > 0 ? "bg-orange-50 text-orange-700" : "bg-gray-50 text-gray-600"} onClick={() => setDetalleModal("diferencia")} />
+            <StatCard label="Cajas"               value={totalCajas || "—"} icon="📦" color="bg-cyan-50 text-cyan-700" onClick={() => setDetalleModal("cajas")} />
+            <StatCard label="Peso total (kg)"     value={totalPeso ? totalPeso.toFixed(1) : "—"} icon="⚖️" color="bg-purple-50 text-purple-700" onClick={() => setDetalleModal("peso")} />
           </div>
 
           {totalMonto > 0 && (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+            <button onClick={() => setDetalleModal("monto")} className="w-full bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3 active:scale-95 transition-all duration-100 hover:shadow-md text-left">
               <span className="text-2xl">💰</span>
               <div>
                 <p className="text-xs text-green-600">Ventas / Monto acumulado</p>
                 <p className="text-2xl font-bold text-green-700">${totalMonto.toLocaleString()}</p>
               </div>
-            </div>
+              <span className="ml-auto text-gray-300 text-lg">›</span>
+            </button>
           )}
 
           <div className="grid lg:grid-cols-2 gap-5">
@@ -351,8 +353,8 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
                     const sem: Semaforo = efic >= 95 ? "verde" : efic >= 85 ? "amarillo" : "rojo";
                     const barW = Math.round((dat.entregado / maxEntregado) * 100);
                     return (
-                      <div key={dia} className="flex items-center gap-3">
-                        <span className="text-xs text-gray-500 w-16 flex-shrink-0">{dia}</span>
+                      <button key={dia} onClick={() => setDetalleModal(`dia:${dia}`)} className="w-full flex items-center gap-3 active:scale-[0.99] transition-all duration-100 rounded hover:bg-gray-50 px-1">
+                        <span className="text-xs text-gray-500 w-16 flex-shrink-0 text-left">{dia}</span>
                         <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full flex items-center justify-end pr-1 text-white text-xs font-medium transition-all ${
@@ -364,7 +366,7 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
                           </div>
                         </div>
                         <span className="text-lg flex-shrink-0">{SEMAFORO_CFG[sem].icon}</span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -497,18 +499,18 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
           <div className="space-y-4">
             {/* Resumen */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="bg-orange-50 rounded-xl p-3 text-center">
+              <button onClick={() => setDetalleModal("extras_retiro")} className="bg-orange-50 rounded-xl p-3 text-center active:scale-95 transition-all duration-100 hover:shadow-md">
                 <p className="text-xl font-bold text-orange-700">{retirosExt.reduce((s, r) => s + r.cantidad, 0)}</p>
                 <p className="text-xs text-orange-500">Retirados</p>
-              </div>
-              <div className="bg-green-50 rounded-xl p-3 text-center">
+              </button>
+              <button onClick={() => setDetalleModal("extras_agr1")} className="bg-green-50 rounded-xl p-3 text-center active:scale-95 transition-all duration-100 hover:shadow-md">
                 <p className="text-xl font-bold text-green-700">{agr1Ext.reduce((s, r) => s + Math.abs(r.cantidad), 0)}</p>
                 <p className="text-xs text-green-500">Agr. c/puntos</p>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-3 text-center">
+              </button>
+              <button onClick={() => setDetalleModal("extras_agr0")} className="bg-slate-50 rounded-xl p-3 text-center active:scale-95 transition-all duration-100 hover:shadow-md">
                 <p className="text-xl font-bold text-slate-600">{agr0Ext.reduce((s, r) => s + Math.abs(r.cantidad), 0)}</p>
                 <p className="text-xs text-slate-400">Agr. s/puntos</p>
-              </div>
+              </button>
             </div>
 
             {/* Retirados */}
@@ -527,6 +529,185 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
             <div className="bg-white rounded-xl shadow-sm p-4">
               <h4 className="font-bold text-slate-600 text-sm mb-3">⚪ Agregado 0 — Sin Puntos ({agr0Ext.length})</h4>
               {renderLista(agr0Ext, "bg-slate-50 text-slate-700", "Sin pts")}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Modal detalle de KPI ── */}
+      {detalleModal && (() => {
+        const isDia = detalleModal.startsWith("dia:");
+        const diaKey = isDia ? detalleModal.slice(4) : "";
+        const diaData = isDia ? porDia[diaKey] : null;
+
+        const title =
+          detalleModal === "cargado"       ? "📥 Unidades cargadas"
+          : detalleModal === "entregado"   ? "📤 Unidades entregadas"
+          : detalleModal === "diferencia"  ? "⚡ Diferencia"
+          : detalleModal === "cajas"       ? "📦 Cajas"
+          : detalleModal === "peso"        ? "⚖️ Peso total"
+          : detalleModal === "monto"       ? "💰 Monto acumulado"
+          : detalleModal === "extras_retiro" ? "📦 Productos Retirados"
+          : detalleModal === "extras_agr1"   ? "✅ Agregado 1 — Con Puntos"
+          : detalleModal === "extras_agr0"   ? "⚪ Agregado 0 — Sin Puntos"
+          : isDia ? `📅 ${diaKey}` : "";
+
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setDetalleModal(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
+                <div>
+                  <h2 className="font-bold text-gray-800 text-lg">{title}</h2>
+                  <p className="text-xs text-gray-500">{chofer.nombre} · {recientes.length} registros</p>
+                </div>
+                <button onClick={() => setDetalleModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95">×</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                {(detalleModal === "cargado" || detalleModal === "entregado" || detalleModal === "diferencia") && (
+                  recientes.length === 0 ? (
+                    <p className="text-gray-400 text-sm text-center py-8">Sin registros en este período</p>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-3 gap-3 mb-2">
+                        <div className="bg-blue-50 rounded-xl p-3 text-center">
+                          <p className="text-xl font-bold text-blue-700">{totalCargado}</p>
+                          <p className="text-xs text-blue-500">Cargado</p>
+                        </div>
+                        <div className="bg-green-50 rounded-xl p-3 text-center">
+                          <p className="text-xl font-bold text-green-700">{totalEntregado}</p>
+                          <p className="text-xs text-green-500">Entregado</p>
+                        </div>
+                        <div className="bg-orange-50 rounded-xl p-3 text-center">
+                          <p className="text-xl font-bold text-orange-700">{diferencia}</p>
+                          <p className="text-xs text-orange-500">Diferencia</p>
+                        </div>
+                      </div>
+                      {recientes.map((r) => {
+                        const diff = (r.cantidadCargada ?? 0) - (r.cantidadEntregada ?? 0);
+                        return (
+                          <div key={r.id} className="flex items-center gap-3 text-xs border border-gray-100 rounded-lg px-3 py-2">
+                            <span className="text-gray-400 flex-shrink-0">{fmtDate(r.timestamp)}</span>
+                            <span className="font-medium text-gray-800 flex-1 truncate">{r.producto}</span>
+                            <span className="text-blue-600">{r.cantidadCargada}↓</span>
+                            <span className="text-green-600">{r.cantidadEntregada}✓</span>
+                            {diff !== 0 && <span className="text-orange-500 font-semibold">+{diff}</span>}
+                          </div>
+                        );
+                      })}
+                    </>
+                  )
+                )}
+                {detalleModal === "cajas" && (
+                  totalCajas === 0 ? (
+                    <p className="text-gray-400 text-sm text-center py-8">Sin registros de cajas en este período</p>
+                  ) : (
+                    <>
+                      <div className="bg-cyan-50 rounded-xl p-4 text-center mb-2">
+                        <p className="text-3xl font-bold text-cyan-700">{totalCajas}</p>
+                        <p className="text-sm text-cyan-500">cajas totales</p>
+                      </div>
+                      {recientes.filter((r) => (r.cajas ?? 0) > 0).map((r) => (
+                        <div key={r.id} className="flex items-center gap-3 text-xs border border-gray-100 rounded-lg px-3 py-2">
+                          <span className="text-gray-400 flex-shrink-0">{fmtDate(r.timestamp)}</span>
+                          <span className="flex-1 truncate font-medium text-gray-800">{r.producto}</span>
+                          <span className="text-cyan-700 font-bold">{r.cajas} caj.</span>
+                        </div>
+                      ))}
+                    </>
+                  )
+                )}
+                {detalleModal === "peso" && (
+                  totalPeso === 0 ? (
+                    <p className="text-gray-400 text-sm text-center py-8">Sin registros de peso en este período</p>
+                  ) : (
+                    <>
+                      <div className="bg-purple-50 rounded-xl p-4 text-center mb-2">
+                        <p className="text-3xl font-bold text-purple-700">{totalPeso.toFixed(1)} kg</p>
+                        <p className="text-sm text-purple-500">peso total</p>
+                      </div>
+                      {recientes.filter((r) => (r.peso ?? 0) > 0).map((r) => (
+                        <div key={r.id} className="flex items-center gap-3 text-xs border border-gray-100 rounded-lg px-3 py-2">
+                          <span className="text-gray-400 flex-shrink-0">{fmtDate(r.timestamp)}</span>
+                          <span className="flex-1 truncate font-medium text-gray-800">{r.producto}</span>
+                          <span className="text-purple-700 font-bold">{(r.peso ?? 0).toFixed(1)} kg</span>
+                        </div>
+                      ))}
+                    </>
+                  )
+                )}
+                {detalleModal === "monto" && (
+                  totalMonto === 0 ? (
+                    <p className="text-gray-400 text-sm text-center py-8">Sin registros de monto en este período</p>
+                  ) : (
+                    <>
+                      <div className="bg-green-50 rounded-xl p-4 text-center mb-2">
+                        <p className="text-3xl font-bold text-green-700">${totalMonto.toLocaleString()}</p>
+                        <p className="text-sm text-green-500">monto acumulado</p>
+                      </div>
+                      {recientes.filter((r) => (r.monto ?? 0) > 0).map((r) => (
+                        <div key={r.id} className="flex items-center gap-3 text-xs border border-gray-100 rounded-lg px-3 py-2">
+                          <span className="text-gray-400 flex-shrink-0">{fmtDate(r.timestamp)}</span>
+                          <span className="flex-1 truncate font-medium text-gray-800">{r.producto}</span>
+                          <span className="text-green-700 font-bold">${(r.monto ?? 0).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </>
+                  )
+                )}
+                {(detalleModal === "extras_retiro" || detalleModal === "extras_agr1" || detalleModal === "extras_agr0") && (() => {
+                  const cat = detalleModal === "extras_retiro" ? "retiro_despacho" : detalleModal === "extras_agr1" ? "agregado_1" : "agregado_0";
+                  const items = extrasChofer.filter((e) => (e as { categoria?: string }).categoria === cat);
+                  return items.length === 0 ? (
+                    <p className="text-gray-400 text-sm text-center py-8">Sin registros en este período</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {items.map((r) => (
+                        <div key={r.id} className="flex items-center gap-2 text-sm border border-gray-100 rounded-lg px-3 py-2">
+                          <span className="text-gray-400 text-xs flex-shrink-0">{fmtDate(r.timestamp)}</span>
+                          <span className="font-medium flex-1 truncate">{r.nombre}</span>
+                          <span className="font-bold text-gray-700 flex-shrink-0">{r.cantidad > 0 ? `+${r.cantidad}` : `×${Math.abs(r.cantidad)}`}</span>
+                          {(r as { motivo?: string }).motivo && (
+                            <span className="text-gray-400 text-xs truncate max-w-[100px]">{(r as { motivo?: string }).motivo}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+                {isDia && diaData && (
+                  <>
+                    <div className="grid grid-cols-3 gap-3 mb-2">
+                      <div className="bg-blue-50 rounded-xl p-3 text-center">
+                        <p className="text-xl font-bold text-blue-700">{diaData.cargado}</p>
+                        <p className="text-xs text-blue-500">Cargado</p>
+                      </div>
+                      <div className="bg-green-50 rounded-xl p-3 text-center">
+                        <p className="text-xl font-bold text-green-700">{diaData.entregado}</p>
+                        <p className="text-xs text-green-500">Entregado</p>
+                      </div>
+                      <div className="bg-orange-50 rounded-xl p-3 text-center">
+                        <p className="text-xl font-bold text-orange-700">{diaData.cargado - diaData.entregado}</p>
+                        <p className="text-xs text-orange-500">Diferencia</p>
+                      </div>
+                    </div>
+                    {recientes.filter((r) => {
+                      const d = toDate(r.timestamp);
+                      return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) === diaKey;
+                    }).map((r) => {
+                      const diff = (r.cantidadCargada ?? 0) - (r.cantidadEntregada ?? 0);
+                      return (
+                        <div key={r.id} className="flex items-center gap-3 text-xs border border-gray-100 rounded-lg px-3 py-2">
+                          <span className="text-gray-400 flex-shrink-0">{fmtDate(r.timestamp)}</span>
+                          <span className="font-medium text-gray-800 flex-1 truncate">{r.producto}</span>
+                          <span className="text-blue-600">{r.cantidadCargada}↓</span>
+                          <span className="text-green-600">{r.cantidadEntregada}✓</span>
+                          {diff !== 0 && <span className="text-orange-500 font-semibold">+{diff}</span>}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -741,12 +922,12 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
   );
 }
 
-function StatCard({ label, value, icon, color }: { label: string; value: string | number; icon: string; color: string }) {
+function StatCard({ label, value, icon, color, onClick }: { label: string; value: string | number; icon: string; color: string; onClick?: () => void }) {
   return (
-    <div className={`${color} rounded-xl p-3 text-center`}>
+    <button onClick={onClick} className={`${color} rounded-xl p-3 text-center w-full active:scale-95 transition-all duration-100 hover:shadow-md`}>
       <p className="text-xl mb-0.5">{icon}</p>
       <p className="text-xl font-bold leading-tight">{value}</p>
       <p className="text-xs opacity-75 mt-0.5">{label}</p>
-    </div>
+    </button>
   );
 }

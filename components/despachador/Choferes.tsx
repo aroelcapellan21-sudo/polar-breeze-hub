@@ -65,6 +65,12 @@ export default function Choferes({ onChoferSelect }: Props) {
   // Confrontar modal
   const [showConfronta,  setShowConfronta]  = useState(false);
 
+  type ChofModal =
+    | { type: "entrega"; item: ProductoItem }
+    | { type: "extra"; item: ExtraLoker }
+    | null;
+  const [chofModal, setChofModal] = useState<ChofModal>(null);
+
   useEffect(() => {
     const uChof = onSnapshot(
       query(collection(db, "usuarios"), where("role", "==", "chofer"), where("activo", "!=", false)),
@@ -431,12 +437,12 @@ export default function Choferes({ onChoferSelect }: Props) {
               </p>
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
                 {selEntregas.map((e, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs px-2 py-1.5 bg-blue-50 rounded-lg">
+                  <button key={i} onClick={() => setChofModal({ type: "entrega", item: e })} className="w-full flex items-center justify-between text-xs px-2 py-1.5 bg-blue-50 rounded-lg active:scale-[0.99] transition-all duration-100 hover:bg-blue-100 text-left">
                     <span className="text-gray-700 truncate mr-2">{e.nombre}</span>
                     <span className="font-semibold text-blue-700 flex-shrink-0">
                       {e.cantidad} {e.unidad ?? ""}
                     </span>
-                  </div>
+                  </button>
                 ))}
               </div>
               {typeof selDriver?.observaciones === "string" && selDriver.observaciones && (
@@ -613,11 +619,11 @@ export default function Choferes({ onChoferSelect }: Props) {
               ) : (
                 <div className="space-y-1.5">
                   {retiros.map((r) => (
-                    <div key={r.id} className="flex items-center gap-2 text-sm bg-orange-50 rounded-lg px-3 py-2">
+                    <button key={r.id} onClick={() => setChofModal({ type: "extra", item: r })} className="w-full flex items-center gap-2 text-sm bg-orange-50 rounded-lg px-3 py-2 active:scale-[0.99] transition-all duration-100 hover:bg-orange-100 text-left">
                       <span className="font-medium text-orange-800 flex-1 truncate">{r.nombre}</span>
                       <span className="text-orange-600 font-bold flex-shrink-0">+{r.cantidad}</span>
                       {r.motivo && <span className="text-gray-400 text-xs truncate max-w-[120px]">{r.motivo}</span>}
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -673,11 +679,11 @@ export default function Choferes({ onChoferSelect }: Props) {
               ) : (
                 <div className="space-y-1.5">
                   {agr1.map((r) => (
-                    <div key={r.id} className="flex items-center gap-2 text-sm bg-green-50 rounded-lg px-3 py-2">
+                    <button key={r.id} onClick={() => setChofModal({ type: "extra", item: r })} className="w-full flex items-center gap-2 text-sm bg-green-50 rounded-lg px-3 py-2 active:scale-[0.99] transition-all duration-100 hover:bg-green-100 text-left">
                       <span className="font-medium text-green-800 flex-1 truncate">{r.nombre}</span>
                       <span className="text-green-600 font-bold flex-shrink-0">×{Math.abs(r.cantidad)}</span>
                       {r.motivo && <span className="text-gray-400 text-xs truncate max-w-[120px]">{r.motivo}</span>}
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -733,12 +739,12 @@ export default function Choferes({ onChoferSelect }: Props) {
               ) : (
                 <div className="space-y-1.5">
                   {agr0.map((r) => (
-                    <div key={r.id} className="flex items-center gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2">
+                    <button key={r.id} onClick={() => setChofModal({ type: "extra", item: r })} className="w-full flex items-center gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2 active:scale-[0.99] transition-all duration-100 hover:bg-slate-100 text-left">
                       <span className="font-medium text-slate-700 flex-1 truncate">{r.nombre}</span>
                       <span className="text-slate-500 font-bold flex-shrink-0">×{Math.abs(r.cantidad)}</span>
                       <span className="text-xs bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded flex-shrink-0">Sin pts</span>
                       {r.motivo && <span className="text-gray-400 text-xs truncate max-w-[80px]">{r.motivo}</span>}
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -778,6 +784,87 @@ export default function Choferes({ onChoferSelect }: Props) {
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* ── Modal detalle de ítem ── */}
+      {chofModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setChofModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h3 className="font-bold text-gray-800">
+                {chofModal.type === "entrega" ? "📋 Producto en lista" : (
+                  chofModal.item.categoria === "retiro_despacho" ? "📦 Producto Retirado"
+                  : chofModal.item.categoria === "agregado_1"    ? "✅ Agregado 1 — Con Puntos"
+                  :                                                "⚪ Agregado 0 — Sin Puntos"
+                )}
+              </h3>
+              <button onClick={() => setChofModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95">×</button>
+            </div>
+            <div className="p-5 space-y-3">
+              {chofModal.type === "entrega" && (() => {
+                const e = chofModal.item;
+                return (
+                  <div className="space-y-3">
+                    <div className="bg-blue-50 rounded-xl p-4">
+                      <p className="font-bold text-gray-800 text-lg">{e.nombre}</p>
+                      <p className="text-sm text-gray-500 mt-1">{sel?.nombre}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-blue-50 rounded-xl p-3 text-center">
+                        <p className="text-2xl font-bold text-blue-700">{e.cantidad}</p>
+                        <p className="text-xs text-blue-500">{e.unidad ?? "unidades"}</p>
+                      </div>
+                      {(e.precio ?? 0) > 0 && (
+                        <div className="bg-green-50 rounded-xl p-3 text-center">
+                          <p className="text-2xl font-bold text-green-700">${(e.precio ?? 0).toLocaleString()}</p>
+                          <p className="text-xs text-green-500">precio</p>
+                        </div>
+                      )}
+                    </div>
+                    {e.visto && (
+                      <p className="text-sm text-center">
+                        {e.visto === "ok" ? "✅ Verificado" : e.visto === "mal" ? "❌ Problema detectado" : "⏳ Sin verificar"}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+              {chofModal.type === "extra" && (() => {
+                const r = chofModal.item;
+                const esRetiro = r.categoria === "retiro_despacho";
+                return (
+                  <div className="space-y-3">
+                    <div className={`rounded-xl p-4 ${esRetiro ? "bg-orange-50" : r.categoria === "agregado_1" ? "bg-green-50" : "bg-slate-50"}`}>
+                      <p className="font-bold text-gray-800 text-lg">{r.nombre}</p>
+                      <p className="text-sm text-gray-500 mt-1">{sel?.nombre}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className={`rounded-xl p-3 text-center ${esRetiro ? "bg-orange-50" : "bg-gray-50"}`}>
+                        <p className={`text-2xl font-bold ${esRetiro ? "text-orange-700" : "text-gray-700"}`}>
+                          {esRetiro ? `+${r.cantidad}` : `×${Math.abs(r.cantidad)}`}
+                        </p>
+                        <p className={`text-xs ${esRetiro ? "text-orange-500" : "text-gray-400"}`}>
+                          {esRetiro ? "devuelto al loker" : "despachado del loker"}
+                        </p>
+                      </div>
+                      <div className={`rounded-xl p-3 text-center ${r.categoria === "agregado_1" ? "bg-green-50" : "bg-slate-50"}`}>
+                        <p className={`text-sm font-bold ${r.categoria === "agregado_1" ? "text-green-700" : "text-slate-500"}`}>
+                          {r.categoria === "retiro_despacho" ? "Retiro" : r.categoria === "agregado_1" ? "⭐ Con puntos" : "Sin puntos"}
+                        </p>
+                        <p className="text-xs text-gray-400">categoría</p>
+                      </div>
+                    </div>
+                    {r.motivo && (
+                      <div className="bg-gray-50 rounded-lg px-3 py-2">
+                        <p className="text-xs text-gray-500">📝 {r.motivo}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
         </div>
       )}
 
