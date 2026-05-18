@@ -7,7 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { ProductoItem, UserProfile, FsDriver, FsSession, MovimientoLoker, toProductoId } from "@/lib/types";
+import { ProductoItem, UserProfile, FsDriver, FsSession, MovimientoLoker, PrecioProducto, toProductoId } from "@/lib/types";
 import {
   ImageUploader, ProductTable, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
@@ -53,6 +53,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
   const [guardando,     setGuardando]     = useState(false);
   const [msg,           setMsg]           = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [stockAlerta,   setStockAlerta]   = useState<{ nombre: string; necesita: number; disponible: number }[] | null>(null);
+  const [precios,       setPrecios]       = useState<PrecioProducto[]>([]);
 
   // ─── Extras por factura ──────────────────────────────────────────────────────
   const [extrasHoy,    setExtrasHoy]    = useState<ExtraLoker[]>([]);
@@ -87,6 +88,12 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     );
     const uSess = onSnapshot(doc(db, "session", "despacho"), (snap) => {
       setSession(snap.exists() ? (snap.data() as FsSession) : null);
+    });
+    // Cargar precios de venta desde config/precios
+    getDoc(doc(db, "config", "precios")).then((snap) => {
+      if (snap.exists()) {
+        setPrecios((snap.data().productos as PrecioProducto[]) ?? []);
+      }
     });
     return () => { uChof(); uDrv(); uSess(); };
   }, []);
@@ -135,6 +142,20 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     setTimeout(() => setMsg(null), 4000);
   };
 
+  // Busca el precio de un producto en el catálogo (por producto_id normalizado o parcial)
+  const buscarPrecio = (nombre: string): number | null => {
+    if (precios.length === 0) return null;
+    const pid = toProductoId(nombre);
+    // Búsqueda exacta
+    const exacto = precios.find((p) => p.producto_id === pid);
+    if (exacto) return exacto.precio;
+    // Búsqueda parcial: el pid del catálogo contiene el pid del nombre buscado
+    const parcial = precios.find(
+      (p) => p.producto_id.includes(pid) || pid.includes(p.producto_id)
+    );
+    return parcial?.precio ?? null;
+  };
+
   const resetEntrada = () => {
     setPreview(null); setImgData(null); setTexto(""); setProductos([]); setObservaciones("");
     setStockAlerta(null);
@@ -161,8 +182,13 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       if (Array.isArray(data.productos) && data.productos.length > 0) {
-        setProductos(data.productos);
-        flash("ok", `IA detectó ${data.productos.length} productos`);
+        // Aplicar precios del catálogo si la IA no los detectó
+        const conPrecios = (data.productos as ProductoItem[]).map((p) => ({
+          ...p,
+          precio: p.precio ?? buscarPrecio(p.nombre),
+        }));
+        setProductos(conPrecios);
+        flash("ok", `IA detectó ${conPrecios.length} productos`);
       } else {
         flash("err", "Sin productos detectados. Edita manualmente.");
       }
@@ -339,16 +365,19 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
 
   const getWhatsAppMsg = () => {
     if (!sel) return "";
+    const totalMonto = productos.reduce((s, p) => s + ((p.precio ?? 0) * (p.cantidad ?? 0)), 0);
     const lines = [
       `🚛 *Entrega — ${sel.nombre}* (Ficha ${sel.ficha ?? "—"})`,
       `👤 Despachador: ${despNombre}`,
       `📅 ${new Date().toLocaleString("es-MX")}`, "",
     ];
     productos.forEach((p) => {
-      const visto = p.visto === "ok" ? "✅" : p.visto === "mal" ? "❌" : "•";
-      lines.push(`${visto} ${p.nombre}: ${p.cantidad} ${p.unidad ?? ""}`);
+      const visto  = p.visto === "ok" ? "✅" : p.visto === "mal" ? "❌" : "•";
+      const precio = p.precio != null ? ` · RD$${p.precio}` : "";
+      lines.push(`${visto} ${p.nombre}: ${p.cantidad} ${p.unidad ?? ""}${precio}`);
     });
-    lines.push(`\nTotal: ${totalUnid} uds`);
+    lines.push(`\n📦 Total: ${totalUnid} uds`);
+    if (totalMonto > 0) lines.push(`💰 Monto: RD$${totalMonto.toLocaleString("es-DO")}`);
     if (observaciones) lines.push(`\n📝 ${observaciones}`);
     return lines.join("\n");
   };
@@ -555,7 +584,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                 productos={productos}
                 onChange={setProductos}
                 showVisto={true}
-                showPrecio={false}
+                showPrecio={true}
               />
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -605,6 +634,19 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
               </p>
             </div>
           )}
+
+          {(() => {
+            const totalMonto = productos.reduce((s, p) => s + ((p.precio ?? 0) * (p.cantidad ?? 0)), 0);
+            return totalMonto > 0 ? (
+              <div className="flex items-center justify-between bg-green-50 border border-green-200
+                rounded-xl px-4 py-2.5">
+                <span className="text-sm font-semibold text-green-800">💰 Total a cobrar:</span>
+                <span className="text-lg font-bold text-green-700">
+                  RD${totalMonto.toLocaleString("es-DO")}
+                </span>
+              </div>
+            ) : null;
+          })()}
 
           <button
             type="button"

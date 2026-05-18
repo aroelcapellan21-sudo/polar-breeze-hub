@@ -102,6 +102,22 @@ export interface PuntosConfig {
   meta?:     number;
 }
 
+// ─── Precios de venta (config/precios) ────────────────────────────────────────
+
+export interface PrecioProducto {
+  codigo:      number;
+  nombre:      string;
+  producto_id: string;   // toProductoId(nombre)
+  precio:      number;
+  moneda:      string;   // "RD$"
+}
+
+export interface PreciosConfig {
+  productos:     PrecioProducto[];
+  moneda:        string;
+  actualizadoEl?: Date | { seconds: number };
+}
+
 // ─── Colecciones adicionales de FacturaScan ──────────────────────────────────
 
 /** Documento session/despacho — resumen de la sesión activa */
