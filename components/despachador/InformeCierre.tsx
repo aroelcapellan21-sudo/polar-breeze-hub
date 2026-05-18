@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { collection, doc, onSnapshot, addDoc, Timestamp } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, addDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ProductoItem, FsSession, FsDriver, MovimientoLoker, toDate } from "@/lib/types";
@@ -39,10 +39,13 @@ function TablaHeader({ children }: { children: React.ReactNode }) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+interface Empresa { nombre: string; rnc: string; direccion: string; telefono: string; }
+
 export default function InformeCierre() {
   const { profile } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
 
+  const [empresa,  setEmpresa]  = useState<Empresa | null>(null);
   const [session,  setSession]  = useState<FsSession | null>(null);
   const [drivers,  setDrivers]  = useState<FsDriver[]>([]);
   const [movsHoy,  setMovsHoy]  = useState<MovimientoLoker[]>([]);
@@ -65,6 +68,13 @@ export default function InformeCierre() {
   const initedFaltantes = useRef(false);
   const initedDanados   = useRef(false);
   const initedChoferes  = useRef(false);
+
+  // ── Empresa ───────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    getDoc(doc(db, "config", "empresa")).then((snap) => {
+      if (snap.exists()) setEmpresa(snap.data() as Empresa);
+    });
+  }, []);
 
   // ── Listeners ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -309,22 +319,30 @@ export default function InformeCierre() {
         </table>` : ""}
     `).join("");
 
+    const emp = empresa;
     const html = `<!DOCTYPE html>
-    <html><head><title>Informe de Cierre</title>
+    <html><head><title>Informe de Cierre — ${emp?.nombre ?? "Polar Breeze"}</title>
     <style>
-      body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #222; }
-      h1   { font-size: 16px; margin-bottom: 4px; }
-      h2   { font-size: 13px; background: #374151; color: white; padding: 5px 8px;
-             margin: 16px 0 8px; border-radius: 3px; }
-      h3   { font-size: 12px; margin: 10px 0 4px; }
+      body  { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #222; }
+      .co   { border-bottom: 2px solid #374151; padding-bottom: 10px; margin-bottom: 14px; }
+      .co-n { font-size: 17px; font-weight: bold; margin: 0 0 3px; }
+      .co-i { font-size: 9.5px; color: #6b7280; margin: 0; }
+      h1    { font-size: 14px; margin: 0 0 4px; }
+      h2    { font-size: 13px; background: #374151; color: white; padding: 5px 8px;
+              margin: 16px 0 8px; border-radius: 3px; }
+      h3    { font-size: 12px; margin: 10px 0 4px; }
       table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
       th, td { border: 1px solid #d1d5db; padding: 5px 7px; text-align: left; }
-      th { background: #f3f4f6; font-weight: 600; }
+      th    { background: #f3f4f6; font-weight: 600; }
       tr:nth-child(even) { background: #f9fafb; }
       .meta { color: #6b7280; font-size: 10px; margin-bottom: 16px; }
-      .obs { border: 1px solid #d1d5db; border-radius: 4px; padding: 8px;
-             background: #f9fafb; font-style: italic; margin-top: 12px; }
+      .obs  { border: 1px solid #d1d5db; border-radius: 4px; padding: 8px;
+              background: #f9fafb; font-style: italic; margin-top: 12px; }
     </style></head><body>
+      <div class="co">
+        <p class="co-n">${emp?.nombre ?? "Polar Breeze E.I.R.L."}</p>
+        <p class="co-i">RNC: ${emp?.rnc ?? ""} &nbsp;·&nbsp; ${emp?.direccion ?? ""} &nbsp;·&nbsp; Tel: ${emp?.telefono ?? ""}</p>
+      </div>
       <h1>📋 INFORME DE CIERRE DEL DÍA</h1>
       <p class="meta">${fecha} — Despachador: ${profile?.nombre ?? "—"}</p>
 
@@ -369,8 +387,9 @@ export default function InformeCierre() {
   const getWhatsAppMsg = () => {
     const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
     const lines = [
+      `🧊 *${empresa?.nombre ?? "Polar Breeze E.I.R.L."}*`,
       `📋 *INFORME DE CIERRE — ${fecha}*`,
-      `👤 ${profile?.nombre}`, "",
+      `👤 Despachador: ${profile?.nombre}`, "",
     ];
     lines.push("🔴 *1. Faltantes del Despacho*");
     if (faltantesRows.length === 0) lines.push("  Sin faltantes");
@@ -423,6 +442,11 @@ export default function InformeCierre() {
         <div className="px-4 py-3 bg-gradient-to-r from-gray-800 to-gray-900">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
+              {empresa && (
+                <p className="text-emerald-300 text-xs font-semibold mb-0.5 tracking-wide">
+                  {empresa.nombre}
+                </p>
+              )}
               <h2 className="text-white font-bold">📋 Informe de Cierre</h2>
               <p className="text-gray-300 text-xs capitalize mt-0.5">{fecha}</p>
               <p className="text-gray-400 text-xs">Despachador: {profile?.nombre}</p>
