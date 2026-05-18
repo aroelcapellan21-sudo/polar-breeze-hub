@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "despachador" | "chofer";
+export type UserRole = "admin" | "despachador" | "chofer" | "encargado";
 
 export interface UserProfile {
   uid: string;
@@ -174,6 +174,30 @@ export interface MovimientoLoker {
   // poblados en salida_despacho y devolucion_chofer
   choferId?: string;
   choferNombre?: string;
+  // referencia al lote de origen (entrada_interior desde encargado)
+  loteNumero?: string;
+  loteId?: string;
+}
+
+// ─── Lote de almacén (colección lotes_loker) ─────────────────────────────────
+
+export interface LoteLoker {
+  id?: string;
+  numero: string;           // "#001", "#002", …
+  proveedor?: string;
+  facturaNumero?: string;
+  facturaEntregada: boolean;
+  productos: {
+    nombre:      string;
+    producto_id: string;
+    cajas:       number;
+    unidades:    number;
+    total:       number;    // cajas + unidades (usado en movimientos_loker)
+  }[];
+  registradoPor:   string;
+  registradoPorId: string;
+  timestamp: Date | { seconds: number };
+  notas?: string;
 }
 
 export function toProductoId(nombre: string): string {

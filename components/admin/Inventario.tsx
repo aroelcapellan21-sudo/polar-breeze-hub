@@ -7,7 +7,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import {
-  MovimientoLoker, TalonarioDoc, toDate, fmtDate, toProductoId,
+  MovimientoLoker, TalonarioDoc, LoteLoker, toDate, fmtDate, toProductoId,
 } from "@/lib/types";
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
@@ -81,12 +81,15 @@ export default function Inventario() {
   const [saldoAbierto,   setSaldoAbierto]   = useState(true);
   const [chofersAbierto, setChofersAbierto] = useState(true);
   const [movAbierto,     setMovAbierto]     = useState(false);
+  const [lotesAbierto,   setLotesAbierto]   = useState(false);
+  const [lotes,          setLotes]          = useState<LoteLoker[]>([]);
 
   // Modal
   type InvModal =
     | { type: "stat"; key: "loker" | "despachado" | "vendido" | "facturado" }
     | { type: "producto"; pid: string; nombre: string }
     | { type: "chofer"; ch: ResumenChofer }
+    | { type: "lote"; lote: LoteLoker }
     | null;
   const [invModal, setInvModal] = useState<InvModal>(null);
 
@@ -118,6 +121,14 @@ export default function Inventario() {
     });
     return unsub;
   }, [todayTs]);
+
+  // ── Listener 3: lotes_loker ───────────────────────────────────────────────
+  useEffect(() => {
+    const q = query(collection(db, "lotes_loker"), orderBy("timestamp", "desc"));
+    return onSnapshot(q, (snap) => {
+      setLotes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as LoteLoker)));
+    });
+  }, []);
 
   // ── Movimientos de hoy ────────────────────────────────────────────────────
   const movHoy = useMemo(
@@ -640,7 +651,91 @@ export default function Inventario() {
         </div>
       )}
 
-      {/* ── 4. Formulario + Lista de movimientos ─────────────────────────────── */}
+      {/* ── 4. Lotes de almacén ──────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <button
+          onClick={() => setLotesAbierto((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3
+            bg-gradient-to-r from-emerald-50 to-emerald-100 hover:from-emerald-100
+            hover:to-emerald-150 transition-colors duration-100"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🏭</span>
+            <span className="font-semibold text-emerald-900 text-sm">Lotes registrados</span>
+            <span className="text-xs bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full">
+              {lotes.length} {lotes.length === 1 ? "lote" : "lotes"}
+            </span>
+            {lotes.some((l) => !l.facturaEntregada) && (
+              <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200
+                px-2 py-0.5 rounded-full font-medium animate-pulse">
+                ⏳ facturas pendientes
+              </span>
+            )}
+          </div>
+          <span className="text-emerald-600 text-sm">{lotesAbierto ? "▲" : "▼"}</span>
+        </button>
+
+        {lotesAbierto && (
+          <div>
+            {lotes.length === 0 ? (
+              <div className="px-4 py-8 text-center">
+                <p className="text-2xl mb-2">🏭</p>
+                <p className="text-sm text-gray-400">Sin lotes registrados aún.</p>
+                <p className="text-xs text-gray-300 mt-1">Los encargados de almacén registran lotes desde su panel.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {lotes.map((lote) => (
+                  <button
+                    key={lote.id}
+                    onClick={() => setInvModal({ type: "lote", lote })}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 active:scale-[0.99]
+                      transition-all duration-100"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-bold text-emerald-700 flex-shrink-0">
+                          {lote.numero}
+                        </span>
+                        {lote.proveedor && (
+                          <span className="text-xs text-gray-500 truncate">{lote.proveedor}</span>
+                        )}
+                        <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded-full border font-medium ${
+                          lote.facturaEntregada
+                            ? "bg-green-100 text-green-700 border-green-200"
+                            : "bg-amber-100 text-amber-700 border-amber-200"
+                        }`}>
+                          {lote.facturaEntregada ? "✅ Factura" : "⏳ Sin factura"}
+                        </span>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs text-gray-400">{fmtDate(lote.timestamp)}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {lote.productos.length} prod · {lote.registradoPor}
+                        </p>
+                      </div>
+                    </div>
+                    {lote.productos.length > 0 && (
+                      <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                        {lote.productos.map((p) => (
+                          <span key={p.producto_id}
+                            className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200
+                              px-2 py-0.5 rounded-full"
+                          >
+                            {p.nombre.split(" ")[0]} {p.cajas > 0 ? `${p.cajas}caj` : ""}{p.cajas > 0 && p.unidades > 0 ? "+" : ""}{p.unidades > 0 ? `${p.unidades}uds` : ""}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── 5. Formulario + Lista de movimientos ─────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
 
         {/* Formulario */}
@@ -853,6 +948,7 @@ export default function Inventario() {
                 {invModal.type === "stat" && invModal.key === "facturado"  && "💰 Facturado hoy"}
                 {invModal.type === "producto" && `📊 Historial — ${invModal.nombre}`}
                 {invModal.type === "chofer"   && `🚛 ${invModal.ch.choferNombre}`}
+                {invModal.type === "lote"     && `🏭 Lote ${invModal.lote.numero}`}
               </h3>
               <button onClick={() => setInvModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95 transition-all">×</button>
             </div>
@@ -1000,6 +1096,77 @@ export default function Inventario() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                );
+              })()}
+
+              {/* Lote: detalle completo */}
+              {invModal.type === "lote" && (() => {
+                const lote = invModal.lote;
+                const fecha = (() => {
+                  const d = toDate(lote.timestamp);
+                  return d.toLocaleDateString("es-MX", { weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+                })();
+                return (
+                  <div className="space-y-3">
+                    {/* Meta */}
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="bg-gray-50 rounded-xl p-3">
+                        <p className="text-xs text-gray-400 mb-0.5">Registrado</p>
+                        <p className="font-medium text-gray-800">{lote.registradoPor}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{fecha}</p>
+                      </div>
+                      <div className={`rounded-xl p-3 ${lote.facturaEntregada ? "bg-green-50" : "bg-amber-50"}`}>
+                        <p className="text-xs text-gray-400 mb-0.5">Factura</p>
+                        {lote.facturaNumero && (
+                          <p className="font-medium text-gray-800 text-xs">{lote.facturaNumero}</p>
+                        )}
+                        <p className={`text-xs font-semibold mt-0.5 ${lote.facturaEntregada ? "text-green-700" : "text-amber-700"}`}>
+                          {lote.facturaEntregada ? "✅ Entregada" : "⏳ Pendiente"}
+                        </p>
+                      </div>
+                    </div>
+                    {lote.proveedor && (
+                      <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-sm">
+                        <span className="text-xs text-gray-400">Proveedor: </span>
+                        <span className="font-medium text-gray-800">{lote.proveedor}</span>
+                      </div>
+                    )}
+                    {/* Productos */}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 mb-2">
+                        Productos ({lote.productos.length})
+                      </p>
+                      <div className="space-y-1.5">
+                        {lote.productos.map((p) => (
+                          <div key={p.producto_id}
+                            className="flex items-center justify-between bg-emerald-50 border border-emerald-200
+                              rounded-xl px-3 py-2.5 text-sm"
+                          >
+                            <span className="font-medium text-emerald-900">{p.nombre}</span>
+                            <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold">
+                              {p.cajas    > 0 && <span>{p.cajas} caj</span>}
+                              {p.cajas    > 0 && p.unidades > 0 && <span>+</span>}
+                              {p.unidades > 0 && <span>{p.unidades} uds</span>}
+                              <span className="text-emerald-400 font-normal">· {p.total} total</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Totales */}
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 flex justify-between text-sm">
+                      <span className="text-emerald-700 font-semibold">Total entradas</span>
+                      <span className="font-bold text-emerald-800">
+                        +{lote.productos.reduce((s, p) => s + p.total, 0)} unidades
+                      </span>
+                    </div>
+                    {lote.notas && (
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+                        <p className="text-xs text-gray-400 mb-0.5">Notas</p>
+                        <p className="text-sm text-gray-700 italic">{lote.notas}</p>
+                      </div>
+                    )}
                   </div>
                 );
               })()}

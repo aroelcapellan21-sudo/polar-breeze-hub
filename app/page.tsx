@@ -5,6 +5,7 @@ import LoginForm from "@/components/LoginForm";
 import AdminDashboard from "@/components/AdminDashboard";
 import DespachadorDashboard from "@/components/DespachadorDashboard";
 import ChoferDashboard from "@/components/ChoferDashboard";
+import EncargadoDashboard from "@/components/EncargadoDashboard";
 
 export default function Home() {
   const { user, profile, loading } = useAuth();
@@ -25,9 +26,10 @@ export default function Home() {
     return <LoginForm />;
   }
 
-  if (profile.role === "admin") return <AdminDashboard />;
+  if (profile.role === "admin")      return <AdminDashboard />;
   if (profile.role === "despachador") return <DespachadorDashboard />;
-  if (profile.role === "chofer") return <ChoferDashboard />;
+  if (profile.role === "chofer")     return <ChoferDashboard />;
+  if (profile.role === "encargado")  return <EncargadoDashboard />;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">

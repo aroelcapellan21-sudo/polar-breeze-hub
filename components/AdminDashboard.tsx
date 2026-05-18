@@ -11,8 +11,9 @@ import StatusDashboard from "@/components/admin/StatusDashboard";
 import Inventario          from "@/components/admin/Inventario";
 import InformesHistorial  from "@/components/admin/InformesHistorial";
 import Anomalias          from "@/components/admin/Anomalias";
+import GestionEncargados  from "@/components/admin/GestionEncargados";
 
-type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias";
+type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados";
 
 export default function AdminDashboard() {
   const { profile, logout } = useAuth();
@@ -89,6 +90,13 @@ export default function AdminDashboard() {
               <span>⚠️</span>
               <span className="hidden sm:inline">Anomalías</span>
             </NavTab>
+            <NavTab
+              active={tab === "encargados"}
+              onClick={() => { setTab("encargados"); setChofer(null); }}
+            >
+              <span>🏭</span>
+              <span className="hidden sm:inline">Encargados</span>
+            </NavTab>
           </nav>
 
           {/* Acciones */}
@@ -133,6 +141,9 @@ export default function AdminDashboard() {
             {tab === "anomalias" && (
               <span className="text-white font-medium">⚠️ Anomalías — detección automática · Telegram</span>
             )}
+            {tab === "encargados" && (
+              <span className="text-white font-medium">🏭 Encargados — gestión de encargados de almacén</span>
+            )}
             {tab === "choferes" && !chofer && (
               <span className="text-white font-medium">👥 Choferes — gestión, inventario y sistema de puntos</span>
             )}
@@ -163,7 +174,8 @@ export default function AdminDashboard() {
         {tab === "inventario" && <Inventario />}
         {tab === "estado" && <StatusDashboard />}
         {tab === "informes" && <InformesHistorial />}
-        {tab === "anomalias" && <Anomalias />}
+        {tab === "anomalias"  && <Anomalias />}
+        {tab === "encargados" && <GestionEncargados />}
       </main>
 
       {/* ── Modal Configuración ── */}
