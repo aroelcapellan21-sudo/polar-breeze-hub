@@ -9,11 +9,12 @@ import { useAuth } from "@/lib/auth-context";
 import { PuntoProducto, LoteLoker, toProductoId } from "@/lib/types";
 
 interface ProductoLote {
-  nombre:      string;
-  producto_id: string;
-  cajas:       number;
-  unidades:    number;
-  total:       number;
+  nombre:        string;
+  producto_id:   string;
+  cajas:         number;
+  unidades:      number;
+  total:         number;
+  costoUnitario?: number;
 }
 
 export default function RegistroLote() {
@@ -23,6 +24,7 @@ export default function RegistroLote() {
   const [selProd,   setSelProd]   = useState("");
   const [cajasStr,  setCajasStr]  = useState("");
   const [unidsStr,  setUnidsStr]  = useState("");
+  const [costoStr,  setCostoStr]  = useState("");
   const [items,     setItems]     = useState<ProductoLote[]>([]);
   const [proveedor, setProveedor] = useState("");
   const [factNum,   setFactNum]   = useState("");
@@ -60,19 +62,21 @@ export default function RegistroLote() {
       return;
     }
     setMsg(null);
+    const costo = parseFloat(costoStr) || undefined;
     const pid   = toProductoId(selProd);
     const total = cajas + unids;
     setItems(prev => {
       const idx = prev.findIndex(i => i.producto_id === pid);
       if (idx >= 0) {
         return prev.map((it, i) => i === idx
-          ? { ...it, cajas: it.cajas + cajas, unidades: it.unidades + unids, total: it.total + total }
+          ? { ...it, cajas: it.cajas + cajas, unidades: it.unidades + unids, total: it.total + total,
+              costoUnitario: costo ?? it.costoUnitario }
           : it
         );
       }
-      return [...prev, { nombre: selProd, producto_id: pid, cajas, unidades: unids, total }];
+      return [...prev, { nombre: selProd, producto_id: pid, cajas, unidades: unids, total, costoUnitario: costo }];
     });
-    setCajasStr(""); setUnidsStr("");
+    setCajasStr(""); setUnidsStr(""); setCostoStr("");
   }
 
   function quitarItem(idx: number) {
@@ -243,12 +247,23 @@ export default function RegistroLote() {
                 <input
                   type="number" value={unidsStr}
                   onChange={(e) => setUnidsStr(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && agregar()}
                   placeholder="Unidades" min="0"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
                     focus:outline-none focus:ring-2 focus:ring-emerald-400"
                 />
                 <p className="text-xs text-gray-400 mt-0.5 text-center">unidades</p>
+              </div>
+              <div className="flex items-start pt-2.5 text-gray-300 font-bold">·</div>
+              <div className="flex-1">
+                <input
+                  type="number" value={costoStr}
+                  onChange={(e) => setCostoStr(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && agregar()}
+                  placeholder="Costo" min="0" step="0.01"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                    focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+                <p className="text-xs text-gray-400 mt-0.5 text-center">$/unidad</p>
               </div>
               <button
                 type="button" onClick={agregar}
@@ -273,11 +288,17 @@ export default function RegistroLote() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-emerald-900 truncate">{it.nombre}</p>
-                    <div className="flex gap-2 mt-0.5 text-xs text-emerald-600">
+                    <div className="flex flex-wrap gap-2 mt-0.5 text-xs text-emerald-600">
                       {it.cajas    > 0 && <span>{it.cajas} caj</span>}
                       {it.cajas    > 0 && it.unidades > 0 && <span>+</span>}
                       {it.unidades > 0 && <span>{it.unidades} uds</span>}
-                      <span className="text-emerald-400">· {it.total} en total</span>
+                      <span className="text-emerald-400">· {it.total} total</span>
+                      {it.costoUnitario != null && (
+                        <span className="text-amber-600 font-semibold">
+                          · ${it.costoUnitario.toFixed(2)}/ud
+                          {" "}(${(it.costoUnitario * it.total).toFixed(2)})
+                        </span>
+                      )}
                     </div>
                   </div>
                   <button
@@ -321,6 +342,15 @@ export default function RegistroLote() {
             </div>
           )}
 
+          {items.length > 0 && items.some(i => i.costoUnitario != null) && (
+            <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <span className="text-xs text-amber-700 font-medium">Inversión total estimada:</span>
+              <span className="text-sm font-bold text-amber-800">
+                ${items.reduce((s, i) => s + (i.costoUnitario ?? 0) * i.total, 0).toFixed(2)}
+              </span>
+            </div>
+          )}
+
           <button
             onClick={guardar}
             disabled={guardando || items.length === 0}
@@ -353,13 +383,28 @@ export default function RegistroLote() {
               <div key={p.producto_id}
                 className="flex items-center justify-between text-sm border border-gray-100 rounded-lg px-3 py-2"
               >
-                <span className="font-medium text-gray-800">{p.nombre}</span>
-                <span className="text-emerald-700 font-semibold">
-                  {[p.cajas > 0 ? `${p.cajas} caj` : null, p.unidades > 0 ? `${p.unidades} uds` : null]
-                    .filter(Boolean).join(" + ")}
-                </span>
+                <span className="font-medium text-gray-800 flex-1 truncate mr-2">{p.nombre}</span>
+                <div className="text-right flex-shrink-0">
+                  <span className="text-emerald-700 font-semibold">
+                    {[p.cajas > 0 ? `${p.cajas} caj` : null, p.unidades > 0 ? `${p.unidades} uds` : null]
+                      .filter(Boolean).join(" + ")}
+                  </span>
+                  {p.costoUnitario != null && (
+                    <p className="text-xs text-amber-600">
+                      ${p.costoUnitario.toFixed(2)}/ud · ${(p.costoUnitario * p.total).toFixed(2)}
+                    </p>
+                  )}
+                </div>
               </div>
             ))}
+            {guardado.productos.some(p => p.costoUnitario != null) && (
+              <div className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2">
+                <span className="text-xs font-semibold text-amber-700">Total invertido:</span>
+                <span className="text-sm font-bold text-amber-800">
+                  ${guardado.productos.reduce((s, p) => s + (p.costoUnitario ?? 0) * p.total, 0).toFixed(2)}
+                </span>
+              </div>
+            )}
             <div className="flex gap-2 pt-2">
               {waNum && (
                 <a

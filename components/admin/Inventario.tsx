@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  collection, query, orderBy, onSnapshot, addDoc, Timestamp, where,
+  collection, query, orderBy, onSnapshot, addDoc, getDocs, Timestamp, where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import {
-  MovimientoLoker, TalonarioDoc, LoteLoker, toDate, fmtDate, toProductoId,
+  MovimientoLoker, TalonarioDoc, LoteLoker, NotaCredito, toDate, fmtDate, toProductoId,
 } from "@/lib/types";
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
@@ -78,11 +78,28 @@ export default function Inventario() {
   const [msg, setMsg]             = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   // UI toggles
-  const [saldoAbierto,   setSaldoAbierto]   = useState(true);
-  const [chofersAbierto, setChofersAbierto] = useState(true);
-  const [movAbierto,     setMovAbierto]     = useState(false);
-  const [lotesAbierto,   setLotesAbierto]   = useState(false);
-  const [lotes,          setLotes]          = useState<LoteLoker[]>([]);
+  const [saldoAbierto,        setSaldoAbierto]        = useState(true);
+  const [chofersAbierto,      setChofersAbierto]      = useState(true);
+  const [movAbierto,          setMovAbierto]           = useState(false);
+  const [lotesAbierto,        setLotesAbierto]        = useState(false);
+  const [consigAbierto,       setConsigAbierto]       = useState(false);
+  const [notasCreditoAbierto, setNotasCreditoAbierto] = useState(false);
+  const [fifoAbierto,         setFifoAbierto]         = useState(false);
+  const [lotes,               setLotes]               = useState<LoteLoker[]>([]);
+  const [notasCredito,        setNotasCredito]        = useState<NotaCredito[]>([]);
+
+  // Form nota de crédito
+  const [ncLoteId,    setNcLoteId]    = useState("");
+  const [ncProveedor, setNcProveedor] = useState("");
+  const [ncFactura,   setNcFactura]   = useState("");
+  const [ncMotivo,    setNcMotivo]    = useState("Productos dañados");
+  const [ncNombre,    setNcNombre]    = useState("");
+  const [ncCantidad,  setNcCantidad]  = useState("");
+  const [ncCosto,     setNcCosto]     = useState("");
+  const [ncItems,     setNcItems]     = useState<NotaCredito["productos"]>([]);
+  const [ncNotas,     setNcNotas]     = useState("");
+  const [guardandoNc, setGuardandoNc] = useState(false);
+  const [msgNc,       setMsgNc]       = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   // Modal
   type InvModal =
@@ -90,6 +107,7 @@ export default function Inventario() {
     | { type: "producto"; pid: string; nombre: string }
     | { type: "chofer"; ch: ResumenChofer }
     | { type: "lote"; lote: LoteLoker }
+    | { type: "nota"; nc: NotaCredito }
     | null;
   const [invModal, setInvModal] = useState<InvModal>(null);
 
@@ -128,6 +146,14 @@ export default function Inventario() {
     return onSnapshot(q, (snap) => {
       setLotes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as LoteLoker)));
     });
+  }, []);
+
+  // ── Listener 4: notas_credito ─────────────────────────────────────────────
+  useEffect(() => {
+    const q = query(collection(db, "notas_credito"), orderBy("timestamp", "desc"));
+    return onSnapshot(q, (snap) => {
+      setNotasCredito(snap.docs.map((d) => ({ id: d.id, ...d.data() } as NotaCredito)));
+    }, () => setNotasCredito([]));
   }, []);
 
   // ── Movimientos de hoy ────────────────────────────────────────────────────
@@ -223,6 +249,77 @@ export default function Inventario() {
       .sort((a, b) => a.choferNombre.localeCompare(b.choferNombre));
   }, [movHoy]);
 
+  // ── Inventario en consignación (acumulado histórico) ─────────────────────
+  const consignacion = useMemo(() => {
+    interface ProdConsig { nombre: string; cantidad: number }
+    const porProducto = new Map<string, ProdConsig>();
+    const porChofer   = new Map<string, { nombre: string; productos: Map<string, ProdConsig> }>();
+
+    for (const m of movimientos) {
+      if (m.tipo !== "salida_despacho" && m.tipo !== "devolucion_chofer") continue;
+      if (!m.choferId) continue;
+      // salida_despacho: cantidad < 0 → delta = +|cantidad| (va al chofer)
+      // devolucion_chofer: cantidad > 0 → delta = -cantidad (regresa al loker)
+      const delta = -m.cantidad;
+
+      const prevP = porProducto.get(m.producto_id) ?? { nombre: m.nombre, cantidad: 0 };
+      porProducto.set(m.producto_id, { nombre: m.nombre, cantidad: prevP.cantidad + delta });
+
+      if (!porChofer.has(m.choferId)) {
+        porChofer.set(m.choferId, { nombre: m.choferNombre ?? m.choferId, productos: new Map() });
+      }
+      const ch    = porChofer.get(m.choferId)!;
+      const prevC = ch.productos.get(m.producto_id) ?? { nombre: m.nombre, cantidad: 0 };
+      ch.productos.set(m.producto_id, { nombre: m.nombre, cantidad: prevC.cantidad + delta });
+    }
+
+    const listaProductos = Array.from(porProducto.entries())
+      .map(([pid, d]) => ({ pid, nombre: d.nombre, cantidad: d.cantidad }))
+      .filter((p) => p.cantidad > 0)
+      .sort((a, b) => b.cantidad - a.cantidad);
+
+    const listaChoferes = Array.from(porChofer.entries())
+      .map(([id, d]) => ({
+        id, nombre: d.nombre,
+        productos: Array.from(d.productos.entries())
+          .map(([pid, p]) => ({ pid, nombre: p.nombre, cantidad: p.cantidad }))
+          .filter((p) => p.cantidad > 0),
+        total: Array.from(d.productos.values()).reduce((s, p) => s + p.cantidad, 0),
+      }))
+      .filter((c) => c.total > 0)
+      .sort((a, b) => b.total - a.total);
+
+    return { listaProductos, listaChoferes,
+      totalConsignado: listaProductos.reduce((s, p) => s + p.cantidad, 0) };
+  }, [movimientos]);
+
+  // ── Orden PEPS por producto (lotes más antiguos primero) ─────────────────
+  const fifoData = useMemo(() => {
+    // Para cada producto, qué lotes tienen unidades (en orden de antigüedad)
+    const byProduct = new Map<string, {
+      nombre: string;
+      lotes: { loteNumero: string; fecha: Date; unidadesEntrada: number }[];
+    }>();
+
+    for (const lote of [...lotes].reverse()) { // más antiguo primero
+      for (const p of lote.productos) {
+        if (!byProduct.has(p.producto_id)) {
+          byProduct.set(p.producto_id, { nombre: p.nombre, lotes: [] });
+        }
+        byProduct.get(p.producto_id)!.lotes.push({
+          loteNumero: lote.numero,
+          fecha: toDate(lote.timestamp),
+          unidadesEntrada: p.total,
+        });
+      }
+    }
+
+    return Array.from(byProduct.entries())
+      .map(([pid, d]) => ({ pid, nombre: d.nombre, lotes: d.lotes }))
+      .filter((p) => p.lotes.length > 0)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [lotes]);
+
   // ── Dashboard stats del día ───────────────────────────────────────────────
   const dashboard = useMemo(() => {
     const totalEnLoker    = saldoConDetalle.reduce((s, p) => s + Math.max(0, p.saldo), 0);
@@ -261,6 +358,70 @@ export default function Inventario() {
       pendientes: chofersTotal - chofersReportados,
     };
   }, [saldoConDetalle, resumenChoferes, talonarioHoy]);
+
+  // ── Agregar ítem a nota de crédito ────────────────────────────────────────
+  function ncAgregarItem() {
+    const cant = parseInt(ncCantidad) || 0;
+    if (!ncNombre.trim() || cant <= 0) return;
+    const costo = parseFloat(ncCosto) || undefined;
+    setNcItems((prev) => {
+      const pid = toProductoId(ncNombre.trim());
+      const idx = prev.findIndex((i) => i.producto_id === pid);
+      if (idx >= 0) {
+        return prev.map((it, i) => i === idx
+          ? { ...it, cantidad: it.cantidad + cant, costoUnitario: costo ?? it.costoUnitario,
+              subtotal: (costo ?? it.costoUnitario ?? 0) * (it.cantidad + cant) }
+          : it
+        );
+      }
+      return [...prev, {
+        nombre: ncNombre.trim(), producto_id: pid, cantidad: cant,
+        costoUnitario: costo, subtotal: costo != null ? costo * cant : undefined,
+      }];
+    });
+    setNcNombre(""); setNcCantidad(""); setNcCosto("");
+  }
+
+  // ── Guardar nota de crédito ────────────────────────────────────────────────
+  async function guardarNotaCredito() {
+    if (ncItems.length === 0 || !ncMotivo.trim()) {
+      setMsgNc({ type: "err", text: "Agrega al menos un producto y un motivo." });
+      return;
+    }
+    setGuardandoNc(true); setMsgNc(null);
+    try {
+      const snap = await getDocs(collection(db, "notas_credito"));
+      const numero    = `NC-${String(snap.size + 1).padStart(3, "0")}`;
+      const totalUnid = ncItems.reduce((s, i) => s + i.cantidad, 0);
+      const totalMon  = ncItems.reduce((s, i) => s + (i.subtotal ?? 0), 0);
+      const loteRef   = lotes.find((l) => l.id === ncLoteId);
+
+      const nc: Omit<NotaCredito, "id"> = {
+        numero,
+        loteId:      ncLoteId   || undefined,
+        loteNumero:  loteRef?.numero ?? undefined,
+        facturaNumero: ncFactura.trim()   || loteRef?.facturaNumero || undefined,
+        proveedor:   ncProveedor.trim() || loteRef?.proveedor     || undefined,
+        motivo:      ncMotivo.trim(),
+        productos:   ncItems,
+        totalUnidades: totalUnid,
+        totalMonto:  totalMon > 0 ? totalMon : undefined,
+        registradoPor:   profile?.nombre ?? "Admin",
+        registradoPorId: profile?.uid    ?? "",
+        timestamp:   Timestamp.now(),
+        notas:       ncNotas.trim() || undefined,
+        estado:      "pendiente",
+      };
+      await addDoc(collection(db, "notas_credito"), nc);
+      setNcItems([]); setNcLoteId(""); setNcProveedor(""); setNcFactura(""); setNcNotas("");
+      setMsgNc({ type: "ok", text: `Nota de crédito ${numero} registrada.` });
+      setTimeout(() => setMsgNc(null), 4000);
+    } catch {
+      setMsgNc({ type: "err", text: "Error al guardar. Intenta de nuevo." });
+    } finally {
+      setGuardandoNc(false);
+    }
+  }
 
   // ── Guardar movimiento ────────────────────────────────────────────────────
   async function handleGuardar(e: React.FormEvent) {
@@ -735,7 +896,398 @@ export default function Inventario() {
         )}
       </div>
 
-      {/* ── 5. Formulario + Lista de movimientos ─────────────────────────────── */}
+      {/* ── 5. Orden PEPS/FIFO ───────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <button
+          onClick={() => setFifoAbierto((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3
+            bg-gradient-to-r from-amber-50 to-amber-100 hover:from-amber-100
+            hover:to-amber-150 transition-colors duration-100"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📋</span>
+            <span className="font-semibold text-amber-900 text-sm">Orden PEPS — lotes por producto</span>
+            <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">
+              {lotes.length} lotes
+            </span>
+          </div>
+          <span className="text-amber-600 text-sm">{fifoAbierto ? "▲" : "▼"}</span>
+        </button>
+
+        {fifoAbierto && (
+          <div className="p-4 space-y-3">
+            {fifoData.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-2xl mb-2">📋</p>
+                <p className="text-sm text-gray-400">Sin lotes registrados para mostrar orden PEPS.</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-gray-500 bg-amber-50 border border-amber-100
+                  rounded-lg px-3 py-2"
+                >
+                  ⚠️ Consumir siempre el lote más antiguo primero.
+                  El orden PEPS es una guía — el sistema no descuenta automáticamente por lote.
+                </p>
+                <div className="space-y-3">
+                  {fifoData.map((prod) => (
+                    <div key={prod.pid} className="border border-gray-100 rounded-xl overflow-hidden">
+                      <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700">
+                        {prod.nombre}
+                      </div>
+                      <div className="divide-y divide-gray-50">
+                        {prod.lotes.map((l, idx) => (
+                          <div key={l.loteNumero}
+                            className={`flex items-center justify-between px-3 py-2 text-xs ${
+                              idx === 0 ? "bg-amber-50" : ""
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              {idx === 0 && (
+                                <span className="bg-amber-500 text-white text-xs px-1.5 py-0.5
+                                  rounded font-bold flex-shrink-0">1º</span>
+                              )}
+                              <span className="font-semibold text-gray-800">{l.loteNumero}</span>
+                              <span className="text-gray-400">
+                                {l.fecha.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
+                              </span>
+                            </div>
+                            <span className="text-emerald-700 font-semibold">
+                              {l.unidadesEntrada} uds entrada
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── 6. Inventario en consignación ───────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <button
+          onClick={() => setConsigAbierto((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3
+            bg-gradient-to-r from-cyan-50 to-cyan-100 hover:from-cyan-100
+            hover:to-cyan-150 transition-colors duration-100"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🚛</span>
+            <span className="font-semibold text-cyan-900 text-sm">Inventario en consignación</span>
+            <span className="text-xs bg-cyan-200 text-cyan-800 px-2 py-0.5 rounded-full">
+              {consignacion.totalConsignado} uds
+            </span>
+            {consignacion.listaChoferes.length > 0 && (
+              <span className="text-xs bg-cyan-100 text-cyan-700 border border-cyan-200
+                px-2 py-0.5 rounded-full font-medium">
+                {consignacion.listaChoferes.length} choferes
+              </span>
+            )}
+          </div>
+          <span className="text-cyan-600 text-sm">{consigAbierto ? "▲" : "▼"}</span>
+        </button>
+
+        {consigAbierto && (
+          <div className="p-4 space-y-4">
+            {consignacion.totalConsignado === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-2xl mb-2">🚛</p>
+                <p className="text-sm text-gray-400">Sin productos en consignación actualmente.</p>
+              </div>
+            ) : (
+              <>
+                {/* Resumen por producto */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-2">
+                    📦 Por producto — total en la calle
+                  </p>
+                  <div className="space-y-1.5">
+                    {consignacion.listaProductos.map((p) => (
+                      <div key={p.pid}
+                        className="flex items-center justify-between bg-cyan-50
+                          border border-cyan-100 rounded-lg px-3 py-2"
+                      >
+                        <span className="text-sm text-gray-800 flex-1 truncate mr-3">{p.nombre}</span>
+                        <span className="text-sm font-bold text-cyan-700 flex-shrink-0">
+                          {p.cantidad} uds
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Resumen por chofer */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-2">
+                    👤 Por chofer — desglose individual
+                  </p>
+                  <div className="space-y-2">
+                    {consignacion.listaChoferes.map((ch) => (
+                      <div key={ch.id}
+                        className="border border-gray-100 rounded-xl overflow-hidden"
+                      >
+                        <div className="flex items-center justify-between
+                          bg-gray-50 px-3 py-2"
+                        >
+                          <span className="text-sm font-semibold text-gray-800">{ch.nombre}</span>
+                          <span className="text-xs font-bold text-cyan-700">
+                            {ch.total} uds total
+                          </span>
+                        </div>
+                        <div className="divide-y divide-gray-50">
+                          {ch.productos.map((p) => (
+                            <div key={p.pid}
+                              className="flex items-center justify-between px-3 py-1.5"
+                            >
+                              <span className="text-xs text-gray-600 flex-1 truncate mr-2">
+                                {p.nombre}
+                              </span>
+                              <span className="text-xs font-semibold text-cyan-600 flex-shrink-0">
+                                {p.cantidad} uds
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── 6. Notas de crédito ──────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <button
+          onClick={() => setNotasCreditoAbierto((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3
+            bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100
+            hover:to-red-150 transition-colors duration-100"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📝</span>
+            <span className="font-semibold text-red-900 text-sm">Notas de crédito</span>
+            <span className="text-xs bg-red-200 text-red-800 px-2 py-0.5 rounded-full">
+              {notasCredito.length}
+            </span>
+            {notasCredito.some((nc) => nc.estado === "pendiente") && (
+              <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200
+                px-2 py-0.5 rounded-full font-medium animate-pulse">
+                ⏳ pendientes
+              </span>
+            )}
+          </div>
+          <span className="text-red-600 text-sm">{notasCreditoAbierto ? "▲" : "▼"}</span>
+        </button>
+
+        {notasCreditoAbierto && (
+          <div className="p-4 space-y-4">
+            {/* Formulario nueva nota */}
+            <div className="border border-red-100 rounded-xl overflow-hidden">
+              <div className="px-3 py-2 bg-red-50 border-b border-red-100">
+                <p className="text-xs font-semibold text-red-800">+ Nueva nota de crédito</p>
+              </div>
+              <div className="p-3 space-y-3">
+                {/* Lote (opcional) */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Lote referencia <span className="text-gray-400">(opcional)</span>
+                  </label>
+                  <select
+                    value={ncLoteId}
+                    onChange={(e) => {
+                      setNcLoteId(e.target.value);
+                      const l = lotes.find((l) => l.id === e.target.value);
+                      if (l) { setNcProveedor(l.proveedor ?? ""); setNcFactura(l.facturaNumero ?? ""); }
+                    }}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                      outline-none focus:ring-2 focus:ring-red-300 bg-white"
+                  >
+                    <option value="">— Sin lote asociado —</option>
+                    {lotes.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.numero}{l.proveedor ? ` — ${l.proveedor}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Proveedor</label>
+                    <input
+                      value={ncProveedor}
+                      onChange={(e) => setNcProveedor(e.target.value)}
+                      placeholder="Nombre"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                        outline-none focus:ring-2 focus:ring-red-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Nº Factura</label>
+                    <input
+                      value={ncFactura}
+                      onChange={(e) => setNcFactura(e.target.value)}
+                      placeholder="F-2024-001"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                        outline-none focus:ring-2 focus:ring-red-300"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Motivo</label>
+                  <select
+                    value={ncMotivo}
+                    onChange={(e) => setNcMotivo(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                      outline-none focus:ring-2 focus:ring-red-300 bg-white"
+                  >
+                    {["Productos dañados", "Faltantes en lote", "Productos vencidos",
+                      "Entrega incorrecta", "Otro"].map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Agregar producto */}
+                <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  <p className="text-xs font-medium text-gray-600">Productos afectados</p>
+                  <div className="flex gap-2">
+                    <input
+                      value={ncNombre}
+                      onChange={(e) => setNcNombre(e.target.value)}
+                      placeholder="Nombre del producto"
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm
+                        outline-none focus:ring-2 focus:ring-red-300"
+                    />
+                    <input
+                      type="number" min={1}
+                      value={ncCantidad}
+                      onChange={(e) => setNcCantidad(e.target.value)}
+                      placeholder="Cant"
+                      className="w-16 border border-gray-200 rounded-lg px-2 py-2 text-sm
+                        outline-none focus:ring-2 focus:ring-red-300"
+                    />
+                    <input
+                      type="number" min={0} step="0.01"
+                      value={ncCosto}
+                      onChange={(e) => setNcCosto(e.target.value)}
+                      placeholder="$/ud"
+                      className="w-20 border border-gray-200 rounded-lg px-2 py-2 text-sm
+                        outline-none focus:ring-2 focus:ring-red-300"
+                    />
+                    <button
+                      onClick={ncAgregarItem}
+                      disabled={!ncNombre.trim() || !ncCantidad}
+                      className="px-3 py-2 bg-red-500 text-white rounded-lg font-bold text-sm
+                        active:scale-95 transition-all duration-100 disabled:opacity-50"
+                    >+</button>
+                  </div>
+                  {ncItems.map((it, idx) => (
+                    <div key={idx} className="flex items-center justify-between bg-red-50
+                      border border-red-100 rounded-lg px-3 py-1.5"
+                    >
+                      <span className="text-xs text-red-900 flex-1 truncate mr-2">{it.nombre}</span>
+                      <span className="text-xs font-bold text-red-700 flex-shrink-0">
+                        {it.cantidad} uds
+                        {it.costoUnitario != null && ` · $${(it.costoUnitario * it.cantidad).toFixed(2)}`}
+                      </span>
+                      <button
+                        onClick={() => setNcItems((p) => p.filter((_, i) => i !== idx))}
+                        className="ml-2 text-red-400 hover:text-red-600 active:scale-95 text-lg leading-none"
+                      >×</button>
+                    </div>
+                  ))}
+                  {ncItems.length > 0 && ncItems.some((i) => i.subtotal) && (
+                    <div className="flex justify-between text-xs font-semibold text-red-700">
+                      <span>Total monto:</span>
+                      <span>${ncItems.reduce((s, i) => s + (i.subtotal ?? 0), 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <textarea
+                  value={ncNotas}
+                  onChange={(e) => setNcNotas(e.target.value)}
+                  rows={2} placeholder="Observaciones adicionales…"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                    outline-none focus:ring-2 focus:ring-red-300 resize-none"
+                />
+
+                {msgNc && (
+                  <div className={`text-sm px-3 py-2 rounded-lg ${
+                    msgNc.type === "ok"
+                      ? "bg-green-50 text-green-700 border border-green-200"
+                      : "bg-red-50 text-red-600 border border-red-200"
+                  }`}>{msgNc.text}</div>
+                )}
+
+                <button
+                  onClick={guardarNotaCredito}
+                  disabled={guardandoNc || ncItems.length === 0}
+                  className="w-full py-2.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white
+                    rounded-xl text-sm font-semibold transition-all duration-100 disabled:opacity-50"
+                >
+                  {guardandoNc ? "Guardando…" : "📝 Registrar nota de crédito"}
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de notas */}
+            {notasCredito.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-600">Notas registradas:</p>
+                {notasCredito.map((nc) => (
+                  <button
+                    key={nc.id}
+                    onClick={() => setInvModal({ type: "nota", nc })}
+                    className="w-full text-left p-3 border border-gray-100 rounded-xl
+                      hover:bg-gray-50 active:scale-[0.99] transition-all duration-100"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-bold text-red-700 flex-shrink-0">{nc.numero}</span>
+                        <span className="text-xs text-gray-500 truncate">{nc.motivo}</span>
+                        <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded-full border ${
+                          nc.estado === "aprobada"  ? "bg-green-100 text-green-700 border-green-200"
+                          : nc.estado === "rechazada" ? "bg-red-100 text-red-700 border-red-200"
+                          : "bg-amber-100 text-amber-700 border-amber-200"
+                        }`}>
+                          {nc.estado}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{fmtDate(nc.timestamp)}</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {nc.productos.map((p, i) => (
+                        <span key={i} className="text-xs bg-red-50 text-red-700 border
+                          border-red-100 px-2 py-0.5 rounded-full">
+                          {p.nombre.split(" ")[0]} ×{p.cantidad}
+                        </span>
+                      ))}
+                      {nc.totalMonto != null && nc.totalMonto > 0 && (
+                        <span className="text-xs bg-amber-50 text-amber-700 border
+                          border-amber-100 px-2 py-0.5 rounded-full font-semibold">
+                          ${nc.totalMonto.toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── 7. Formulario + Lista de movimientos ─────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
 
         {/* Formulario */}
@@ -949,6 +1501,7 @@ export default function Inventario() {
                 {invModal.type === "producto" && `📊 Historial — ${invModal.nombre}`}
                 {invModal.type === "chofer"   && `🚛 ${invModal.ch.choferNombre}`}
                 {invModal.type === "lote"     && `🏭 Lote ${invModal.lote.numero}`}
+                {invModal.type === "nota"     && `📝 ${invModal.nc.numero}`}
               </h3>
               <button onClick={() => setInvModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95 transition-all">×</button>
             </div>
@@ -1167,6 +1720,99 @@ export default function Inventario() {
                         <p className="text-sm text-gray-700 italic">{lote.notas}</p>
                       </div>
                     )}
+                    {/* Costos del lote */}
+                    {lote.productos.some((p) => p.costoUnitario != null) && (
+                      <div className="border border-amber-200 rounded-xl overflow-hidden">
+                        <div className="bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                          💰 Costos del lote
+                        </div>
+                        <div className="divide-y divide-gray-50">
+                          {lote.productos.filter((p) => p.costoUnitario != null).map((p) => (
+                            <div key={p.producto_id} className="flex items-center justify-between px-3 py-2 text-xs">
+                              <span className="text-gray-700 flex-1 truncate">{p.nombre}</span>
+                              <span className="text-amber-700 font-semibold ml-2">
+                                ${p.costoUnitario!.toFixed(2)}/ud
+                                {" · "}${(p.costoUnitario! * p.total).toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="bg-amber-50 px-3 py-2 flex justify-between text-xs font-bold text-amber-800">
+                          <span>Inversión total:</span>
+                          <span>${lote.productos.reduce((s, p) => s + (p.costoUnitario ?? 0) * p.total, 0).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Nota de crédito: detalle */}
+              {invModal.type === "nota" && (() => {
+                const nc = invModal.nc;
+                return (
+                  <div className="space-y-3">
+                    <div className={`rounded-xl px-4 py-3 flex items-center justify-between ${
+                      nc.estado === "aprobada"   ? "bg-green-50 border border-green-200"
+                      : nc.estado === "rechazada" ? "bg-red-50 border border-red-200"
+                      : "bg-amber-50 border border-amber-200"
+                    }`}>
+                      <div>
+                        <p className="font-bold text-gray-800">{nc.motivo}</p>
+                        {nc.proveedor && <p className="text-xs text-gray-500 mt-0.5">{nc.proveedor}</p>}
+                      </div>
+                      <span className={`text-sm font-bold px-3 py-1 rounded-full ${
+                        nc.estado === "aprobada"   ? "bg-green-200 text-green-800"
+                        : nc.estado === "rechazada" ? "bg-red-200 text-red-800"
+                        : "bg-amber-200 text-amber-800"
+                      }`}>{nc.estado}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {nc.loteNumero && (
+                        <div className="bg-gray-50 rounded-lg px-3 py-2">
+                          <p className="text-gray-400">Lote ref.</p>
+                          <p className="font-semibold text-gray-800">{nc.loteNumero}</p>
+                        </div>
+                      )}
+                      {nc.facturaNumero && (
+                        <div className="bg-gray-50 rounded-lg px-3 py-2">
+                          <p className="text-gray-400">Factura</p>
+                          <p className="font-semibold text-gray-800">{nc.facturaNumero}</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      {nc.productos.map((p, i) => (
+                        <div key={i} className="flex items-center justify-between bg-red-50
+                          border border-red-100 rounded-xl px-3 py-2.5 text-sm"
+                        >
+                          <span className="font-medium text-red-900">{p.nombre}</span>
+                          <div className="text-right text-xs text-red-700 font-semibold">
+                            <span>{p.cantidad} uds</span>
+                            {p.subtotal != null && p.subtotal > 0 && (
+                              <p className="text-amber-600">${p.subtotal.toFixed(2)}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {nc.totalMonto != null && nc.totalMonto > 0 && (
+                      <div className="flex justify-between bg-amber-50 border border-amber-200
+                        rounded-xl px-3 py-2.5 text-sm font-bold text-amber-800"
+                      >
+                        <span>Monto total:</span>
+                        <span>${nc.totalMonto.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {nc.notas && (
+                      <div className="bg-gray-50 rounded-xl px-3 py-2.5">
+                        <p className="text-xs text-gray-400 mb-0.5">Notas</p>
+                        <p className="text-sm text-gray-700 italic">{nc.notas}</p>
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-400 text-right">
+                      {nc.registradoPor} · {fmtDate(nc.timestamp)}
+                    </p>
                   </div>
                 );
               })()}

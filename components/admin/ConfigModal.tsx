@@ -25,7 +25,7 @@ async function restUpdatePassword(idToken: string, newPassword: string) {
   return r.json() as Promise<{ error?: { message: string } }>;
 }
 
-type Section = "passwords" | "config" | "telegram";
+type Section = "passwords" | "config" | "telegram" | "correo";
 
 export default function ConfigModal({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<Section>("passwords");
@@ -170,10 +170,65 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  // ── Correo ───────────────────────────────────────────────────────────────────
+  const [correoEmail,  setCorreoEmail]  = useState("");
+  const [correoPass,   setCorreoPass]   = useState("");
+  const [correoLock,   setCorreoLock]   = useState(true);
+  const [correoPwd,    setCorreoPwd]    = useState("");
+  const [checkingMail, setCheckingMail] = useState(false);
+  const [mailResult,   setMailResult]   = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  const unlockCorreo = async () => {
+    const user = auth.currentUser;
+    if (!user?.email) return;
+    try {
+      const cred = EmailAuthProvider.credential(user.email, correoPwd);
+      await reauthenticateWithCredential(user, cred);
+      const snap = await getDoc(doc(db, "config", "main"));
+      if (snap.exists()) {
+        const data = snap.data();
+        setCorreoEmail((data.correoMonitoreo as string) ?? "");
+        setCorreoPass("");  // no mostramos la contraseña almacenada
+      }
+      setCorreoLock(false); setCorreoPwd("");
+    } catch {
+      flash("err", "Contraseña Admin incorrecta");
+    }
+  };
+
+  const saveCorreo = async () => {
+    if (!correoEmail.trim()) { flash("err", "Ingresa el correo a monitorear"); return; }
+    try {
+      await setDoc(doc(db, "config", "main"), {
+        correoMonitoreo: correoEmail.trim(),
+        ...(correoPass.trim() && { correoPassword: correoPass.trim() }),
+      }, { merge: true });
+      flash("ok", "Correo de monitoreo guardado ✓");
+      setCorreoPass("");
+    } catch (e) {
+      flash("err", e instanceof Error ? e.message : "Error");
+    }
+  };
+
+  const checkEmail = async () => {
+    setCheckingMail(true); setMailResult(null);
+    try {
+      const res = await fetch("/api/check-email", { method: "POST" });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setMailResult({ type: "ok", text: data.message ?? "Verificación completada" });
+    } catch (e) {
+      setMailResult({ type: "err", text: e instanceof Error ? e.message : "Error al verificar" });
+    } finally {
+      setCheckingMail(false);
+    }
+  };
+
   const SECTIONS: { key: Section; label: string; icon: string }[] = [
     { key: "passwords", label: "Contraseñas", icon: "🔑" },
     { key: "config",    label: "Config",       icon: "🏢" },
     { key: "telegram",  label: "Telegram",     icon: "🤖" },
+    { key: "correo",    label: "Correo",        icon: "📧" },
   ];
 
   return (
@@ -371,6 +426,90 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
               >
                 {cfgLoad ? "Guardando..." : "Guardar Configuración"}
               </button>
+            </div>
+          )}
+
+          {/* ── Correo ── */}
+          {section === "correo" && (
+            <div className="space-y-4">
+              {correoLock ? (
+                <div className="space-y-3">
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
+                    <p className="font-semibold mb-1">📧 Recepción automática de facturas</p>
+                    <p className="text-xs text-blue-600">
+                      El sistema monitorea una cuenta de correo. Cuando llega una factura del
+                      proveedor, la IA la lee y registra el lote automáticamente.
+                      Usa una Contraseña de Aplicación de Gmail (no la contraseña normal).
+                    </p>
+                  </div>
+                  <p className="text-sm text-gray-500">Ingresa tu contraseña Admin para ver/editar la config de correo.</p>
+                  <input
+                    type="password" value={correoPwd} onChange={(e) => setCorreoPwd(e.target.value)}
+                    placeholder="Contraseña Admin"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  <button
+                    onClick={unlockCorreo} disabled={!correoPwd}
+                    className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white
+                      py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+                  >
+                    🔓 Desbloquear
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <Field
+                    label="Correo a monitorear"
+                    value={correoEmail}
+                    onChange={setCorreoEmail}
+                    placeholder="facturas@polarbreeze.com"
+                    type="email"
+                  />
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Contraseña de Aplicación de Gmail
+                    </label>
+                    <input
+                      type="password" value={correoPass} onChange={(e) => setCorreoPass(e.target.value)}
+                      placeholder="xxxx xxxx xxxx xxxx (nueva = reemplaza)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Ve a Cuenta Google → Seguridad → Verificación en 2 pasos → Contraseñas de aplicación.
+                      Deja en blanco para mantener la contraseña guardada.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={saveCorreo} disabled={!correoEmail.trim()}
+                    className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white
+                      py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+                  >
+                    💾 Guardar configuración de correo
+                  </button>
+
+                  <div className="border-t border-gray-100 pt-4 space-y-3">
+                    <p className="text-xs font-semibold text-gray-600">Verificación manual</p>
+                    <p className="text-xs text-gray-400">
+                      Ejecuta una revisión inmediata del correo para procesar facturas pendientes.
+                    </p>
+                    <button
+                      onClick={checkEmail} disabled={checkingMail || !correoEmail.trim()}
+                      className="w-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white
+                        py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+                    >
+                      {checkingMail ? "Revisando correo…" : "📬 Revisar correo ahora"}
+                    </button>
+                    {mailResult && (
+                      <div className={`text-sm px-3 py-2 rounded-lg ${
+                        mailResult.type === "ok"
+                          ? "bg-green-50 text-green-700 border border-green-200"
+                          : "bg-red-50 text-red-700 border border-red-200"
+                      }`}>{mailResult.text}</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

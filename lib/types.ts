@@ -189,16 +189,43 @@ export interface LoteLoker {
   facturaNumero?: string;
   facturaEntregada: boolean;
   productos: {
-    nombre:      string;
-    producto_id: string;
-    cajas:       number;
-    unidades:    number;
-    total:       number;    // cajas + unidades (usado en movimientos_loker)
+    nombre:        string;
+    producto_id:   string;
+    cajas:         number;
+    unidades:      number;
+    total:         number;    // cajas + unidades (usado en movimientos_loker)
+    costoUnitario?: number;   // costo real por unidad en este lote
   }[];
   registradoPor:   string;
   registradoPorId: string;
   timestamp: Date | { seconds: number };
   notas?: string;
+}
+
+// ─── Nota de crédito (colección notas_credito) ───────────────────────────────
+
+export interface NotaCredito {
+  id?: string;
+  numero: string;            // "NC-001", "NC-002", …
+  loteId?: string;
+  loteNumero?: string;
+  facturaNumero?: string;
+  proveedor?: string;
+  motivo: string;            // "Productos dañados" | "Faltantes" | "Otro"
+  productos: {
+    nombre:      string;
+    producto_id: string;
+    cantidad:    number;
+    costoUnitario?: number;
+    subtotal?:   number;
+  }[];
+  totalUnidades: number;
+  totalMonto?:   number;
+  registradoPor:   string;
+  registradoPorId: string;
+  timestamp: Date | { seconds: number };
+  notas?: string;
+  estado: "pendiente" | "aprobada" | "rechazada";
 }
 
 export function toProductoId(nombre: string): string {

@@ -63,6 +63,10 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
   const [savingAgr1,   setSavingAgr1]   = useState(false);
   const [savingAgr0,   setSavingAgr0]   = useState(false);
 
+  // Consignación acumulada del chofer seleccionado
+  const [consigChofer, setConsigChofer] = useState<{ nombre: string; cantidad: number }[]>([]);
+  const [consigAbierto, setConsigAbierto] = useState(true);
+
   // Confrontar modal
   const [showConfronta,  setShowConfronta]  = useState(false);
 
@@ -87,24 +91,41 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     return () => { uChof(); uDrv(); uSess(); };
   }, []);
 
-  // Cargar extras de hoy para el chofer seleccionado
+  // Cargar movimientos del chofer seleccionado (extras hoy + consignación total)
   useEffect(() => {
-    if (!sel) { setExtrasHoy([]); return; }
+    if (!sel) { setExtrasHoy([]); setConsigChofer([]); return; }
     const q = query(collection(db, "movimientos_loker"), where("choferId", "==", sel.uid));
     const unsub = onSnapshot(q, (snap) => {
       const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
       const docs: ExtraLoker[] = [];
+      const consigMap = new Map<string, { nombre: string; cantidad: number }>();
+
       snap.docs.forEach((d) => {
         const data = d.data();
-        if (!data.categoria) return;
         const ts = data.timestamp?.seconds
           ? new Date(data.timestamp.seconds * 1000)
           : data.timestamp instanceof Date ? data.timestamp : new Date(0);
-        if (ts < hoy) return;
-        docs.push({ id: d.id, nombre: data.nombre, cantidad: data.cantidad,
-          motivo: data.motivo, categoria: data.categoria, timestamp: data.timestamp });
+
+        // Extras de hoy (con categoría)
+        if (data.categoria && ts >= hoy) {
+          docs.push({ id: d.id, nombre: data.nombre, cantidad: data.cantidad,
+            motivo: data.motivo, categoria: data.categoria, timestamp: data.timestamp });
+        }
+
+        // Consignación acumulada (salida_despacho y devolucion_chofer)
+        if (data.tipo === "salida_despacho" || data.tipo === "devolucion_chofer") {
+          const delta = -(data.cantidad as number); // salida negativa → delta positivo
+          const prev  = consigMap.get(data.producto_id) ?? { nombre: data.nombre, cantidad: 0 };
+          consigMap.set(data.producto_id, { nombre: data.nombre, cantidad: prev.cantidad + delta });
+        }
       });
+
       setExtrasHoy(docs);
+      setConsigChofer(
+        Array.from(consigMap.values())
+          .filter((p) => p.cantidad > 0)
+          .sort((a, b) => b.cantidad - a.cantidad)
+      );
     });
     return () => unsub();
   }, [sel?.uid]);
@@ -600,6 +621,52 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
           )}
         </div>
       </div>
+
+      {/* ── Consignación actual del chofer ── */}
+      {sel && (
+        <div className="bg-white rounded-xl shadow-sm border border-cyan-100 overflow-hidden">
+          <button
+            onClick={() => setConsigAbierto((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3
+              bg-gradient-to-r from-cyan-50 to-cyan-100 hover:from-cyan-100
+              hover:to-cyan-150 transition-colors duration-100"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-cyan-800">📦 Consignación actual</span>
+              <span className="text-xs bg-cyan-200 text-cyan-800 px-2 py-0.5 rounded-full font-bold">
+                {consigChofer.reduce((s, p) => s + p.cantidad, 0)} uds
+              </span>
+              <span className="text-xs text-cyan-500">{sel.nombre.split(" ")[0]}</span>
+            </div>
+            <span className="text-cyan-600 text-sm">{consigAbierto ? "▲" : "▼"}</span>
+          </button>
+
+          {consigAbierto && (
+            <div className="p-3">
+              {consigChofer.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-3">
+                  Sin productos en consignación para {sel.nombre.split(" ")[0]}
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {consigChofer.map((p) => (
+                    <div key={p.nombre}
+                      className="flex items-center justify-between bg-cyan-50
+                        border border-cyan-100 rounded-lg px-3 py-2"
+                    >
+                      <span className="text-sm text-gray-800 flex-1 truncate mr-2">{p.nombre}</span>
+                      <span className="text-sm font-bold text-cyan-700 flex-shrink-0">{p.cantidad} uds</span>
+                    </div>
+                  ))}
+                  <p className="text-xs text-gray-400 text-center pt-1">
+                    Total acumulado histórico — incluye todos los despachos menos devoluciones
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Secciones extras por factura ── */}
       {sel && (
