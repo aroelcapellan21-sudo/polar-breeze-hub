@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   collection, query, where, orderBy, onSnapshot,
   doc, getDoc, setDoc, addDoc, Timestamp,
@@ -10,6 +10,7 @@ import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import {
   UserProfile, ImbentarioRecord, InventarioBaseItem,
   calcSemaforo, Semaforo, toDate, fmtDate, ProductoItem, TalonarioDoc, MovimientoLoker,
+  PreciosConfig, PuntosConfig,
 } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { auth } from "@/lib/firebase";
@@ -47,6 +48,11 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
   // Product detail modal
   const [selectedProd, setSelectedProd] = useState<string | null>(null);
   const [detalleModal, setDetalleModal] = useState<string | null>(null);
+
+  // Precios / puntos config + modal inventario base
+  const [preciosConfig, setPreciosConfig] = useState<PreciosConfig | null>(null);
+  const [puntosConfig,  setPuntosConfig]  = useState<PuntosConfig | null>(null);
+  const [selectedInvBase, setSelectedInvBase] = useState<InventarioBaseItem | null>(null);
 
   useEffect(() => {
     const q = query(
@@ -89,6 +95,16 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
     return () => { u1(); u2(); u3(); };
   }, [chofer.uid]);
 
+  // Load precios y puntos desde config
+  useEffect(() => {
+    getDoc(doc(db, "config", "precios")).then((snap) => {
+      if (snap.exists()) setPreciosConfig(snap.data() as PreciosConfig);
+    });
+    getDoc(doc(db, "config", "puntos")).then((snap) => {
+      if (snap.exists()) setPuntosConfig(snap.data() as PuntosConfig);
+    });
+  }, []);
+
   // Load driver entregas (FacturaScan editable)
   useEffect(() => {
     getDoc(doc(db, "drivers", chofer.uid)).then((snap) => {
@@ -99,6 +115,23 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
       setEditEntregas(JSON.parse(JSON.stringify(entregas)));
     });
   }, [chofer.uid]);
+
+  // Totales RD$ y puntos del inventario base
+  const totalInvRD = useMemo(() => {
+    if (!preciosConfig || invBase.length === 0) return null;
+    return invBase.reduce((s, p) => {
+      const pc = preciosConfig.productos.find((x) => x.producto_id === p.producto_id);
+      return s + (pc ? p.cantidad * pc.precio : 0);
+    }, 0);
+  }, [invBase, preciosConfig]);
+
+  const totalInvPts = useMemo(() => {
+    if (!puntosConfig || invBase.length === 0) return null;
+    return invBase.reduce((s, p) => {
+      const pc = puntosConfig.productos.find((x) => x.nombre === p.nombre);
+      return s + (pc ? p.cantidad * pc.puntos : 0);
+    }, 0);
+  }, [invBase, puntosConfig]);
 
   // Filtrar por rango de días o por fecha exacta
   const cutoff = new Date();
@@ -253,44 +286,47 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
       </div>
 
       {/* ── Sub tabs + compartir ── */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-        {([
-          { key: "stats",      label: "📊 Stats" },
-          { key: "talonario",  label: "📋 Talonario" },
-          { key: "inventario", label: "📦 Inventario" },
-          { key: "extras",     label: "⭐ Extras" },
-        ] as { key: SubTab; label: string }[]).map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setSubTab(t.key)}
-            className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all duration-100 active:scale-95 ${
-              subTab === t.key
-                ? "bg-white text-purple-700 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-      <ShareBar getMessage={() => {
-        const periodo = fechaBuscar || `últimos ${rango} días`;
-        const lines = [
-          `📦 ${chofer.nombre} — ficha ${chofer.ficha ?? "—"}`,
-          `Período: ${periodo}`,
-          `• Cargado: ${totalCargado} uds`,
-          `• Entregado: ${totalEntregado} uds`,
-          `• Diferencia: ${diferencia}`,
-        ];
-        if (totalMonto > 0) lines.push(`• Monto: $${totalMonto.toLocaleString()}`);
-        if (Object.keys(porProducto).length) {
-          lines.push("Productos:");
-          Object.entries(porProducto).forEach(([prod, d]) =>
-            lines.push(`  • ${prod}: ${d.entregado}/${d.cargado} entregado`));
-        }
-        return lines.join("\n");
-      }} />
+      <div className="space-y-2">
+        <div className="grid grid-cols-4 gap-2">
+          {([
+            { key: "stats",      emoji: "📊", label: "Stats" },
+            { key: "talonario",  emoji: "📋", label: "Talonario" },
+            { key: "inventario", emoji: "📦", label: "Inventario" },
+            { key: "extras",     emoji: "⭐", label: "Extras" },
+          ] as { key: SubTab; emoji: string; label: string }[]).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setSubTab(t.key)}
+              className={`flex flex-col items-center gap-1.5 py-3 px-1 rounded-xl font-bold transition-all duration-100 active:scale-95 ${
+                subTab === t.key
+                  ? "bg-purple-600 text-white shadow-lg"
+                  : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              <span className="text-2xl leading-none">{t.emoji}</span>
+              <span className="text-sm font-bold">{t.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex justify-end">
+          <ShareBar getMessage={() => {
+            const periodo = fechaBuscar || `últimos ${rango} días`;
+            const lines = [
+              `📦 ${chofer.nombre} — ficha ${chofer.ficha ?? "—"}`,
+              `Período: ${periodo}`,
+              `• Cargado: ${totalCargado} uds`,
+              `• Entregado: ${totalEntregado} uds`,
+              `• Diferencia: ${diferencia}`,
+            ];
+            if (totalMonto > 0) lines.push(`• Monto: $${totalMonto.toLocaleString()}`);
+            if (Object.keys(porProducto).length) {
+              lines.push("Productos:");
+              Object.entries(porProducto).forEach(([prod, d]) =>
+                lines.push(`  • ${prod}: ${d.entregado}/${d.cargado} entregado`));
+            }
+            return lines.join("\n");
+          }} />
+        </div>
       </div>
 
       {/* ── Stats ── */}
@@ -826,24 +862,94 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
         );
       })()}
 
+      {/* ── Modal producto del inventario base ── */}
+      {selectedInvBase && (() => {
+        const precio  = preciosConfig?.productos.find((x) => x.producto_id === selectedInvBase.producto_id)?.precio ?? null;
+        const puntos  = puntosConfig?.productos.find((x) => x.nombre === selectedInvBase.nombre)?.puntos ?? null;
+        const totalRD  = precio !== null ? selectedInvBase.cantidad * precio : null;
+        const totalPts = puntos !== null ? selectedInvBase.cantidad * puntos : null;
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedInvBase(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b">
+                <div>
+                  <h2 className="font-bold text-gray-800 text-lg leading-tight">{selectedInvBase.nombre}</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Inventario base · {chofer.nombre}</p>
+                </div>
+                <button onClick={() => setSelectedInvBase(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95">×</button>
+              </div>
+              <div className="p-5 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-violet-50 rounded-xl p-3 text-center">
+                    <p className="text-2xl font-bold text-violet-700">{selectedInvBase.cantidad}</p>
+                    <p className="text-xs text-violet-500">Unidades asignadas</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-xl p-3 text-center">
+                    <p className="text-2xl font-bold text-blue-700">
+                      {precio !== null ? `RD$${precio.toLocaleString()}` : "—"}
+                    </p>
+                    <p className="text-xs text-blue-500">Precio unitario</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-green-50 rounded-xl p-3 text-center">
+                    <p className="text-2xl font-bold text-green-700">
+                      {totalRD !== null ? `RD$${totalRD.toLocaleString()}` : "—"}
+                    </p>
+                    <p className="text-xs text-green-500">Total RD$</p>
+                  </div>
+                  <div className="bg-yellow-50 rounded-xl p-3 text-center">
+                    <p className="text-2xl font-bold text-yellow-700">
+                      {puntos !== null ? puntos : "—"}
+                    </p>
+                    <p className="text-xs text-yellow-500">Puntos por unidad</p>
+                  </div>
+                </div>
+                {totalPts !== null && (
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
+                    <p className="text-3xl font-bold text-amber-600">{totalPts.toLocaleString()}</p>
+                    <p className="text-sm text-amber-500 mt-0.5">Total de puntos</p>
+                  </div>
+                )}
+                {precio === null && puntos === null && (
+                  <p className="text-xs text-gray-400 text-center py-1">
+                    Sin precio ni puntos configurados para este producto
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Inventario base (read-only) ── */}
       {subTab === "inventario" && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 py-4 bg-gradient-to-r from-violet-50 to-violet-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-violet-900 text-sm">📋 Inventario base asignado</h3>
-                <p className="text-xs text-violet-600 mt-0.5">18/05/2026 · solo lectura</p>
-              </div>
-              {invBase.length > 0 && (
-                <div className="text-right">
-                  <p className="text-lg font-bold text-violet-700">
-                    {invBase.reduce((s, p) => s + p.cantidad, 0)}
-                  </p>
-                  <p className="text-xs text-violet-500">uds total</p>
-                </div>
-              )}
+            <div className="mb-3">
+              <h3 className="font-bold text-violet-900 text-sm">📋 Inventario base asignado</h3>
+              <p className="text-xs text-violet-600 mt-0.5">18/05/2026 · toca un producto para ver detalles</p>
             </div>
+            {invBase.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white/70 rounded-xl p-2.5 text-center">
+                  <p className="text-lg font-bold text-violet-700">{invBase.reduce((s, p) => s + p.cantidad, 0)}</p>
+                  <p className="text-xs text-violet-500">Unidades</p>
+                </div>
+                <div className="bg-white/70 rounded-xl p-2.5 text-center">
+                  <p className="text-base font-bold text-green-700">
+                    {totalInvRD !== null ? `RD$${totalInvRD.toLocaleString()}` : "—"}
+                  </p>
+                  <p className="text-xs text-green-500">Valor total</p>
+                </div>
+                <div className="bg-white/70 rounded-xl p-2.5 text-center">
+                  <p className="text-base font-bold text-amber-600">
+                    {totalInvPts !== null ? totalInvPts.toLocaleString() : "—"}
+                  </p>
+                  <p className="text-xs text-amber-500">Puntos totales</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {invBase.length === 0 ? (
@@ -861,25 +967,48 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
                   <tr className="bg-violet-50/60 text-violet-700 border-b border-violet-100">
                     <th className="text-left px-4 py-2.5 font-semibold">Producto</th>
                     <th className="text-right px-4 py-2.5 font-semibold w-20">Cant.</th>
+                    <th className="w-6"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {invBase.map((p, i) => (
-                    <tr key={i} className="hover:bg-violet-50/30">
-                      <td className="px-4 py-2 text-gray-700 font-medium">{p.nombre}</td>
-                      <td className="px-4 py-2 text-right font-bold text-violet-700">{p.cantidad}</td>
+                    <tr
+                      key={i}
+                      onClick={() => setSelectedInvBase(p)}
+                      className="hover:bg-violet-50/50 cursor-pointer active:bg-violet-100/60 transition-colors"
+                    >
+                      <td className="px-4 py-2.5 text-gray-700 font-medium">{p.nombre}</td>
+                      <td className="px-4 py-2.5 text-right font-bold text-violet-700">{p.cantidad}</td>
+                      <td className="pr-3 py-2.5 text-gray-300 text-sm">›</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="bg-violet-50/60 border-t border-violet-100 font-bold text-xs">
-                    <td className="px-4 py-2 text-violet-700">
-                      Total — {invBase.length} productos
-                    </td>
+                    <td className="px-4 py-2 text-violet-700">Total — {invBase.length} productos</td>
                     <td className="px-4 py-2 text-right text-violet-700">
-                      {invBase.reduce((s, p) => s + p.cantidad, 0)}
+                      {invBase.reduce((s, p) => s + p.cantidad, 0)} uds
                     </td>
+                    <td></td>
                   </tr>
+                  {totalInvRD !== null && (
+                    <tr className="bg-white border-t border-violet-50 text-xs">
+                      <td className="px-4 py-1.5 text-gray-500">Valor total</td>
+                      <td className="px-4 py-1.5 text-right font-bold text-green-700">
+                        RD${totalInvRD.toLocaleString()}
+                      </td>
+                      <td></td>
+                    </tr>
+                  )}
+                  {totalInvPts !== null && (
+                    <tr className="bg-white text-xs border-t border-gray-50">
+                      <td className="px-4 py-1.5 text-gray-500">Puntos totales</td>
+                      <td className="px-4 py-1.5 text-right font-bold text-amber-600">
+                        {totalInvPts.toLocaleString()} pts
+                      </td>
+                      <td></td>
+                    </tr>
+                  )}
                 </tfoot>
               </table>
             </div>
