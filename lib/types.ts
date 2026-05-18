@@ -178,7 +178,7 @@ export interface FsConfig {
 
 export interface MovimientoLoker {
   id?: string;
-  tipo: "entrada_interior" | "devolucion_chofer" | "salida_despacho" | "merma" | "ajuste";
+  tipo: "entrada_interior" | "entrada_consignacion_inicial" | "devolucion_chofer" | "salida_despacho" | "merma" | "ajuste";
   categoria?: "retiro_despacho" | "agregado_1" | "agregado_0";
   generaPuntos?: boolean;
   producto_id: string;
