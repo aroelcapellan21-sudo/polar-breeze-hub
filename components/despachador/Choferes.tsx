@@ -34,9 +34,10 @@ interface ExtraLoker {
 
 interface Props {
   onChoferSelect?: (c: UserProfile | null) => void;
+  despachadorActivo?: string;
 }
 
-export default function Choferes({ onChoferSelect }: Props) {
+export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
   const { profile } = useAuth();
   const [choferes,      setChoferes]      = useState<UserProfile[]>([]);
   const [drivers,       setDrivers]       = useState<FsDriver[]>([]);
@@ -204,7 +205,7 @@ export default function Choferes({ onChoferSelect }: Props) {
         choferId:          sel.uid, choferNombre: sel.nombre,
         productos, observaciones: observaciones || null,
         totalEntregado, totalMonto: totalMonto || null,
-        despachadorId:     profile.uid, despachadorNombre: profile.nombre,
+        despachadorId:     profile.uid, despachadorNombre: despNombre,
         timestamp:         Timestamp.now(),
       });
 
@@ -212,12 +213,12 @@ export default function Choferes({ onChoferSelect }: Props) {
         choferId:          sel.uid, choferNombre: sel.nombre, choferFicha: sel.ficha ?? "",
         productos, observaciones: observaciones || null,
         tipo: "retirada", fuente: "despacho",
-        despachadorId: profile.uid, despachadorNombre: profile.nombre,
+        despachadorId: profile.uid, despachadorNombre: despNombre,
         timestamp: Timestamp.now(),
       });
 
       await addDoc(collection(db, "facturascan"), {
-        despachadorId:     profile.uid, despachadorNombre: profile.nombre,
+        despachadorId:     profile.uid, despachadorNombre: despNombre,
         facturaNumero:     `FS-${sel.ficha ?? sel.uid.slice(0, 4)}-${Date.now().toString().slice(-5)}`,
         cliente:           sel.nombre, monto: totalMonto,
         timestamp:         Timestamp.now(), estado: "procesada",
@@ -231,7 +232,7 @@ export default function Choferes({ onChoferSelect }: Props) {
           producto_id:  toProductoId(p.nombre),
           nombre:       p.nombre,
           cantidad:     -(p.cantidad ?? 0),
-          responsable:  profile.nombre,
+          responsable:  despNombre,
           choferId:     sel.uid,
           choferNombre: sel.nombre,
           timestamp:    Timestamp.now(),
@@ -281,7 +282,7 @@ export default function Choferes({ onChoferSelect }: Props) {
         producto_id:  toProductoId(form.nombre),
         nombre:       form.nombre.trim(),
         cantidad:     esRetiro ? form.cantidad : -(form.cantidad),
-        responsable:  profile.nombre,
+        responsable:  despNombre,
         choferId:     sel.uid,
         choferNombre: sel.nombre,
         timestamp:    Timestamp.now(),
@@ -313,11 +314,13 @@ export default function Choferes({ onChoferSelect }: Props) {
     : analizando ? 2
     : productos.length === 0 ? 2 : 3;
 
+  const despNombre = despachadorActivo || profile?.nombre || "Despachador";
+
   const getWhatsAppMsg = () => {
     if (!sel) return "";
     const lines = [
       `🚛 *Entrega — ${sel.nombre}* (Ficha ${sel.ficha ?? "—"})`,
-      `👤 Despachador: ${profile?.nombre}`,
+      `👤 Despachador: ${despNombre}`,
       `📅 ${new Date().toLocaleString("es-MX")}`, "",
     ];
     productos.forEach((p) => {

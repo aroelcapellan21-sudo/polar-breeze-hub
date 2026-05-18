@@ -1,52 +1,63 @@
 "use client";
 
-import { useState } from "react";
-import { doc, setDoc, addDoc, collection, Timestamp } from "firebase/firestore";
+import { useState, useEffect } from "react";
+import { doc, setDoc, addDoc, collection, Timestamp, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { ProductoItem } from "@/lib/types";
+import { ProductoItem, PuntoProducto } from "@/lib/types";
 import {
   ImageUploader, ProductTable, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
 } from "./shared";
 
-const STEPS = [
-  { label: "Entrada" },
-  { label: "Analizar IA" },
-  { label: "Revisar" },
-  { label: "Observaciones" },
-  { label: "Guardar" },
-];
+interface Props {
+  despachadorActivo?: string;
+}
 
-export default function CuartoFrio() {
+const STEPS_FOTO   = [{ label: "Foto" }, { label: "Analizar IA" }, { label: "Revisar" }, { label: "Guardar" }];
+const STEPS_MANUAL = [{ label: "Seleccionar" }, { label: "Revisar" }, { label: "Guardar" }];
+
+export default function CuartoFrio({ despachadorActivo }: Props) {
   const { profile } = useAuth();
-  const [mode,         setMode]         = useState<"foto" | "manual">("foto");
-  const [preview,      setPreview]      = useState<string | null>(null);
-  const [imgData,      setImgData]      = useState<{ base64: string; mimeType: string } | null>(null);
-  const [texto,        setTexto]        = useState("");
-  const [productos,    setProductos]    = useState<ProductoItem[]>([]);
+  const [mode,          setMode]          = useState<"foto" | "manual">("foto");
+  const [preview,       setPreview]       = useState<string | null>(null);
+  const [imgData,       setImgData]       = useState<{ base64: string; mimeType: string } | null>(null);
+  const [texto,         setTexto]         = useState("");
+  const [productos,     setProductos]     = useState<ProductoItem[]>([]);
   const [observaciones, setObservaciones] = useState("");
-  const [analizando,   setAnalizando]   = useState(false);
-  const [guardando,    setGuardando]    = useState(false);
-  const [msg,          setMsg]          = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [analizando,    setAnalizando]    = useState(false);
+  const [guardando,     setGuardando]     = useState(false);
+  const [msg,           setMsg]           = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  // Catálogo para modo manual
+  const [catalogo,      setCatalogo]      = useState<PuntoProducto[]>([]);
+  const [manualProd,    setManualProd]    = useState("");
+  const [manualCajas,   setManualCajas]   = useState(0);
+  const [manualUnids,   setManualUnids]   = useState(0);
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "puntos")).then((snap) => {
+      if (snap.exists()) {
+        const pd = snap.data();
+        setCatalogo(pd.productos ?? []);
+        if ((pd.productos as PuntoProducto[] ?? []).length > 0) {
+          setManualProd((pd.productos as PuntoProducto[])[0].nombre);
+        }
+      }
+    });
+  }, []);
 
   const flash = (type: "ok" | "err", text: string) => {
     setMsg({ type, text });
     setTimeout(() => setMsg(null), 4000);
   };
 
-  const handleFile = (base64: string, mimeType: string, prev: string) => {
-    setImgData({ base64, mimeType });
-    setPreview(prev);
-  };
+  const despNombre = despachadorActivo || profile?.nombre || "Despachador";
 
-  // Determinar paso actual
+  // Modo foto
   const canAnalyze = mode === "foto" ? !!imgData : texto.trim().length > 10;
-  const currentStep = !canAnalyze ? 0
-    : analizando ? 1
-    : productos.length === 0 ? 1
-    : observaciones !== undefined && productos.length > 0 ? 3
-    : 2;
+  const currentStepFoto = !canAnalyze ? 0 : analizando ? 1 : productos.length === 0 ? 1 : 2;
+  const currentStepManual = productos.length > 0 ? 1 : 0;
 
   const analizar = async () => {
     setAnalizando(true);
@@ -54,7 +65,6 @@ export default function CuartoFrio() {
       const body = imgData
         ? { tipo: "cuarto_frio", imageBase64: imgData.base64, mimeType: imgData.mimeType }
         : { tipo: "cuarto_frio", texto };
-
       const res  = await fetch("/api/analyze", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -74,21 +84,43 @@ export default function CuartoFrio() {
     }
   };
 
+  // Agregar producto en modo manual
+  const addManual = () => {
+    if (!manualProd) return;
+    setProductos((prev) => {
+      const idx = prev.findIndex((p) => p.nombre === manualProd);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = {
+          ...next[idx],
+          cajas:    (next[idx].cajas    ?? 0) + manualCajas,
+          cantidad: (next[idx].cantidad ?? 0) + manualUnids,
+        };
+        return next;
+      }
+      return [...prev, { nombre: manualProd, cantidad: manualUnids, cajas: manualCajas, unidad: "pz" }];
+    });
+    setManualCajas(0);
+    setManualUnids(0);
+  };
+
   const guardar = async () => {
     if (!profile || productos.length === 0) return;
     setGuardando(true);
     try {
       const totalUnidades = productos.reduce((s, p) => s + (p.cantidad ?? 0), 0);
-      const totalPeso     = productos.reduce((s, p) => s + (p.peso ?? 0), 0);
+      const totalCajas    = productos.reduce((s, p) => s + (p.cajas    ?? 0), 0);
+      const totalPeso     = productos.reduce((s, p) => s + (p.peso     ?? 0), 0);
 
       await setDoc(doc(db, "session", "despacho"), {
         cuartoFrio:        productos,
         totalProductos:    productos.length,
         totalUnidades,
-        totalPeso:         totalPeso || null,
+        totalCajas:        totalCajas || null,
+        totalPeso:         totalPeso  || null,
         despachadorId:     profile.uid,
-        despachadorNombre: profile.nombre,
-        despachador:       profile.nombre,
+        despachadorNombre: despNombre,
+        despachador:       despNombre,
         observaciones:     observaciones || null,
         fecha:             Timestamp.now(),
         estado:            "activa",
@@ -100,13 +132,14 @@ export default function CuartoFrio() {
         tipo:              "cuarto_frio",
         productos,
         totalUnidades,
+        totalCajas:        totalCajas || null,
         observaciones:     observaciones || null,
         despachadorId:     profile.uid,
-        despachadorNombre: profile.nombre,
+        despachadorNombre: despNombre,
         timestamp:         Timestamp.now(),
       });
 
-      flash("ok", `Cuarto frío guardado — ${totalUnidades} unidades en ${productos.length} productos`);
+      flash("ok", `Cuarto frío guardado — ${totalUnidades} uds · ${totalCajas} cajas · ${productos.length} productos`);
     } catch (e) {
       flash("err", e instanceof Error ? e.message : "Error al guardar");
     } finally {
@@ -114,46 +147,117 @@ export default function CuartoFrio() {
     }
   };
 
-  const totalUnid = productos.reduce((s, p) => s + (p.cantidad ?? 0), 0);
+  const totalUnid  = productos.reduce((s, p) => s + (p.cantidad ?? 0), 0);
+  const totalCajas = productos.reduce((s, p) => s + (p.cajas    ?? 0), 0);
 
   const getWhatsAppMsg = () => {
-    const lines = [`🥶 *Cuarto Frío — ${profile?.nombre}*`, `📅 ${new Date().toLocaleString("es-MX")}`, ""];
-    productos.forEach((p) => lines.push(`• ${p.nombre}: ${p.cantidad} ${p.unidad ?? ""}`));
-    lines.push(`\nTotal: ${totalUnid} uds`);
+    const lines = [`🥶 *Cuarto Frío — ${despNombre}*`, `📅 ${new Date().toLocaleString("es-MX")}`, ""];
+    productos.forEach((p) => {
+      const partes: string[] = [];
+      if (p.cajas)    partes.push(`${p.cajas} caj`);
+      if (p.cantidad) partes.push(`${p.cantidad} uds`);
+      lines.push(`• ${p.nombre}: ${partes.join(" / ") || "—"}`);
+    });
+    lines.push(`\nTotal: ${totalCajas} cajas · ${totalUnid} uds`);
     if (observaciones) lines.push(`\n📝 ${observaciones}`);
     return lines.join("\n");
   };
 
+  const resetMode = (m: "foto" | "manual") => {
+    setMode(m);
+    setPreview(null); setImgData(null); setTexto("");
+    setProductos([]); setObservaciones("");
+    setManualCajas(0); setManualUnids(0);
+  };
+
   return (
     <div className="space-y-4">
-      {/* Progreso */}
-      <ProgressSteps steps={STEPS} current={currentStep} />
+      <ProgressSteps
+        steps={mode === "foto" ? STEPS_FOTO : STEPS_MANUAL}
+        current={mode === "foto" ? currentStepFoto : currentStepManual}
+      />
 
       <div className="grid lg:grid-cols-2 gap-5">
+
         {/* ── Panel izquierdo: entrada ── */}
         <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-blue-700">🥶 Cuarto Frío</h2>
-            <ModeToggle mode={mode} onChange={(m) => { setMode(m); setPreview(null); setImgData(null); setTexto(""); }} />
+            <ModeToggle mode={mode} onChange={resetMode} />
           </div>
 
-          {mode === "foto" ? (
-            <ImageUploader
-              preview={preview}
-              onFile={handleFile}
-              onClear={() => { setPreview(null); setImgData(null); }}
-            />
-          ) : (
-            <textarea
-              value={texto}
-              onChange={(e) => setTexto(e.target.value)}
-              placeholder={"Pega o escribe la lista del cuarto frío.\nEjemplo:\n- Leche entera 24 cajas\n- Queso fresco 12 piezas"}
-              className="w-full h-48 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800
-                focus:ring-2 focus:ring-blue-400 outline-none resize-none"
-            />
+          {/* ── Modo Foto ── */}
+          {mode === "foto" && (
+            <>
+              <ImageUploader
+                preview={preview}
+                onFile={(b, m, p) => { setImgData({ base64: b, mimeType: m }); setPreview(p); }}
+                onClear={() => { setPreview(null); setImgData(null); }}
+              />
+              <AiButton onClick={analizar} loading={analizando} disabled={!canAnalyze} />
+            </>
           )}
 
-          <AiButton onClick={analizar} loading={analizando} disabled={!canAnalyze} />
+          {/* ── Modo Manual — lista desplegable ── */}
+          {mode === "manual" && (
+            <div className="space-y-4">
+              {catalogo.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  <p className="text-2xl mb-2">📋</p>
+                  <p>Sin productos configurados.</p>
+                  <p className="text-xs mt-1">El Admin debe agregar productos en<br/>Gestión Choferes → Puntos.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Selector de producto */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Producto</label>
+                    <select
+                      value={manualProd}
+                      onChange={(e) => setManualProd(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                    >
+                      {catalogo.map((p) => (
+                        <option key={p.nombre} value={p.nombre}>{p.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Cajas + Unidades */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">📦 Cajas</label>
+                      <input
+                        type="number" min={0}
+                        value={manualCajas || ""}
+                        onChange={(e) => setManualCajas(Math.max(0, Number(e.target.value)))}
+                        placeholder="0"
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-400 text-center"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">🔢 Unidades</label>
+                      <input
+                        type="number" min={0}
+                        value={manualUnids || ""}
+                        onChange={(e) => setManualUnids(Math.max(0, Number(e.target.value)))}
+                        placeholder="0"
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-400 text-center"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={addManual}
+                    disabled={!manualProd || (manualCajas === 0 && manualUnids === 0)}
+                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-50"
+                  >
+                    + Agregar a lista
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {msg && (
             <div className={`text-sm px-3 py-2 rounded-lg ${
@@ -164,14 +268,14 @@ export default function CuartoFrio() {
           )}
         </div>
 
-        {/* ── Panel derecho: tabla editable + observaciones + guardar ── */}
+        {/* ── Panel derecho: lista + guardar ── */}
         <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-gray-700">
-              Inventario detectado
+              {mode === "manual" ? "Lista de productos" : "Inventario detectado"}
               {productos.length > 0 && (
                 <span className="ml-2 text-sm font-normal text-gray-400">
-                  {productos.length} productos · {totalUnid} uds
+                  {productos.length} productos · {totalCajas ? `${totalCajas} caj · ` : ""}{totalUnid} uds
                 </span>
               )}
             </h3>
@@ -189,15 +293,49 @@ export default function CuartoFrio() {
           {productos.length === 0 ? (
             <div className="text-center py-12 text-gray-400 text-sm">
               <p className="text-3xl mb-2">📋</p>
-              <p>Agrega una foto o texto y presiona</p>
-              <p className="font-medium">✨ Analizar con IA</p>
-              <p className="mt-3 text-xs text-gray-300">O agrega productos manualmente</p>
+              {mode === "foto" ? (
+                <>
+                  <p>Agrega una foto y presiona</p>
+                  <p className="font-medium">✨ Analizar con IA</p>
+                </>
+              ) : (
+                <p>Selecciona productos y toca<br/><strong>+ Agregar a lista</strong></p>
+              )}
+            </div>
+          ) : mode === "manual" ? (
+            /* Vista especial para modo manual: cajas + unidades separados */
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {productos.map((p, i) => (
+                <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 rounded-xl border border-blue-100">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{p.nombre}</p>
+                    <div className="flex gap-3 mt-0.5 text-xs text-gray-500">
+                      <span>📦 {p.cajas ?? 0} cajas</span>
+                      <span>🔢 {p.cantidad ?? 0} uds</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    {/* Quick edit inline */}
+                    <button
+                      onClick={() => {
+                        setManualProd(p.nombre);
+                        setProductos((prev) => prev.filter((_, idx) => idx !== i));
+                        setManualCajas(p.cajas ?? 0);
+                        setManualUnids(p.cantidad ?? 0);
+                      }}
+                      className="text-xs text-blue-500 hover:text-blue-700 active:scale-95 transition-all px-1"
+                    >✏️</button>
+                    <button
+                      onClick={() => setProductos((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="text-gray-300 hover:text-red-400 active:scale-95 transition-all text-lg leading-none"
+                    >×</button>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <>
               <ProductTable productos={productos} onChange={setProductos} showPrecio={false} />
-
-              {/* Observaciones — sobrantes y faltantes */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   📝 Observaciones — sobrantes y faltantes
@@ -212,6 +350,23 @@ export default function CuartoFrio() {
                 />
               </div>
             </>
+          )}
+
+          {/* Observaciones para modo manual también */}
+          {mode === "manual" && productos.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                📝 Observaciones
+              </label>
+              <textarea
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+                placeholder="Ej: 3 cajas sobrantes de leche..."
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800
+                  focus:ring-2 focus:ring-blue-400 outline-none resize-none"
+              />
+            </div>
           )}
 
           <button

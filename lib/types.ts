@@ -64,7 +64,8 @@ export interface WeightAlert {
 
 export interface ProductoItem {
   nombre:   string;
-  cantidad: number;
+  cantidad: number;   // unidades sueltas
+  cajas?:   number;   // número de cajas (cuarto frío)
   unidad?:  string;
   peso?:    number | null;
   precio?:  number | null;

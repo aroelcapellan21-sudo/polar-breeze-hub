@@ -10,8 +10,9 @@ import ConfigModal     from "@/components/admin/ConfigModal";
 import StatusDashboard from "@/components/admin/StatusDashboard";
 import Inventario          from "@/components/admin/Inventario";
 import InformesHistorial  from "@/components/admin/InformesHistorial";
+import Anomalias          from "@/components/admin/Anomalias";
 
-type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes";
+type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias";
 
 export default function AdminDashboard() {
   const { profile, logout } = useAuth();
@@ -81,6 +82,13 @@ export default function AdminDashboard() {
               <span>📋</span>
               <span className="hidden sm:inline">Informes</span>
             </NavTab>
+            <NavTab
+              active={tab === "anomalias"}
+              onClick={() => { setTab("anomalias"); setChofer(null); }}
+            >
+              <span>⚠️</span>
+              <span className="hidden sm:inline">Anomalías</span>
+            </NavTab>
           </nav>
 
           {/* Acciones */}
@@ -122,6 +130,9 @@ export default function AdminDashboard() {
             {tab === "informes" && (
               <span className="text-white font-medium">📋 Informes — cierres del día por fecha</span>
             )}
+            {tab === "anomalias" && (
+              <span className="text-white font-medium">⚠️ Anomalías — detección automática · Telegram</span>
+            )}
             {tab === "choferes" && !chofer && (
               <span className="text-white font-medium">👥 Choferes — gestión, inventario y sistema de puntos</span>
             )}
@@ -152,6 +163,7 @@ export default function AdminDashboard() {
         {tab === "inventario" && <Inventario />}
         {tab === "estado" && <StatusDashboard />}
         {tab === "informes" && <InformesHistorial />}
+        {tab === "anomalias" && <Anomalias />}
       </main>
 
       {/* ── Modal Configuración ── */}

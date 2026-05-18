@@ -43,6 +43,7 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
   // ── Config ───────────────────────────────────────────────────────────────────
   const [cfg, setCfg]     = useState<FsConfig>({});
   const [cfgLoad, setCfgLoad] = useState(false);
+  const [nuevoDespachador, setNuevoDespachador] = useState("");
 
   // ── Telegram ─────────────────────────────────────────────────────────────────
   const [tgToken, setTgToken] = useState("");
@@ -284,6 +285,65 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
                 <Field label="Umbral 🚨 (%)" type="number"
                   value={String(cfg.alertaCritical ?? 15)}
                   onChange={(v) => setCfg((p) => ({ ...p, alertaCritical: Number(v) }))} />
+              </div>
+
+              {/* Lista de Despachadores */}
+              <div className="border border-gray-100 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="font-semibold text-gray-700 text-sm">👤 Equipo de Despachadores</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Nombres que aparecen en el selector del Despachador para identificarse al iniciar el día.
+                  </p>
+                </div>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                  {((cfg.listaDespachadores as string[]) ?? []).length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-2">Sin despachadores configurados</p>
+                  ) : (
+                    ((cfg.listaDespachadores as string[]) ?? []).map((n, i) => (
+                      <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
+                        <span className="text-sm flex-1 text-gray-800">👤 {n}</span>
+                        <button
+                          onClick={() => setCfg((p) => ({
+                            ...p,
+                            listaDespachadores: ((p.listaDespachadores as string[]) ?? []).filter((_, idx) => idx !== i),
+                          }))}
+                          className="text-gray-300 hover:text-red-400 active:scale-95 text-lg leading-none"
+                        >×</button>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={nuevoDespachador}
+                    onChange={(e) => setNuevoDespachador(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && nuevoDespachador.trim()) {
+                        setCfg((p) => ({
+                          ...p,
+                          listaDespachadores: [...((p.listaDespachadores as string[]) ?? []), nuevoDespachador.trim()],
+                        }));
+                        setNuevoDespachador("");
+                      }
+                    }}
+                    placeholder="Nombre del despachador"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  <button
+                    onClick={() => {
+                      if (!nuevoDespachador.trim()) return;
+                      setCfg((p) => ({
+                        ...p,
+                        listaDespachadores: [...((p.listaDespachadores as string[]) ?? []), nuevoDespachador.trim()],
+                      }));
+                      setNuevoDespachador("");
+                    }}
+                    disabled={!nuevoDespachador.trim()}
+                    className="px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium active:scale-95 disabled:opacity-50 transition-all duration-100"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
 
               {/* WhatsApp Bot */}

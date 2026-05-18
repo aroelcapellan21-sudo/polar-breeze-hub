@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   collection, getDocs, doc, setDoc, updateDoc, Timestamp, getDoc,
 } from "firebase/firestore";
@@ -27,6 +27,31 @@ export default function DespachadorDashboard() {
   const { profile, logout } = useAuth();
   const [tab,        setTab]        = useState<Tab>("cuartofrio");
   const [selChofer,  setSelChofer]  = useState<UserProfile | null>(null);
+
+  // Identidad del despachador activo
+  const [despNombre,        setDespNombre]        = useState("");
+  const [listaDespachadores, setListaDespachadores] = useState<string[]>([]);
+  const [showNombreModal,   setShowNombreModal]   = useState(false);
+  const [nombreCustom,      setNombreCustom]      = useState("");
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "main")).then((snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setListaDespachadores((d.listaDespachadores as string[]) ?? []);
+        setDespNombre((d.despachadorActivo as string) ?? "");
+      }
+    });
+  }, []);
+
+  const selectDespachador = async (nombre: string) => {
+    setDespNombre(nombre);
+    setShowNombreModal(false);
+    setNombreCustom("");
+    try {
+      await setDoc(doc(db, "config", "main"), { despachadorActivo: nombre }, { merge: true });
+    } catch { /* non-critical */ }
+  };
 
   // Restablecer modal state
   const [showReset,   setShowReset]   = useState(false);
@@ -177,16 +202,93 @@ export default function DespachadorDashboard() {
         </div>
       </header>
 
+      {/* ── Barra de identidad del despachador ── */}
+      <div className={`border-b ${despNombre ? "bg-blue-50 border-blue-100" : "bg-amber-50 border-amber-200"}`}>
+        <div className="max-w-6xl mx-auto px-4 py-2 flex items-center gap-3">
+          <span className="text-xs text-gray-500">Despachando como:</span>
+          {despNombre ? (
+            <button
+              onClick={() => setShowNombreModal(true)}
+              className="flex items-center gap-1.5 text-sm font-semibold text-blue-800 active:scale-95 hover:text-blue-600 transition-all duration-100"
+            >
+              👤 {despNombre}
+              <span className="text-xs font-normal text-blue-400">cambiar</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowNombreModal(true)}
+              className="text-xs bg-amber-200 text-amber-800 px-3 py-1 rounded-full active:scale-95 hover:bg-amber-300 transition-all duration-100 font-medium animate-pulse"
+            >
+              ⚠️ ¿Quién despacha hoy? Toca para identificarte
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* ── Contenido ── */}
       <main className="max-w-6xl mx-auto px-4 py-5">
-        {tab === "cuartofrio" && <CuartoFrio />}
+        {tab === "cuartofrio" && <CuartoFrio despachadorActivo={despNombre} />}
         {tab === "choferes"   && (
-          <Choferes onChoferSelect={setSelChofer} />
+          <Choferes despachadorActivo={despNombre} onChoferSelect={setSelChofer} />
         )}
         {tab === "comparar"   && <Comparar />}
         {tab === "historial"  && <Historial />}
         {tab === "cierre"     && <InformeCierre />}
       </main>
+
+      {/* ── Modal: ¿Quién despacha? ── */}
+      {showNombreModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4" onClick={() => setShowNombreModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center">
+              <p className="text-3xl mb-1">👤</p>
+              <h3 className="font-bold text-gray-800 text-lg">¿Quién despacha hoy?</h3>
+              <p className="text-xs text-gray-400 mt-1">Tu nombre aparecerá en facturas, WhatsApp y reportes del Admin</p>
+            </div>
+            {listaDespachadores.length > 0 ? (
+              <div className="space-y-2">
+                {listaDespachadores.map((nombre) => (
+                  <button
+                    key={nombre}
+                    onClick={() => selectDespachador(nombre)}
+                    className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all duration-100 active:scale-95 ${
+                      despNombre === nombre
+                        ? "border-blue-500 bg-blue-50 text-blue-800"
+                        : "border-gray-100 hover:border-blue-200 hover:bg-blue-50"
+                    }`}
+                  >
+                    👤 {nombre}
+                    {despNombre === nombre && <span className="ml-2 text-xs text-blue-400">✓ activo</span>}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-2">
+                El Admin puede configurar la lista en<br/>Configuración → Config.
+              </p>
+            )}
+            <div className="flex gap-2 pt-1">
+              <input
+                value={nombreCustom}
+                onChange={(e) => setNombreCustom(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && nombreCustom.trim() && selectDespachador(nombreCustom.trim())}
+                placeholder="Escribir nombre..."
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <button
+                onClick={() => nombreCustom.trim() && selectDespachador(nombreCustom.trim())}
+                disabled={!nombreCustom.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium active:scale-95 disabled:opacity-50 transition-all duration-100"
+              >
+                OK
+              </button>
+            </div>
+            <button onClick={() => setShowNombreModal(false)} className="w-full py-2 text-gray-400 text-xs hover:text-gray-600 transition-colors">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal Restablecer ── */}
       {showReset && (
