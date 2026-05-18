@@ -41,21 +41,36 @@ const ROLES = [
     ring: "focus:ring-cyan-400",
     btn: "from-cyan-600 to-teal-700",
   },
+  {
+    key: "encargado" as UserRole,
+    label: "ENCARGADO",
+    icon: "🏭",
+    hint: "Almacén · registro de lotes",
+    email: "",
+    border: "border-emerald-400 hover:border-emerald-500",
+    active: "border-emerald-600 bg-emerald-50",
+    text: "text-emerald-700",
+    ring: "focus:ring-emerald-400",
+    btn: "from-emerald-600 to-emerald-800",
+  },
 ] as const;
 
 export default function LoginForm() {
   const { login } = useAuth();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
-  const [credential, setCredential] = useState("");
-  const [error, setError] = useState("");
+  const [credential,    setCredential]    = useState("");
+  const [credentialPwd, setCredentialPwd] = useState("");
+  const [error,  setError]  = useState("");
   const [loading, setLoading] = useState(false);
 
-  const roleConfig = ROLES.find((r) => r.key === selectedRole) ?? null;
-  const isChofer = selectedRole === "chofer";
+  const roleConfig  = ROLES.find((r) => r.key === selectedRole) ?? null;
+  const isChofer    = selectedRole === "chofer";
+  const isEncargado = selectedRole === "encargado";
 
   const handleRoleSelect = (role: UserRole) => {
     setSelectedRole(role);
     setCredential("");
+    setCredentialPwd("");
     setError("");
   };
 
@@ -67,9 +82,14 @@ export default function LoginForm() {
     try {
       const email = isChofer
         ? `${credential.trim()}@chofer.polarbreeze.com`
+        : isEncargado
+        ? credential.trim()
         : roleConfig.email;
-      // Chofer passwords are stored padded to ≥6 chars (Firebase Auth minimum)
-      const password = isChofer ? credential.trim().padStart(6, "0") : credential;
+      const password = isChofer
+        ? credential.trim().padStart(6, "0")
+        : isEncargado
+        ? credentialPwd
+        : credential;
       await login(email, password);
     } catch {
       const msg = isChofer
@@ -126,27 +146,61 @@ export default function LoginForm() {
           {/* Password / Ficha field */}
           {selectedRole && (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
-                  {isChofer ? "🪪 Número de Ficha" : "🔑 Contraseña"}
-                </label>
-                <input
-                  type={isChofer ? "text" : "password"}
-                  value={credential}
-                  onChange={(e) => setCredential(e.target.value)}
-                  required
-                  autoFocus
-                  minLength={3}
-                  placeholder={isChofer ? "Ej: 0042" : "••••••••"}
-                  className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none text-gray-800 text-base transition
-                    focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
-                />
-                {isChofer && (
-                  <p className="text-xs text-gray-400 mt-1.5">
-                    Usa el número de ficha que te asignó el admin. Mínimo 3 dígitos.
-                  </p>
-                )}
-              </div>
+              {isEncargado ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
+                      📧 Email
+                    </label>
+                    <input
+                      type="email"
+                      value={credential}
+                      onChange={(e) => setCredential(e.target.value)}
+                      required
+                      autoFocus
+                      placeholder="tu@correo.com"
+                      className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none
+                        text-gray-800 text-base transition focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
+                      🔑 Contraseña
+                    </label>
+                    <input
+                      type="password"
+                      value={credentialPwd}
+                      onChange={(e) => setCredentialPwd(e.target.value)}
+                      required
+                      placeholder="••••••••"
+                      className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none
+                        text-gray-800 text-base transition focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
+                    {isChofer ? "🪪 Número de Ficha" : "🔑 Contraseña"}
+                  </label>
+                  <input
+                    type={isChofer ? "text" : "password"}
+                    value={credential}
+                    onChange={(e) => setCredential(e.target.value)}
+                    required
+                    autoFocus
+                    minLength={3}
+                    placeholder={isChofer ? "Ej: 0042" : "••••••••"}
+                    className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none text-gray-800 text-base transition
+                      focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
+                  />
+                  {isChofer && (
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      Usa el número de ficha que te asignó el admin. Mínimo 3 dígitos.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-2.5 rounded-lg">
@@ -156,7 +210,9 @@ export default function LoginForm() {
 
               <button
                 type="submit"
-                disabled={loading || !credential || credential.length < 3}
+                disabled={loading || (isEncargado
+                  ? !credential || !credentialPwd || credentialPwd.length < 3
+                  : !credential || credential.length < 3)}
                 className={`w-full bg-gradient-to-r ${roleConfig?.btn} text-white py-3.5 rounded-xl font-bold text-base
                   hover:opacity-90 active:scale-95 transition-all duration-100 disabled:opacity-50 shadow-md`}
               >

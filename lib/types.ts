@@ -6,6 +6,7 @@ export interface UserProfile {
   role: UserRole;
   nombre: string;
   ficha?: string;
+  telefono?: string;
   activo?: boolean;
   createdAt: Date;
 }
