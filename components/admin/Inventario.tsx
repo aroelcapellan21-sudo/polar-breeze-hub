@@ -40,11 +40,12 @@ interface SaldoDetalle {
 // ─── Config de tipos de movimiento ───────────────────────────────────────────
 
 const TIPO_CFG = {
-  entrada_interior:  { label: "Entrada interior",  sign:  1, bg: "bg-green-100",  text: "text-green-700",  border: "border-green-200"  },
-  devolucion_chofer: { label: "Devolución chofer", sign:  1, bg: "bg-blue-100",   text: "text-blue-700",   border: "border-blue-200"   },
-  salida_despacho:   { label: "Salida despacho",   sign: -1, bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
-  merma:             { label: "Merma",             sign: -1, bg: "bg-red-100",    text: "text-red-700",    border: "border-red-200"    },
-  ajuste:            { label: "Ajuste",            sign:  0, bg: "bg-gray-100",   text: "text-gray-700",   border: "border-gray-200"   },
+  entrada_interior:             { label: "Entrada interior",       sign:  1, bg: "bg-green-100",  text: "text-green-700",  border: "border-green-200"  },
+  entrada_consignacion_inicial: { label: "Inventario base",        sign:  1, bg: "bg-violet-100", text: "text-violet-700", border: "border-violet-200" },
+  devolucion_chofer:            { label: "Devolución chofer",      sign:  1, bg: "bg-blue-100",   text: "text-blue-700",   border: "border-blue-200"   },
+  salida_despacho:              { label: "Salida despacho",        sign: -1, bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
+  merma:                        { label: "Merma",                  sign: -1, bg: "bg-red-100",    text: "text-red-700",    border: "border-red-200"    },
+  ajuste:                       { label: "Ajuste",                 sign:  0, bg: "bg-gray-100",   text: "text-gray-700",   border: "border-gray-200"   },
 } as const;
 
 type TipoLoker = MovimientoLoker["tipo"];
@@ -85,6 +86,8 @@ export default function Inventario() {
   const [consigAbierto,       setConsigAbierto]       = useState(false);
   const [notasCreditoAbierto, setNotasCreditoAbierto] = useState(false);
   const [fifoAbierto,         setFifoAbierto]         = useState(false);
+  const [invBaseAbierto,      setInvBaseAbierto]      = useState(false);
+  const [invBaseExpanded,     setInvBaseExpanded]     = useState<string | null>(null);
   const [lotes,               setLotes]               = useState<LoteLoker[]>([]);
   const [notasCredito,        setNotasCredito]        = useState<NotaCredito[]>([]);
 
@@ -319,6 +322,36 @@ export default function Inventario() {
       .filter((p) => p.lotes.length > 0)
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [lotes]);
+
+  // ── Inventario base por chofer (entrada_consignacion_inicial) ────────────
+  const inventarioBase = useMemo(() => {
+    const porChofer = new Map<string, {
+      nombre: string;
+      productos: Map<string, { nombre: string; cantidad: number }>;
+    }>();
+
+    for (const m of movimientos) {
+      if (m.tipo !== "entrada_consignacion_inicial") continue;
+      if (!m.choferId) continue;
+      if (!porChofer.has(m.choferId)) {
+        porChofer.set(m.choferId, { nombre: m.choferNombre ?? m.choferId, productos: new Map() });
+      }
+      const ch   = porChofer.get(m.choferId)!;
+      const prev = ch.productos.get(m.producto_id) ?? { nombre: m.nombre, cantidad: 0 };
+      ch.productos.set(m.producto_id, { nombre: m.nombre, cantidad: prev.cantidad + m.cantidad });
+    }
+
+    return Array.from(porChofer.entries())
+      .map(([id, d]) => ({
+        id,
+        nombre: d.nombre,
+        productos: Array.from(d.productos.entries())
+          .map(([pid, p]) => ({ pid, nombre: p.nombre, cantidad: p.cantidad }))
+          .sort((a, b) => b.cantidad - a.cantidad),
+        total: Array.from(d.productos.values()).reduce((s, p) => s + p.cantidad, 0),
+      }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [movimientos]);
 
   // ── Dashboard stats del día ───────────────────────────────────────────────
   const dashboard = useMemo(() => {
@@ -1062,7 +1095,169 @@ export default function Inventario() {
         )}
       </div>
 
-      {/* ── 6. Notas de crédito ──────────────────────────────────────────────── */}
+      {/* ── 7. Inventario base por chofer ───────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <button
+          onClick={() => setInvBaseAbierto((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3
+            bg-gradient-to-r from-violet-50 to-violet-100 hover:from-violet-100
+            hover:to-violet-150 transition-colors duration-100"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📋</span>
+            <span className="font-semibold text-violet-900 text-sm">Inventario base — choferes</span>
+            {inventarioBase.length > 0 && (
+              <span className="text-xs bg-violet-200 text-violet-800 px-2 py-0.5 rounded-full">
+                {inventarioBase.length} choferes
+              </span>
+            )}
+            {inventarioBase.length > 0 && (
+              <span className="text-xs bg-violet-100 text-violet-700 border border-violet-200
+                px-2 py-0.5 rounded-full">
+                {inventarioBase.reduce((s, c) => s + c.total, 0).toLocaleString()} uds total
+              </span>
+            )}
+          </div>
+          <span className="text-violet-600 text-sm">{invBaseAbierto ? "▲" : "▼"}</span>
+        </button>
+
+        {invBaseAbierto && (
+          <div>
+            {inventarioBase.length === 0 ? (
+              <div className="px-4 py-8 text-center">
+                <p className="text-2xl mb-2">📋</p>
+                <p className="text-sm text-gray-400">Sin inventario base registrado.</p>
+                <p className="text-xs text-gray-300 mt-1">
+                  Ejecuta el script seed-inventario-base para cargar los datos.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {inventarioBase.map((ch) => {
+                  const expanded = invBaseExpanded === ch.id;
+                  // Consignación actual de este chofer (para comparar)
+                  const consigActual = consignacion.listaChoferes.find((c) => c.id === ch.id);
+                  const totalActual  = consigActual?.total ?? 0;
+                  const diff         = totalActual - ch.total;
+
+                  return (
+                    <div key={ch.id}>
+                      {/* Fila cabecera del chofer */}
+                      <button
+                        onClick={() => setInvBaseExpanded(expanded ? null : ch.id)}
+                        className="w-full px-4 py-3 text-left flex items-center
+                          justify-between hover:bg-violet-50/40 active:scale-[0.995]
+                          transition-all duration-100"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <span className="font-semibold text-sm text-gray-800 truncate">
+                            {ch.nombre}
+                          </span>
+                          <span className="flex-shrink-0 text-xs bg-violet-100 text-violet-700
+                            border border-violet-200 px-2 py-0.5 rounded-full">
+                            {ch.total} uds base · {ch.productos.length} prod
+                          </span>
+                          {/* Comparación con consignación actual */}
+                          {consigActual && (
+                            <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full
+                              border font-medium ${
+                                Math.abs(diff) <= 2
+                                  ? "bg-green-50 text-green-700 border-green-200"
+                                  : diff > 0
+                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}>
+                              Actual: {totalActual} uds
+                              {diff > 0 ? ` (+${diff})` : diff < 0 ? ` (${diff})` : " ✅"}
+                            </span>
+                          )}
+                        </div>
+                        <span className="flex-shrink-0 text-violet-400 text-xs ml-2">
+                          {expanded ? "▲" : "▼"}
+                        </span>
+                      </button>
+
+                      {/* Tabla de productos expandida */}
+                      {expanded && (
+                        <div className="border-t border-violet-50 overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-violet-50/60 text-violet-700">
+                                <th className="text-left px-4 py-2 font-semibold">Producto</th>
+                                <th className="text-right px-4 py-2 font-semibold">Base</th>
+                                {consigActual && (
+                                  <th className="text-right px-4 py-2 font-semibold">Actual</th>
+                                )}
+                                {consigActual && (
+                                  <th className="text-right px-4 py-2 font-semibold">Dif</th>
+                                )}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {ch.productos.map((p) => {
+                                const actual = consigActual?.productos.find(
+                                  (cp) => cp.pid === p.pid,
+                                )?.cantidad ?? null;
+                                const d = actual !== null ? actual - p.cantidad : null;
+                                return (
+                                  <tr key={p.pid} className="hover:bg-violet-50/30">
+                                    <td className="px-4 py-2 text-gray-700 font-medium
+                                      max-w-[180px] truncate">
+                                      {p.nombre}
+                                    </td>
+                                    <td className="px-4 py-2 text-right font-bold text-violet-700">
+                                      {p.cantidad}
+                                    </td>
+                                    {consigActual && (
+                                      <td className="px-4 py-2 text-right text-cyan-700 font-semibold">
+                                        {actual ?? <span className="text-gray-300">—</span>}
+                                      </td>
+                                    )}
+                                    {consigActual && (
+                                      <td className={`px-4 py-2 text-right font-semibold ${
+                                        d === null ? "text-gray-300"
+                                        : Math.abs(d) <= 1 ? "text-green-600"
+                                        : d > 0 ? "text-blue-600"
+                                        : "text-amber-600"
+                                      }`}>
+                                        {d === null ? "—" : d > 0 ? `+${d}` : d}
+                                      </td>
+                                    )}
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot>
+                              <tr className="bg-violet-50/60 font-bold text-xs">
+                                <td className="px-4 py-2 text-violet-700">Total</td>
+                                <td className="px-4 py-2 text-right text-violet-700">{ch.total}</td>
+                                {consigActual && (
+                                  <td className="px-4 py-2 text-right text-cyan-700">{totalActual}</td>
+                                )}
+                                {consigActual && (
+                                  <td className={`px-4 py-2 text-right ${
+                                    Math.abs(diff) <= 2 ? "text-green-600"
+                                    : diff > 0 ? "text-blue-600"
+                                    : "text-amber-600"
+                                  }`}>
+                                    {diff > 0 ? `+${diff}` : diff}
+                                  </td>
+                                )}
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── 8. Notas de crédito ──────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <button
           onClick={() => setNotasCreditoAbierto((v) => !v)}
