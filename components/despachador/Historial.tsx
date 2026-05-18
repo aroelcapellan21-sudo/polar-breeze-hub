@@ -110,7 +110,7 @@ export default function Historial() {
               <span className="text-gray-400 text-sm">{abiertos.has(dia) ? "▲" : "▼"}</span>
             </button>
 
-            {(!abiertos.has(dia)) && (
+            {(abiertos.has(dia)) && (
               <div className="divide-y divide-gray-50">
                 {regs.map((r) => {
                   const cfg      = TIPO_CFG[r.tipo ?? ""] ?? { icon: "📋", label: r.tipo ?? "registro", color: "bg-gray-50 text-gray-600 border-gray-200" };
