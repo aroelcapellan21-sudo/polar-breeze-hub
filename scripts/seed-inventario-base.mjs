@@ -55,8 +55,12 @@ async function postDoc(collection, fields, idToken) {
   return json;
 }
 
-async function patchDoc(path, fields, idToken) {
-  const r = await fetch(`${FS_URL}/${path}`, {
+async function patchDoc(path, fields, idToken, mask = null) {
+  // Con updateMask solo se actualizan los campos indicados (no reemplaza el documento entero)
+  const maskQuery = mask
+    ? "?" + mask.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join("&")
+    : "";
+  const r = await fetch(`${FS_URL}/${path}${maskQuery}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
     body: JSON.stringify({ fields }),
@@ -508,10 +512,11 @@ async function main() {
 
     const inventarioBaseField = { arrayValue: { values: baseValues } };
 
+    // updateMask: solo toca estos dos campos — no sobreescribe role ni ningún otro campo
     await patchDoc(`usuarios/${choferId}`, {
       inventario_base:     inventarioBaseField,
       inventarioBaseDate:  ts(TIMESTAMP),
-    }, idToken);
+    }, idToken, ["inventario_base", "inventarioBaseDate"]);
 
     // 3. Campo inventario_base en drivers/{uid}
     await patchDoc(`drivers/${choferId}`, {
