@@ -98,6 +98,35 @@ export function openPrint(html: string) {
   win.onload = () => win.print();
 }
 
+/** Sección de QR + código de barras para documentos del chofer. */
+export function pbQrSection(
+  qrDataUrl:      string,
+  barcodeDataUrl: string,
+  ficha:          string,
+  nombre:         string,
+): string {
+  if (!qrDataUrl) return "";
+  return `
+<div style="page-break-inside:avoid;margin-top:16px;border-top:1px solid #ccc;
+  padding-top:12px;display:flex;align-items:center;gap:14px;">
+  <div style="flex-shrink:0;text-align:center;">
+    <img src="${qrDataUrl}" alt="QR Perfil" style="width:80px;height:80px;display:block;" />
+    <div style="font-size:7.5px;color:#888;margin-top:2px;">Abrir perfil</div>
+  </div>
+  <div style="flex:1;min-width:0;">
+    ${barcodeDataUrl
+      ? `<img src="${barcodeDataUrl}" alt="Cód. de barras" style="max-width:200px;height:45px;display:block;" />`
+      : ""}
+    <div style="font-size:9px;color:#555;margin-top:5px;">
+      <b>${nombre}</b> &nbsp;·&nbsp; Ficha: <b>${ficha}</b>
+    </div>
+    <div style="font-size:8px;color:#aaa;margin-top:2px;">
+      Escanea el QR para acceder al sistema · Código de barras para lector físico
+    </div>
+  </div>
+</div>`;
+}
+
 /** Genera una tabla HTML estándar PB. */
 export function pbTable(
   headers: string[],

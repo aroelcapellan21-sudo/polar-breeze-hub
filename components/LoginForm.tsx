@@ -1,8 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { UserRole } from "@/lib/types";
+
+const IS_DEV = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+
+const DEV_CREDS: Record<UserRole, { email: string; password: string }> = {
+  admin:       { email: "admin@polarbreeze.com",                                           password: process.env.NEXT_PUBLIC_DEV_ADMIN_PWD   ?? "" },
+  despachador: { email: "despachador@polarbreeze.com",                                     password: process.env.NEXT_PUBLIC_DEV_DESP_PWD    ?? "" },
+  chofer:      { email: `${process.env.NEXT_PUBLIC_DEV_CHOFER_FICHA ?? "0001"}@chofer.polarbreeze.com`,
+                 password: (process.env.NEXT_PUBLIC_DEV_CHOFER_FICHA ?? "0001").padStart(6, "0") },
+  encargado:   { email: process.env.NEXT_PUBLIC_DEV_ENC_EMAIL ?? "",                       password: process.env.NEXT_PUBLIC_DEV_ENC_PWD     ?? "" },
+};
 
 const ROLES = [
   {
@@ -62,6 +72,17 @@ export default function LoginForm() {
   const [credentialPwd, setCredentialPwd] = useState("");
   const [error,  setError]  = useState("");
   const [loading, setLoading] = useState(false);
+  const [showNormalForm, setShowNormalForm] = useState(false);
+
+  // Auto-fill ficha si viene ?ficha= en la URL (desde QR de factura)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ficha  = params.get("ficha");
+    if (ficha) {
+      setSelectedRole("chofer");
+      setCredential(ficha);
+    }
+  }, []);
 
   const roleConfig  = ROLES.find((r) => r.key === selectedRole) ?? null;
   const isChofer    = selectedRole === "chofer";
@@ -72,6 +93,23 @@ export default function LoginForm() {
     setCredential("");
     setCredentialPwd("");
     setError("");
+  };
+
+  const handleDevLogin = async (role: UserRole) => {
+    const creds = DEV_CREDS[role];
+    if (!creds.email || !creds.password) {
+      setError(`Sin credenciales dev para ${role}. Completa .env.local`);
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await login(creds.email, creds.password);
+    } catch {
+      setError("Error al entrar (dev). Verifica las credenciales en .env.local");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,6 +152,55 @@ export default function LoginForm() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl shadow-black/30 p-6">
+
+          {/* ── MODO DESARROLLO ─────────────────────────────── */}
+          {IS_DEV && !showNormalForm && (
+            <div className="mb-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex-1 h-px bg-orange-200" />
+                <span className="text-xs font-bold text-orange-500 tracking-widest uppercase">
+                  🔧 Modo desarrollo
+                </span>
+                <span className="flex-1 h-px bg-orange-200" />
+              </div>
+              <div className="space-y-2">
+                {ROLES.map((role) => (
+                  <button
+                    key={role.key}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleDevLogin(role.key)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border
+                      bg-orange-50 border-orange-200 hover:bg-orange-100 active:scale-95
+                      transition-all duration-100 text-left disabled:opacity-50`}
+                  >
+                    <span className="text-2xl leading-none flex-shrink-0">{role.icon}</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-orange-800">{role.label}</p>
+                      <p className="text-xs text-orange-500">{role.hint}</p>
+                    </div>
+                    <span className="text-orange-400 text-sm font-bold flex-shrink-0">⚡</span>
+                  </button>
+                ))}
+              </div>
+              {error && (
+                <div className="mt-2 bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 rounded-lg">
+                  {error}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowNormalForm(true)}
+                className="w-full mt-3 text-xs text-gray-400 hover:text-gray-600 active:scale-95 transition-all py-1"
+              >
+                Usar formulario completo →
+              </button>
+            </div>
+          )}
+
+          {/* ── Formulario normal (siempre en prod, toggle en dev) ── */}
+          {(!IS_DEV || showNormalForm) && <>
+
           {/* Role buttons — mismo tamaño, efecto punch */}
           <div className="space-y-3 mb-6">
             {ROLES.map((role) => (
@@ -229,6 +316,19 @@ export default function LoginForm() {
               </button>
             </form>
           )}
+
+          {/* Volver al panel dev */}
+          {IS_DEV && showNormalForm && (
+            <button
+              type="button"
+              onClick={() => { setShowNormalForm(false); setSelectedRole(null); setCredential(""); setError(""); }}
+              className="w-full mt-3 text-xs text-orange-400 hover:text-orange-600 active:scale-95 transition-all py-1"
+            >
+              ← Volver a modo desarrollo
+            </button>
+          )}
+
+          </> /* fin formulario normal */}
         </div>
 
         <p className="text-center text-blue-400/60 text-xs mt-6">

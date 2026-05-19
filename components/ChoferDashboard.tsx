@@ -14,7 +14,7 @@ import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 import { ShareBar }          from "@/components/shared/ShareButtons";
 import { useRegisterModal } from "@/components/shared/ModalShareContext";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
-import { pbPrintDoc, pbTable } from "@/lib/print-template";
+import { pbPrintDoc, pbTable, pbQrSection } from "@/lib/print-template";
 
 function getTodayStart() {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d;
@@ -45,8 +45,10 @@ export default function ChoferDashboard() {
   const [waErr,        setWaErr]        = useState<string | null>(null);
 
   type ChoferModal = "semaforo" | "puntos" | "monto" | { pid: string; nombre: string } | null;
-  const [modal,      setModal]      = useState<ChoferModal>(null);
-  const [showTablas, setShowTablas] = useState(false);
+  const [modal,        setModal]        = useState<ChoferModal>(null);
+  const [showTablas,   setShowTablas]   = useState(false);
+  const [qrDataUrl,    setQrDataUrl]    = useState("");
+  const [barcodeUrl,   setBarcodeUrl]   = useState("");
 
   const todayStart = useMemo(() => getTodayStart(), []);
 
@@ -92,6 +94,28 @@ export default function ChoferDashboard() {
 
     return () => { unsubImb(); unsubMov(); unsubTal(); };
   }, [profile]);
+
+  // ── QR y código de barras para facturas impresas ─────────────────────────────
+  useEffect(() => {
+    if (!profile?.ficha) return;
+    const ficha = profile.ficha;
+    const appUrl = `${window.location.origin}?ficha=${encodeURIComponent(ficha)}`;
+
+    import("qrcode").then((mod) => {
+      mod.default.toDataURL(appUrl, { margin: 1, width: 120, color: { dark: "#1e3a5f", light: "#ffffff" } })
+        .then(setQrDataUrl);
+    });
+
+    import("jsbarcode").then((mod) => {
+      const canvas = document.createElement("canvas");
+      mod.default(canvas, ficha, {
+        format: "CODE128", width: 2, height: 45,
+        fontSize: 12, displayValue: true, margin: 4,
+        lineColor: "#1e3a5f",
+      });
+      setBarcodeUrl(canvas.toDataURL());
+    });
+  }, [profile?.ficha]);
 
   // ── Puntos quincena ──────────────────────────────────────────────────────────
   const quincena = useMemo(() => getQuincena(), []);
@@ -231,10 +255,11 @@ export default function ChoferDashboard() {
   const buildPuntosHtml = () => {
     const rows = puntosDetalle.map((d) => [d.nombre, d.cantidad, d.pts, `<b>${d.total}</b>`]);
     const total: (string|number)[] = ["<b>Total</b>", "", "", `<b>${puntosTotal} / ${meta} pts</b>`];
+    const qr = pbQrSection(qrDataUrl, barcodeUrl, profile?.ficha ?? "", profile?.nombre ?? "");
     return pbPrintDoc(
       `Puntos — ${quincena.label}`,
       `${profile?.nombre ?? "Chofer"} · ${pct.toFixed(0)}% de la meta`,
-      pbTable(["Producto", "Cantidad", "Pts/ud", "Total"], rows, total),
+      pbTable(["Producto", "Cantidad", "Pts/ud", "Total"], rows, total) + qr,
     );
   };
 
@@ -267,10 +292,11 @@ export default function ChoferDashboard() {
     );
     const rows  = items.map((it) => [it.nombre, it.cantidad, `$${it.precio.toLocaleString()}`, `<b>$${it.subtotal.toLocaleString("es-MX")}</b>`]);
     const total: (string|number)[] = ["<b>Total estimado</b>", "", "", `<b>$${montoHoy.total.toLocaleString("es-MX")}</b>`];
+    const qr = pbQrSection(qrDataUrl, barcodeUrl, profile?.ficha ?? "", profile?.nombre ?? "");
     return pbPrintDoc(
       "Monto Estimado del Día",
       profile?.nombre ?? "Chofer",
-      rows.length > 0 ? pbTable(["Producto", "Cantidad", "Precio", "Subtotal"], rows, total) : "<p>Sin precios configurados.</p>",
+      (rows.length > 0 ? pbTable(["Producto", "Cantidad", "Precio", "Subtotal"], rows, total) : "<p>Sin precios configurados.</p>") + qr,
     );
   };
 
