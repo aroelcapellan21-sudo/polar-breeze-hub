@@ -11,6 +11,7 @@ import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { UserProfile, PuntosConfig, PuntoProducto } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import ProyeccionesChoferes from "@/components/admin/ProyeccionesChoferes";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
 
 const API_KEY  = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
 const AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
@@ -230,18 +231,18 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
 
   // ── Filtrado ─────────────────────────────────────────────────────────────────
   const getWhatsAppMsg = () => {
-    const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
     const activos = choferes.filter((c) => c.activo !== false);
     const bajas   = choferes.filter((c) => c.activo === false);
-    const lines   = [`👥 Choferes Polar Breeze — ${fecha}`];
+    const lines   = [pbHeader(), `👥 *Choferes Polar Breeze*`, ""];
     if (activos.length) {
       lines.push(`Activos (${activos.length}):`);
       activos.forEach((c) => lines.push(`  • ${c.nombre} — ficha ${c.ficha ?? "—"}`));
     }
     if (bajas.length) {
-      lines.push(`Baja (${bajas.length}):`);
+      lines.push(``, `Baja (${bajas.length}):`);
       bajas.forEach((c) => lines.push(`  • ${c.nombre} — ficha ${c.ficha ?? "—"}`));
     }
+    lines.push("", pbFooter());
     return lines.join("\n");
   };
 

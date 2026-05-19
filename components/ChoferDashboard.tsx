@@ -9,6 +9,7 @@ import {
   MovimientoLoker, TalonarioDoc, toDate,
 } from "@/lib/types";
 import SobrantesChofer from "@/components/chofer/SobrantesChofer";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
 
 function getTodayStart() {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d;
@@ -180,20 +181,17 @@ export default function ChoferDashboard() {
 
   // ── WhatsApp ──────────────────────────────────────────────────────────────────
   const buildMsg = () => {
-    const fecha = new Date().toLocaleDateString("es-MX", {
-      weekday: "long", day: "numeric", month: "long",
-    });
     const lines = [
+      pbHeader(),
       `📦 *REPORTE DE SOBRANTES*`,
       `🚛 ${profile?.nombre ?? "Chofer"}`,
-      `📅 ${fecha}`,
       ``,
     ];
     reporteCompleto.forEach(({ nombre, sobrante, vendido }) => {
       lines.push(`• *${nombre}* — sobrante: ${sobrante} · vendido: ${vendido}`);
     });
     if (reporteCompleto.length === 0) lines.push("Sin productos registrados");
-    lines.push(``, `✅ Polar Breeze Hub`);
+    lines.push("", pbFooter());
     return lines.join("\n");
   };
 

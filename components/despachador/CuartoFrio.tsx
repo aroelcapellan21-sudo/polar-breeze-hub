@@ -5,6 +5,7 @@ import { doc, setDoc, addDoc, collection, Timestamp, getDoc } from "firebase/fir
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ProductoItem, PuntoProducto } from "@/lib/types";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
 import {
   ImageUploader, ProductTable, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
@@ -151,15 +152,16 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
   const totalCajas = productos.reduce((s, p) => s + (p.cajas    ?? 0), 0);
 
   const getWhatsAppMsg = () => {
-    const lines = [`🥶 *Cuarto Frío — ${despNombre}*`, `📅 ${new Date().toLocaleString("es-MX")}`, ""];
+    const lines = [pbHeader(), `🥶 *Cuarto Frío — ${despNombre}*`, ""];
     productos.forEach((p) => {
       const partes: string[] = [];
       if (p.cajas)    partes.push(`${p.cajas} caj`);
       if (p.cantidad) partes.push(`${p.cantidad} uds`);
       lines.push(`• ${p.nombre}: ${partes.join(" / ") || "—"}`);
     });
-    lines.push(`\nTotal: ${totalCajas} cajas · ${totalUnid} uds`);
+    lines.push(`\n📦 Total: ${totalCajas} cajas · ${totalUnid} uds`);
     if (observaciones) lines.push(`\n📝 ${observaciones}`);
+    lines.push("", pbFooter());
     return lines.join("\n");
   };
 

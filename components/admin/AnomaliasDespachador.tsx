@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { UserProfile, toDate } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
 
 interface AnomaliaDespacho {
   id: string;
@@ -106,18 +107,19 @@ export default function AnomaliasDespachador({ mode, registradorNombre }: Props)
   const totalRD = useMemo(() => filtradas.reduce((s, a) => s + (a.total ?? 0), 0), [filtradas]);
 
   const getWhatsAppMsg = () => {
-    const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
     const lines = [
-      `⚠️ Anomalías de Despacho — ${fecha}`,
-      `Total: RD$${totalRD.toLocaleString()}`,
+      pbHeader(),
+      `⚠️ *Anomalías de Despacho*`,
+      `Total: RD$${totalRD.toLocaleString("es-DO")}`,
       `Registros: ${filtradas.length}`,
       "",
     ];
     filtradas.forEach((a) => {
       lines.push(`• ${a.producto} ×${a.cantidad} → ${a.receptorNombre}`);
-      if (a.total > 0) lines.push(`  RD$${a.total.toLocaleString()} (RD$${a.costoUnitario}/ud) · ${a.fecha}`);
+      if (a.total > 0) lines.push(`  RD$${a.total.toLocaleString("es-DO")} (RD$${a.costoUnitario}/ud) · ${a.fecha}`);
       if (a.notas) lines.push(`  📝 ${a.notas}`);
     });
+    lines.push("", pbFooter());
     return lines.join("\n");
   };
 

@@ -5,6 +5,7 @@ import { collection, doc, getDoc, onSnapshot, addDoc, Timestamp } from "firebase
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ProductoItem, FsSession, FsDriver, MovimientoLoker, toDate } from "@/lib/types";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -385,10 +386,9 @@ export default function InformeCierre() {
 
   // ── WhatsApp text ─────────────────────────────────────────────────────────
   const getWhatsAppMsg = () => {
-    const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
     const lines = [
-      `🧊 *${empresa?.nombre ?? "Polar Breeze E.I.R.L."}*`,
-      `📋 *INFORME DE CIERRE — ${fecha}*`,
+      pbHeader(),
+      `📋 *INFORME DE CIERRE*`,
       `👤 Despachador: ${profile?.nombre}`, "",
     ];
     lines.push("🔴 *1. Faltantes del Despacho*");
@@ -411,7 +411,11 @@ export default function InformeCierre() {
     else cfNoEntrRows.forEach((r) => lines.push(`  • ${r.producto}: ${r.cantidad} u${r.persona ? ` — ${r.persona}` : ""}${r.motivo ? ` — ${r.motivo}` : ""}`));
     lines.push("");
 
-    if (obsGenerales) lines.push(`📝 ${obsGenerales}`);
+    if (obsGenerales) lines.push(`📝 ${obsGenerales}`, "");
+
+    if (session?.totalMonto)    lines.push(`💵 *Total general: RD$${(session.totalMonto as number).toLocaleString("es-DO")}*`);
+    if (session?.totalUnidades) lines.push(`📦 *Total unidades despachadas: ${session.totalUnidades}*`);
+    lines.push("", `✍️ *Firma: Polar Breeze S.R.L.*`, "", pbFooter());
     return lines.join("\n");
   };
 

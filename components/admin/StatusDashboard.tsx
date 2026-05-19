@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { collection, query, limit, onSnapshot, doc, getDoc, setDoc } from "firebase/firestore";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { db } from "@/lib/firebase";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
 
 type ServiceStatus = "ok" | "warning" | "error" | "unknown" | "verificando";
 
@@ -286,9 +287,9 @@ export default function StatusDashboard() {
             } Verificar ahora
           </button>
           <ShareBar getMessage={() => {
-            const fecha = new Date().toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-            const lines = [`🖥️ Estado Sistema — ${fecha}`];
+            const lines = [pbHeader(), `🖥️ *Estado del Sistema*`, ""];
             services.forEach((s) => lines.push(`• ${s.icon} ${s.label}: ${SEM[s.check.status].label} — ${s.check.message}`));
+            lines.push("", pbFooter());
             return lines.join("\n");
           }} />
           <button

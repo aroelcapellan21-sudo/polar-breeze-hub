@@ -13,6 +13,7 @@ import {
   calcSemaforo, Semaforo, toDate, fmtDate,
 } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
 
 interface Props {
   onVerChofer: (c: UserProfile) => void;
@@ -265,17 +266,17 @@ export default function Overview({ onVerChofer }: Props) {
 
       {/* ── Compartir ── */}
       <div className="flex justify-end">
-        <ShareBar getMessage={() => {
-          const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
-          return [
-            `📊 Resumen Admin Polar Breeze — ${fecha}`,
-            `• Choferes activos: ${chofActivos}`,
-            `• Despachos hoy: ${kpiDespachos}`,
-            `• Facturado hoy: $${kpiFacturado.toLocaleString()}`,
-            `• Alertas críticas: ${alertasCrit}`,
-            `• Peso total: ${kpiPeso.toFixed(1)} kg`,
-          ].join("\n");
-        }} />
+        <ShareBar getMessage={() => [
+          pbHeader(),
+          `📊 *Resumen Admin Polar Breeze*`,
+          `• Choferes activos: ${chofActivos}`,
+          `• Despachos hoy: ${kpiDespachos}`,
+          `• Facturado hoy: RD$${kpiFacturado.toLocaleString("es-DO")}`,
+          `• Alertas críticas: ${alertasCrit}`,
+          `• Peso total: ${kpiPeso.toFixed(1)} kg`,
+          "",
+          pbFooter(),
+        ].join("\n")} />
       </div>
 
       {/* ── KPI Cards — Hub + FacturaScan session/despacho ── */}

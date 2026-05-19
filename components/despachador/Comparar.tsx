@@ -5,6 +5,7 @@ import { collection, doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ProductoItem, FsSession, FsDriver, calcSemaforo, toDate } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
 
 const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
 
@@ -105,10 +106,11 @@ export default function Comparar() {
   const semIcon  = { verde: "✅", amarillo: "⚠️", rojo: "🚨" }[semGlobal];
 
   const getWhatsAppMsg = () => {
-    const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
     const lines = [
-      `⚖️ Comparativo Despacho — ${fecha}`,
+      pbHeader(),
+      `⚖️ *Comparativo Despacho*`,
       `C.Frío: ${totalCF} · Entregado: ${totalEntr} · Diferencia: ${totalDiff}`,
+      "",
       "Productos:",
     ];
     filas.forEach((f) => {
@@ -117,6 +119,7 @@ export default function Comparar() {
         .map(([n, c]) => `${n.split(" ")[0]}:${c}`).join(" ");
       lines.push(`${icon} ${f.nombre}: CF=${f.cuartoFrio} / Ent=${f.entregado} / Diff=${f.diferencia}${chofers ? ` (${chofers})` : ""}`);
     });
+    lines.push("", pbFooter());
     return lines.join("\n");
   };
 

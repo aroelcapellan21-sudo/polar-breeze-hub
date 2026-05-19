@@ -5,6 +5,7 @@ import { collection, query, orderBy, onSnapshot, limit } from "firebase/firestor
 import { db } from "@/lib/firebase";
 import { FsHistory, ProductoItem, toDate, fmtDate } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
 
 const TIPO_CFG: Record<string, { icon: string; label: string; color: string }> = {
   cuarto_frio:    { icon: "🥶", label: "Cuarto Frío",   color: "bg-blue-50   text-blue-700   border-blue-200"   },
@@ -52,11 +53,10 @@ export default function Historial() {
   const tipos = Array.from(new Set(records.map((r) => r.tipo).filter(Boolean))) as string[];
 
   const getWhatsAppMsg = () => {
-    const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
     const filtroLabel = filtro === "todos" ? "todos" : (TIPO_CFG[filtro]?.label ?? filtro);
-    const lines = [`📅 Historial — ${filtroLabel} — ${fecha}`, `${filtrados.length} registros`];
+    const lines = [pbHeader(), `📅 *Historial — ${filtroLabel}*`, `${filtrados.length} registros`, ""];
     Object.entries(porDia).slice(0, 5).forEach(([dia, regs]) => {
-      lines.push(`\n${dia}:`);
+      lines.push(`${dia}:`);
       regs.slice(0, 3).forEach((r) => {
         const prods = (Array.isArray(r.productos) ? (r.productos as ProductoItem[]) : [])
           .slice(0, 3).map((p) => `${p.nombre}×${p.cantidad}`).join(", ");
@@ -64,7 +64,9 @@ export default function Historial() {
         lines.push(`  • ${quien}${prods ? ` — ${prods}` : ""}`);
       });
       if (regs.length > 3) lines.push(`  ...y ${regs.length - 3} más`);
+      lines.push("");
     });
+    lines.push(pbFooter());
     return lines.join("\n");
   };
 

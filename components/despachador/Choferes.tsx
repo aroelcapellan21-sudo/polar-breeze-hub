@@ -8,6 +8,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ProductoItem, UserProfile, FsDriver, FsSession, MovimientoLoker, PrecioProducto, toProductoId } from "@/lib/types";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
 import {
   ImageUploader, ProductTable, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
@@ -367,9 +368,10 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     if (!sel) return "";
     const totalMonto = productos.reduce((s, p) => s + ((p.precio ?? 0) * (p.cantidad ?? 0)), 0);
     const lines = [
+      pbHeader(),
       `🚛 *Entrega — ${sel.nombre}* (Ficha ${sel.ficha ?? "—"})`,
       `👤 Despachador: ${despNombre}`,
-      `📅 ${new Date().toLocaleString("es-MX")}`, "",
+      "",
     ];
     productos.forEach((p) => {
       const visto  = p.visto === "ok" ? "✅" : p.visto === "mal" ? "❌" : "•";
@@ -379,6 +381,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     lines.push(`\n📦 Total: ${totalUnid} uds`);
     if (totalMonto > 0) lines.push(`💰 Monto: RD$${totalMonto.toLocaleString("es-DO")}`);
     if (observaciones) lines.push(`\n📝 ${observaciones}`);
+    lines.push("", pbFooter());
     return lines.join("\n");
   };
 
