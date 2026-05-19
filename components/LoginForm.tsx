@@ -6,14 +6,6 @@ import { UserRole } from "@/lib/types";
 
 const IS_DEV = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
-const DEV_CREDS: Record<UserRole, { email: string; password: string }> = {
-  admin:       { email: "admin@polarbreeze.com",                                           password: process.env.NEXT_PUBLIC_DEV_ADMIN_PWD   ?? "" },
-  despachador: { email: "despachador@polarbreeze.com",                                     password: process.env.NEXT_PUBLIC_DEV_DESP_PWD    ?? "" },
-  chofer:      { email: `${process.env.NEXT_PUBLIC_DEV_CHOFER_FICHA ?? "0001"}@chofer.polarbreeze.com`,
-                 password: (process.env.NEXT_PUBLIC_DEV_CHOFER_FICHA ?? "0001").padStart(6, "0") },
-  encargado:   { email: process.env.NEXT_PUBLIC_DEV_ENC_EMAIL ?? "",                       password: process.env.NEXT_PUBLIC_DEV_ENC_PWD     ?? "" },
-};
-
 const ROLES = [
   {
     key: "admin" as UserRole,
@@ -66,7 +58,7 @@ const ROLES = [
 ] as const;
 
 export default function LoginForm() {
-  const { login } = useAuth();
+  const { login, devLogin } = useAuth();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [credential,    setCredential]    = useState("");
   const [credentialPwd, setCredentialPwd] = useState("");
@@ -95,20 +87,9 @@ export default function LoginForm() {
     setError("");
   };
 
-  const handleDevLogin = async (role: UserRole) => {
-    const creds = DEV_CREDS[role];
-    if (!creds.email || !creds.password) {
-      setError(`Sin credenciales dev para ${role}. Completa .env.local`);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      await login(creds.email, creds.password);
-    } catch {
-      setError("Error al entrar (dev). Verifica las credenciales en .env.local");
-    } finally {
-      setLoading(false);
+  const handleDevLogin = (role: UserRole) => {
+    if (devLogin) {
+      devLogin(role);
     }
   };
 
