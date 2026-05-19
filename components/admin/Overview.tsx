@@ -142,6 +142,24 @@ export default function Overview({ onVerChofer }: Props) {
     return map;
   }, [imbHoy]);
 
+  // ── Ranking de choferes por rendimiento (últimos 15d) ───────────────────
+  const rankingChoferes = useMemo(() => {
+    return choferes
+      .filter((c) => c.activo !== false)
+      .map((chofer) => {
+        const recs = imbPorChofer[chofer.uid] ?? [];
+        const totalEntregado = recs.reduce((s, r) => s + (r.cantidadEntregada ?? 0), 0);
+        const totalMonto     = recs.reduce((s, r) => s + (r.monto ?? 0), 0);
+        const sem            = calcSemaforo(recs);
+        return { chofer, totalEntregado, totalMonto, sem };
+      })
+      .filter((x) => x.totalEntregado > 0)
+      .sort((a, b) => {
+        if (a.totalMonto > 0 || b.totalMonto > 0) return b.totalMonto - a.totalMonto;
+        return b.totalEntregado - a.totalEntregado;
+      });
+  }, [choferes, imbPorChofer]);
+
   // ── Enriquecer choferes con datos de drivers de FacturaScan ─────────────
   // Intenta hacer match por ficha, luego por nombre (case-insensitive)
   const driverPorChofer = useMemo(() => {
@@ -413,6 +431,83 @@ export default function Overview({ onVerChofer }: Props) {
           {fsSession.fecha && (
             <span className="text-xs text-orange-400 ml-auto">{fmtDate(fsSession.fecha)}</span>
           )}
+        </div>
+      )}
+
+      {/* ── Ranking de choferes ── */}
+      {rankingChoferes.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-amber-100">
+            <h2 className="font-bold text-amber-900">🏆 Ranking de Choferes</h2>
+            <p className="text-xs text-amber-600 mt-0.5">
+              Últimos 15 días · ordenado por {rankingChoferes[0]?.totalMonto > 0 ? "monto vendido" : "unidades entregadas"}
+            </p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {rankingChoferes.map(({ chofer, totalEntregado, totalMonto, sem }, i) => {
+              const isPrimero = i === 0;
+              return (
+                <button
+                  key={chofer.uid}
+                  onClick={() => onVerChofer(chofer)}
+                  className={`w-full flex items-center gap-3 px-5 py-3 text-left active:scale-[0.99] transition-all duration-100 ${
+                    isPrimero ? "bg-yellow-50 hover:bg-yellow-100" : "hover:bg-gray-50"
+                  }`}
+                >
+                  {/* Posición */}
+                  <span className="w-8 text-center flex-shrink-0">
+                    {isPrimero
+                      ? <span className="text-xl">🥇</span>
+                      : <span className="text-xs font-bold text-gray-400">#{i + 1}</span>}
+                  </span>
+
+                  {/* Avatar */}
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
+                      isPrimero ? "bg-yellow-500" : "bg-cyan-500"
+                    }`}
+                  >
+                    {chofer.nombre.charAt(0).toUpperCase()}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-semibold text-sm truncate ${isPrimero ? "text-yellow-900" : "text-gray-800"}`}>
+                      {chofer.nombre}
+                    </p>
+                    {isPrimero ? (
+                      <p className="text-xs text-yellow-600 font-medium">🎉 ¡Mejor rendimiento del período!</p>
+                    ) : (
+                      <p className="text-xs text-gray-400">Ficha {chofer.ficha ?? "—"}</p>
+                    )}
+                  </div>
+
+                  {/* Métricas */}
+                  <div className="text-right flex-shrink-0">
+                    {totalMonto > 0 ? (
+                      <>
+                        <p className={`font-bold text-sm ${isPrimero ? "text-yellow-700" : "text-green-700"}`}>
+                          RD${totalMonto.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-gray-400">{totalEntregado} uds</p>
+                      </>
+                    ) : (
+                      <p className={`font-bold text-sm ${isPrimero ? "text-yellow-700" : "text-gray-700"}`}>
+                        {totalEntregado} uds
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Semáforo */}
+                  <span className="text-xl flex-shrink-0">{SEM[sem].icon}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="px-5 py-2 border-t flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-xs text-gray-400">Toca un chofer para ver su detalle</span>
+          </div>
         </div>
       )}
 

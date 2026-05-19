@@ -10,10 +10,11 @@ import ConfigModal     from "@/components/admin/ConfigModal";
 import StatusDashboard from "@/components/admin/StatusDashboard";
 import Inventario          from "@/components/admin/Inventario";
 import InformesHistorial  from "@/components/admin/InformesHistorial";
-import Anomalias          from "@/components/admin/Anomalias";
-import GestionEncargados  from "@/components/admin/GestionEncargados";
+import Anomalias             from "@/components/admin/Anomalias";
+import AnomaliasDespachador  from "@/components/admin/AnomaliasDespachador";
+import GestionEncargados     from "@/components/admin/GestionEncargados";
 
-type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados";
+type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp";
 
 export default function AdminDashboard() {
   const { profile, logout } = useAuth();
@@ -97,6 +98,13 @@ export default function AdminDashboard() {
               <span>🏭</span>
               <span className="hidden sm:inline">Encargados</span>
             </NavTab>
+            <NavTab
+              active={tab === "anom_desp"}
+              onClick={() => { setTab("anom_desp"); setChofer(null); }}
+            >
+              <span>📋</span>
+              <span className="hidden sm:inline">Anomalías Desp.</span>
+            </NavTab>
           </nav>
 
           {/* Acciones */}
@@ -144,6 +152,9 @@ export default function AdminDashboard() {
             {tab === "encargados" && (
               <span className="text-white font-medium">🏭 Encargados — gestión de encargados de almacén</span>
             )}
+            {tab === "anom_desp" && (
+              <span className="text-white font-medium">📋 Anomalías Despacho — faltantes registrados por despachadores</span>
+            )}
             {tab === "choferes" && !chofer && (
               <span className="text-white font-medium">👥 Choferes — gestión, inventario y sistema de puntos</span>
             )}
@@ -176,6 +187,7 @@ export default function AdminDashboard() {
         {tab === "informes" && <InformesHistorial />}
         {tab === "anomalias"  && <Anomalias />}
         {tab === "encargados" && <GestionEncargados />}
+        {tab === "anom_desp"  && <AnomaliasDespachador mode="admin" />}
       </main>
 
       {/* ── Modal Configuración ── */}

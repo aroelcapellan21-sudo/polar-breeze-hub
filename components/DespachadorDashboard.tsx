@@ -11,9 +11,10 @@ import CuartoFrio    from "@/components/despachador/CuartoFrio";
 import Choferes      from "@/components/despachador/Choferes";
 import Comparar      from "@/components/despachador/Comparar";
 import Historial     from "@/components/despachador/Historial";
-import InformeCierre from "@/components/despachador/InformeCierre";
+import InformeCierre         from "@/components/despachador/InformeCierre";
+import AnomaliasDespachador  from "@/components/admin/AnomaliasDespachador";
 
-type Tab = "cuartofrio" | "choferes" | "comparar" | "historial" | "cierre";
+type Tab = "cuartofrio" | "choferes" | "comparar" | "historial" | "cierre" | "anomalias";
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: "cuartofrio", icon: "🥶", label: "Cuarto Frío" },
@@ -21,6 +22,7 @@ const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: "comparar",   icon: "⚖️", label: "Comparar"    },
   { key: "historial",  icon: "📅", label: "Historial"   },
   { key: "cierre",     icon: "📋", label: "Cierre"      },
+  { key: "anomalias",  icon: "⚠️", label: "Anomalías"   },
 ];
 
 export default function DespachadorDashboard() {
@@ -181,6 +183,7 @@ export default function DespachadorDashboard() {
               {tab === "comparar"   && "Comparar — cuarto frío vs. choferes en tiempo real"}
               {tab === "historial"  && "Historial — registros del día por tipo"}
               {tab === "cierre"     && "Cierre — informe final del día de despacho"}
+            {tab === "anomalias"  && "Anomalías — registrar productos faltantes en el despacho"}
             </button>
             {/* Chofer breadcrumb */}
             {tab === "choferes" && selChofer && (
@@ -234,6 +237,9 @@ export default function DespachadorDashboard() {
         {tab === "comparar"   && <Comparar />}
         {tab === "historial"  && <Historial />}
         {tab === "cierre"     && <InformeCierre />}
+        {tab === "anomalias"  && (
+          <AnomaliasDespachador mode="despachador" registradorNombre={despNombre} />
+        )}
       </main>
 
       {/* ── Modal: ¿Quién despacha? ── */}

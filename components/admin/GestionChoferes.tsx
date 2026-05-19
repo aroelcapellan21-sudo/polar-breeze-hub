@@ -10,6 +10,7 @@ import { auth } from "@/lib/firebase";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { UserProfile, PuntosConfig, PuntoProducto } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
+import ProyeccionesChoferes from "@/components/admin/ProyeccionesChoferes";
 
 const API_KEY  = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
 const AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
@@ -406,6 +407,9 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── Proyecciones ── */}
+      <ProyeccionesChoferes choferes={choferes} />
 
       {/* ── Panel Puntos ── */}
       <div className="lg:col-span-3 bg-white rounded-xl shadow-sm p-5">
