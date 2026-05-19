@@ -38,8 +38,9 @@ tr:nth-child(even) td { background: #f5f8fc; }
 /* ── Pie de página ── */
 .pb-ftr       { position: fixed; bottom: 0; left: 0; right: 0;
                 border-top: 1px solid #999; background: #fff;
-                display: flex; justify-content: space-between; align-items: center;
-                padding: 4px 12mm; font-size: 8px; color: #666; }
+                display: flex; flex-direction: column; align-items: center;
+                gap: 1px; padding: 5px 0; font-size: 8px; color: #666;
+                text-align: center; }
 .pb-ftr b     { font-weight: 700; color: #1e3a5f; }
 @media screen {
   .pb-ftr { position: static; margin-top: 24px; }
@@ -79,9 +80,9 @@ export function pbPrintDoc(
 ${subtitle ? `<div class="pb-subtitle">${subtitle}</div>` : ""}
 ${bodyHtml}
 <div class="pb-ftr">
-  <span>Generado por <b>Sistema Polar Breeze Hub</b></span>
-  <b>NO ACEPTAMOS CAMBIOS NI DEVOLUCIONES</b>
-  <span>${fecha} · ${hora}</span>
+  <div>Generado por <b>Sistema Polar Breeze Hub</b></div>
+  <div><b>NO ACEPTAMOS CAMBIOS NI DEVOLUCIONES</b></div>
+  <div>${fecha} · ${hora}</div>
 </div>
 </body></html>`;
 }
