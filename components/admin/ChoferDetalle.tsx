@@ -54,6 +54,14 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
   const [puntosConfig,  setPuntosConfig]  = useState<PuntosConfig | null>(null);
   const [selectedInvBase, setSelectedInvBase] = useState<InventarioBaseItem | null>(null);
 
+  // Edición inventario base
+  const [invBaseOverride, setInvBaseOverride] = useState<InventarioBaseItem[] | null>(null);
+  const [editingBase,     setEditingBase]     = useState(false);
+  const [editInvBase,     setEditInvBase]     = useState<InventarioBaseItem[]>([]);
+  const [confirmSaveBase, setConfirmSaveBase] = useState(false);
+  const [savingBase,      setSavingBase]      = useState(false);
+  const [invBaseMsg,      setInvBaseMsg]      = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
   useEffect(() => {
     const q = query(
       collection(db, "imbentario"),
@@ -113,25 +121,33 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
       const entregas = Array.isArray(data.entregas) ? (data.entregas as ProductoItem[]) : [];
       setDriverEntregas(entregas);
       setEditEntregas(JSON.parse(JSON.stringify(entregas)));
+      if (Array.isArray(data.inventarioBase)) {
+        setInvBaseOverride(data.inventarioBase as InventarioBaseItem[]);
+      }
     });
   }, [chofer.uid]);
 
-  // Totales RD$ y puntos del inventario base
+  // Inventario base efectivo: override manual si existe, sino calculado de movimientos
+  const activeInvBase = useMemo(
+    () => invBaseOverride ?? invBase,
+    [invBaseOverride, invBase],
+  );
+
   const totalInvRD = useMemo(() => {
-    if (!preciosConfig || invBase.length === 0) return null;
-    return invBase.reduce((s, p) => {
+    if (!preciosConfig || activeInvBase.length === 0) return null;
+    return activeInvBase.reduce((s, p) => {
       const pc = preciosConfig.productos.find((x) => x.producto_id === p.producto_id);
       return s + (pc ? p.cantidad * pc.precio : 0);
     }, 0);
-  }, [invBase, preciosConfig]);
+  }, [activeInvBase, preciosConfig]);
 
   const totalInvPts = useMemo(() => {
-    if (!puntosConfig || invBase.length === 0) return null;
-    return invBase.reduce((s, p) => {
+    if (!puntosConfig || activeInvBase.length === 0) return null;
+    return activeInvBase.reduce((s, p) => {
       const pc = puntosConfig.productos.find((x) => x.nombre === p.nombre);
       return s + (pc ? p.cantidad * pc.puntos : 0);
     }, 0);
-  }, [invBase, puntosConfig]);
+  }, [activeInvBase, puntosConfig]);
 
   // Filtrar por rango de días o por fecha exacta
   const cutoff = new Date();
@@ -179,6 +195,31 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
 
   const diasOrdenados = Object.entries(porDia).reverse();
   const maxEntregado  = Math.max(...diasOrdenados.map(([, v]) => v.entregado), 1);
+
+  // Inventario base — edición y guardado
+  const startEditBase = () => {
+    setEditInvBase(JSON.parse(JSON.stringify(activeInvBase)));
+    setEditingBase(true);
+  };
+
+  const saveInvBase = async () => {
+    setSavingBase(true);
+    try {
+      await setDoc(doc(db, "drivers", chofer.uid), {
+        inventarioBase: editInvBase,
+        updatedAt: new Date(),
+      }, { merge: true });
+      setInvBaseOverride([...editInvBase]);
+      setEditingBase(false);
+      setConfirmSaveBase(false);
+      setInvBaseMsg({ type: "ok", text: "Inventario base actualizado ✓" });
+    } catch (e) {
+      setInvBaseMsg({ type: "err", text: e instanceof Error ? e.message : "Error al guardar" });
+    } finally {
+      setSavingBase(false);
+      setTimeout(() => setInvBaseMsg(null), 4000);
+    }
+  };
 
   // Unlock inventory for editing
   const unlockInventario = async () => {
@@ -297,14 +338,14 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
             <button
               key={t.key}
               onClick={() => setSubTab(t.key)}
-              className={`flex flex-col items-center gap-1.5 py-3 px-1 rounded-xl font-bold transition-all duration-100 active:scale-95 ${
+              className={`flex flex-col items-center gap-2 py-5 px-1 rounded-xl transition-all duration-100 active:scale-95 ${
                 subTab === t.key
                   ? "bg-purple-600 text-white shadow-lg"
                   : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
               }`}
             >
-              <span className="text-2xl leading-none">{t.emoji}</span>
-              <span className="text-sm font-bold">{t.label}</span>
+              <span className="text-3xl leading-none">{t.emoji}</span>
+              <span className="text-base font-extrabold leading-tight">{t.label}</span>
             </button>
           ))}
         </div>
@@ -922,99 +963,174 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
         );
       })()}
 
-      {/* ── Inventario base (read-only) ── */}
-      {subTab === "inventario" && (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 bg-gradient-to-r from-violet-50 to-violet-100">
-            <div className="mb-3">
-              <h3 className="font-bold text-violet-900 text-sm">📋 Inventario base asignado</h3>
-              <p className="text-xs text-violet-600 mt-0.5">18/05/2026 · toca un producto para ver detalles</p>
+      {/* ── Inventario base (editable por Admin) ── */}
+      {subTab === "inventario" && (() => {
+        const displayList = editingBase ? editInvBase : activeInvBase;
+        return (
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            {/* Cabecera */}
+            <div className="px-5 py-4 bg-gradient-to-r from-violet-50 to-violet-100">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="font-bold text-violet-900 text-sm">📋 Inventario base asignado</h3>
+                  <p className="text-xs text-violet-600 mt-0.5">
+                    {invBaseOverride ? "Editado manualmente · " : ""}toca un producto para ver detalles
+                  </p>
+                </div>
+                {!editingBase ? (
+                  <button
+                    onClick={startEditBase}
+                    className="text-xs px-3 py-1.5 bg-violet-600 text-white rounded-lg font-semibold active:scale-95 hover:bg-violet-700 transition-all duration-100 flex-shrink-0"
+                  >
+                    ✏️ Editar
+                  </button>
+                ) : (
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => setEditingBase(false)}
+                      className="text-xs px-2.5 py-1.5 bg-gray-200 text-gray-600 rounded-lg font-semibold active:scale-95 hover:bg-gray-300 transition-all duration-100"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => setConfirmSaveBase(true)}
+                      className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg font-semibold active:scale-95 hover:bg-green-700 transition-all duration-100"
+                    >
+                      💾 Guardar
+                    </button>
+                  </div>
+                )}
+              </div>
+              {activeInvBase.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-white/70 rounded-xl p-2.5 text-center">
+                    <p className="text-lg font-bold text-violet-700">
+                      {displayList.reduce((s, p) => s + p.cantidad, 0)}
+                    </p>
+                    <p className="text-xs text-violet-500">Unidades</p>
+                  </div>
+                  <div className="bg-white/70 rounded-xl p-2.5 text-center">
+                    <p className="text-base font-bold text-green-700">
+                      {totalInvRD !== null ? `RD$${totalInvRD.toLocaleString()}` : "—"}
+                    </p>
+                    <p className="text-xs text-green-500">Valor total</p>
+                  </div>
+                  <div className="bg-white/70 rounded-xl p-2.5 text-center">
+                    <p className="text-base font-bold text-amber-600">
+                      {totalInvPts !== null ? totalInvPts.toLocaleString() : "—"}
+                    </p>
+                    <p className="text-xs text-amber-500">Puntos totales</p>
+                  </div>
+                </div>
+              )}
             </div>
-            {invBase.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-white/70 rounded-xl p-2.5 text-center">
-                  <p className="text-lg font-bold text-violet-700">{invBase.reduce((s, p) => s + p.cantidad, 0)}</p>
-                  <p className="text-xs text-violet-500">Unidades</p>
-                </div>
-                <div className="bg-white/70 rounded-xl p-2.5 text-center">
-                  <p className="text-base font-bold text-green-700">
-                    {totalInvRD !== null ? `RD$${totalInvRD.toLocaleString()}` : "—"}
-                  </p>
-                  <p className="text-xs text-green-500">Valor total</p>
-                </div>
-                <div className="bg-white/70 rounded-xl p-2.5 text-center">
-                  <p className="text-base font-bold text-amber-600">
-                    {totalInvPts !== null ? totalInvPts.toLocaleString() : "—"}
-                  </p>
-                  <p className="text-xs text-amber-500">Puntos totales</p>
-                </div>
+
+            {/* Mensaje de estado */}
+            {invBaseMsg && (
+              <div className={`mx-4 mt-3 text-sm px-3 py-2 rounded-lg ${invBaseMsg.type === "ok" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+                {invBaseMsg.text}
+              </div>
+            )}
+
+            {/* Tabla */}
+            {activeInvBase.length === 0 ? (
+              <div className="px-5 py-6 text-center">
+                <p className="text-2xl mb-2">📋</p>
+                <p className="text-sm text-gray-400">Sin inventario base registrado</p>
+                <p className="text-xs text-gray-300 mt-1">Ejecuta seed-inventario-base para cargar los datos.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-violet-50/60 text-violet-700 border-b border-violet-100">
+                      <th className="text-left px-4 py-2.5 font-semibold">Producto</th>
+                      <th className="text-right px-4 py-2.5 font-semibold w-28">Cantidad</th>
+                      <th className="w-6"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {displayList.map((p, i) => (
+                      <tr
+                        key={i}
+                        onClick={editingBase ? undefined : () => setSelectedInvBase(p)}
+                        className={`${editingBase ? "" : "hover:bg-violet-50/50 cursor-pointer active:bg-violet-100/60"} transition-colors`}
+                      >
+                        <td className="px-4 py-2.5 text-gray-700 font-medium">{p.nombre}</td>
+                        <td className="px-4 py-2 text-right">
+                          {editingBase ? (
+                            <input
+                              type="number"
+                              min="0"
+                              value={editInvBase[i]?.cantidad ?? 0}
+                              onChange={(e) => {
+                                const next = [...editInvBase];
+                                next[i] = { ...next[i], cantidad: Number(e.target.value) };
+                                setEditInvBase(next);
+                              }}
+                              className="w-20 px-2 py-1 border border-violet-300 rounded text-right text-xs outline-none focus:ring-1 focus:ring-violet-500"
+                            />
+                          ) : (
+                            <span className="font-bold text-violet-700">{p.cantidad}</span>
+                          )}
+                        </td>
+                        <td className="pr-3 py-2.5 text-gray-300 text-sm">{!editingBase && "›"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-violet-50/60 border-t border-violet-100 font-bold text-xs">
+                      <td className="px-4 py-2.5 text-violet-700">
+                        Total — {displayList.length} productos
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-violet-700">
+                        {displayList.reduce((s, p) => s + p.cantidad, 0)} uds
+                      </td>
+                      <td></td>
+                    </tr>
+                    {totalInvRD !== null && (
+                      <tr className="bg-white border-t border-violet-50">
+                        <td className="px-4 py-2.5 text-gray-700 font-semibold text-xs">💵 Total general RD$</td>
+                        <td className="px-4 py-2.5 text-right font-extrabold text-green-700 text-sm">
+                          RD${totalInvRD.toLocaleString()}
+                        </td>
+                        <td></td>
+                      </tr>
+                    )}
+                    {totalInvPts !== null && (
+                      <tr className="bg-amber-50/50 border-t border-amber-100">
+                        <td className="px-4 py-2.5 text-gray-700 font-semibold text-xs">⭐ Total general puntos</td>
+                        <td className="px-4 py-2.5 text-right font-extrabold text-amber-600 text-sm">
+                          {totalInvPts.toLocaleString()} pts
+                        </td>
+                        <td></td>
+                      </tr>
+                    )}
+                  </tfoot>
+                </table>
+              </div>
+            )}
+
+            {/* Botones al pie en modo edición */}
+            {editingBase && (
+              <div className="px-5 py-4 border-t border-gray-100 flex gap-2 justify-end">
+                <button
+                  onClick={() => setEditingBase(false)}
+                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold active:scale-95 hover:bg-gray-200 transition-all duration-100"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => setConfirmSaveBase(true)}
+                  className="px-5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold active:scale-95 hover:bg-green-700 transition-all duration-100"
+                >
+                  💾 Guardar cambios
+                </button>
               </div>
             )}
           </div>
-
-          {invBase.length === 0 ? (
-            <div className="px-5 py-6 text-center">
-              <p className="text-2xl mb-2">📋</p>
-              <p className="text-sm text-gray-400">Sin inventario base registrado</p>
-              <p className="text-xs text-gray-300 mt-1">
-                Ejecuta seed-inventario-base para cargar los datos.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-violet-50/60 text-violet-700 border-b border-violet-100">
-                    <th className="text-left px-4 py-2.5 font-semibold">Producto</th>
-                    <th className="text-right px-4 py-2.5 font-semibold w-20">Cant.</th>
-                    <th className="w-6"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {invBase.map((p, i) => (
-                    <tr
-                      key={i}
-                      onClick={() => setSelectedInvBase(p)}
-                      className="hover:bg-violet-50/50 cursor-pointer active:bg-violet-100/60 transition-colors"
-                    >
-                      <td className="px-4 py-2.5 text-gray-700 font-medium">{p.nombre}</td>
-                      <td className="px-4 py-2.5 text-right font-bold text-violet-700">{p.cantidad}</td>
-                      <td className="pr-3 py-2.5 text-gray-300 text-sm">›</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-violet-50/60 border-t border-violet-100 font-bold text-xs">
-                    <td className="px-4 py-2 text-violet-700">Total — {invBase.length} productos</td>
-                    <td className="px-4 py-2 text-right text-violet-700">
-                      {invBase.reduce((s, p) => s + p.cantidad, 0)} uds
-                    </td>
-                    <td></td>
-                  </tr>
-                  {totalInvRD !== null && (
-                    <tr className="bg-white border-t border-violet-50 text-xs">
-                      <td className="px-4 py-1.5 text-gray-500">Valor total</td>
-                      <td className="px-4 py-1.5 text-right font-bold text-green-700">
-                        RD${totalInvRD.toLocaleString()}
-                      </td>
-                      <td></td>
-                    </tr>
-                  )}
-                  {totalInvPts !== null && (
-                    <tr className="bg-white text-xs border-t border-gray-50">
-                      <td className="px-4 py-1.5 text-gray-500">Puntos totales</td>
-                      <td className="px-4 py-1.5 text-right font-bold text-amber-600">
-                        {totalInvPts.toLocaleString()} pts
-                      </td>
-                      <td></td>
-                    </tr>
-                  )}
-                </tfoot>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Inventario FacturaScan (editable) ── */}
       {subTab === "inventario" && (
@@ -1123,6 +1239,36 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
               </button>
             </div>
           )}
+        </div>
+      )}
+      {/* ── Modal confirmación guardar inventario base ── */}
+      {confirmSaveBase && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5">
+            <div className="text-center">
+              <p className="text-3xl mb-2">💾</p>
+              <h2 className="font-extrabold text-gray-800 text-lg">¿Guardar cambios?</h2>
+              <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                ¿Está seguro que desea guardar los cambios en el inventario de este chofer?
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmSaveBase(false)}
+                disabled={savingBase}
+                className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold active:scale-95 hover:bg-gray-200 transition-all duration-100 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveInvBase}
+                disabled={savingBase}
+                className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold active:scale-95 hover:bg-green-700 transition-all duration-100 disabled:opacity-60"
+              >
+                {savingBase ? "Guardando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
