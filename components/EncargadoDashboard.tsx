@@ -5,7 +5,9 @@ import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { MovimientoLoker } from "@/lib/types";
-import RegistroLote from "@/components/encargado/RegistroLote";
+import RegistroLote          from "@/components/encargado/RegistroLote";
+import FloatingFAB           from "@/components/shared/FloatingFAB";
+import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 
 type Tab = "lote" | "stock";
 
@@ -13,6 +15,7 @@ export default function EncargadoDashboard() {
   const { profile, logout } = useAuth();
   const [tab,         setTab]         = useState<Tab>("lote");
   const [movimientos, setMovimientos] = useState<MovimientoLoker[]>([]);
+  const [showTablas,  setShowTablas]  = useState(false);
   const [stockCargado, setStockCargado] = useState(false);
 
   useEffect(() => {
@@ -75,7 +78,15 @@ export default function EncargadoDashboard() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              onClick={() => setShowTablas(true)}
+              title="Consultar tablas"
+              className="bg-white/10 hover:bg-white/20 active:scale-95 w-8 h-8 rounded-lg
+                flex items-center justify-center text-base transition-all duration-100"
+            >
+              📋
+            </button>
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium leading-tight">{profile?.nombre}</p>
               <span className="text-xs text-emerald-300">Encargado</span>
@@ -150,6 +161,12 @@ export default function EncargadoDashboard() {
           </div>
         )}
       </main>
+
+      {/* ── Modal Tablas ── */}
+      {showTablas && <ConsultarTablaModal onClose={() => setShowTablas(false)} />}
+
+      {/* ── Botón flotante ── */}
+      <FloatingFAB />
     </div>
   );
 }

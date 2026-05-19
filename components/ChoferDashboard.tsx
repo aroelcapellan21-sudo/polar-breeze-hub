@@ -8,7 +8,9 @@ import {
   ImbentarioRecord, PuntosConfig, PuntoProducto,
   MovimientoLoker, TalonarioDoc, toDate,
 } from "@/lib/types";
-import SobrantesChofer from "@/components/chofer/SobrantesChofer";
+import SobrantesChofer       from "@/components/chofer/SobrantesChofer";
+import FloatingFAB           from "@/components/shared/FloatingFAB";
+import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 
 function getTodayStart() {
@@ -40,7 +42,8 @@ export default function ChoferDashboard() {
   const [waErr,        setWaErr]        = useState<string | null>(null);
 
   type ChoferModal = "semaforo" | "puntos" | "monto" | { pid: string; nombre: string } | null;
-  const [modal, setModal] = useState<ChoferModal>(null);
+  const [modal,      setModal]      = useState<ChoferModal>(null);
+  const [showTablas, setShowTablas] = useState(false);
 
   const todayStart = useMemo(() => getTodayStart(), []);
 
@@ -296,9 +299,19 @@ export default function ChoferDashboard() {
               </p>
             </div>
           </div>
-          <button onClick={logout} className="bg-white/15 hover:bg-white/25 active:scale-95 px-3 py-1.5 rounded-lg text-xs transition-all duration-100 font-medium">
-            Salir
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowTablas(true)}
+              title="Consultar tablas"
+              className="bg-white/15 hover:bg-white/25 active:scale-95 w-8 h-8 rounded-lg
+                flex items-center justify-center text-base transition-all duration-100"
+            >
+              📋
+            </button>
+            <button onClick={logout} className="bg-white/15 hover:bg-white/25 active:scale-95 px-3 py-1.5 rounded-lg text-xs transition-all duration-100 font-medium">
+              Salir
+            </button>
+          </div>
         </div>
       </header>
 
@@ -561,6 +574,12 @@ export default function ChoferDashboard() {
           </div>
         </div>
       )}
+
+      {/* ── Modal Tablas ── */}
+      {showTablas && <ConsultarTablaModal onClose={() => setShowTablas(false)} />}
+
+      {/* ── Botón flotante ── */}
+      <FloatingFAB getMessage={buildMsg} />
     </div>
   );
 }

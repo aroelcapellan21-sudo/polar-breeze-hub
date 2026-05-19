@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { UserProfile } from "@/lib/types";
+import { UserProfile, PuntosConfig, PreciosConfig } from "@/lib/types";
 import Overview        from "@/components/admin/Overview";
 import GestionChoferes from "@/components/admin/GestionChoferes";
 import ChoferDetalle   from "@/components/admin/ChoferDetalle";
@@ -13,14 +15,96 @@ import InformesHistorial  from "@/components/admin/InformesHistorial";
 import Anomalias             from "@/components/admin/Anomalias";
 import AnomaliasDespachador  from "@/components/admin/AnomaliasDespachador";
 import GestionEncargados     from "@/components/admin/GestionEncargados";
+import FloatingFAB           from "@/components/shared/FloatingFAB";
+import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 
 type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp";
+
+type SearchItem =
+  | { kind: "chofer";   data: UserProfile }
+  | { kind: "producto"; nombre: string; tipo: "puntos" | "precios" };
 
 export default function AdminDashboard() {
   const { profile, logout } = useAuth();
   const [tab,         setTab]         = useState<Tab>("overview");
   const [chofer,      setChofer]      = useState<UserProfile | null>(null);
   const [showConfig,  setShowConfig]  = useState(false);
+  const [showTablas,  setShowTablas]  = useState(false);
+
+  // ── Buscador general ─────────────────────────────────────────────────────────
+  const [searchOpen,  setSearchOpen]  = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchItems, setSearchItems] = useState<SearchItem[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchRef  = useRef<HTMLDivElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+
+  const openSearch = async () => {
+    setSearchOpen(true);
+    setSearchQuery("");
+    setTimeout(() => searchInput.current?.focus(), 50);
+    if (searchItems.length > 0) return;
+    setSearchLoading(true);
+    try {
+      const [chofSnap, puntosSnap, preciosSnap] = await Promise.all([
+        getDocs(query(collection(db, "usuarios"), where("role", "==", "chofer"))),
+        getDoc(doc(db, "config", "puntos")),
+        getDoc(doc(db, "config", "precios")),
+      ]);
+      const items: SearchItem[] = [];
+      chofSnap.docs.forEach((d) => items.push({ kind: "chofer", data: d.data() as UserProfile }));
+      if (puntosSnap.exists()) {
+        const cfg = puntosSnap.data() as PuntosConfig;
+        cfg.productos?.forEach((p) => items.push({ kind: "producto", nombre: p.nombre, tipo: "puntos" }));
+      }
+      if (preciosSnap.exists()) {
+        const cfg = preciosSnap.data() as PreciosConfig;
+        cfg.productos?.forEach((p) => {
+          if (!items.some((x) => x.kind === "producto" && x.nombre.toLowerCase() === p.nombre.toLowerCase())) {
+            items.push({ kind: "producto", nombre: p.nombre, tipo: "precios" });
+          }
+        });
+      }
+      setSearchItems(items);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [searchOpen]);
+
+  const q = searchQuery.trim().toLowerCase();
+  const searchResults = q.length < 2 ? [] : searchItems.filter((item) => {
+    if (item.kind === "chofer") {
+      return (
+        item.data.nombre?.toLowerCase().includes(q) ||
+        item.data.ficha?.toLowerCase().includes(q)
+      );
+    }
+    return item.nombre.toLowerCase().includes(q);
+  }).slice(0, 12);
+
+  const handleSearchSelect = (item: SearchItem) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    if (item.kind === "chofer") {
+      verChofer(item.data);
+    } else {
+      setTab("inventario");
+      setChofer(null);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const verChofer = (c: UserProfile) => {
     setChofer(c);
@@ -108,7 +192,25 @@ export default function AdminDashboard() {
           </nav>
 
           {/* Acciones */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* 🔍 Buscador */}
+            <button
+              onClick={openSearch}
+              title="Buscar chofer, producto, ficha…"
+              className="bg-white/10 hover:bg-white/20 active:scale-95 w-8 h-8 rounded-lg
+                flex items-center justify-center text-base transition-all duration-100"
+            >
+              🔍
+            </button>
+            {/* 📋 Tablas */}
+            <button
+              onClick={() => setShowTablas(true)}
+              title="Consultar tablas"
+              className="bg-white/10 hover:bg-white/20 active:scale-95 w-8 h-8 rounded-lg
+                flex items-center justify-center text-base transition-all duration-100"
+            >
+              📋
+            </button>
             <button
               onClick={() => setShowConfig(true)}
               title="Configuración"
@@ -192,6 +294,84 @@ export default function AdminDashboard() {
 
       {/* ── Modal Configuración ── */}
       {showConfig && <ConfigModal onClose={() => setShowConfig(false)} />}
+
+      {/* ── Modal Tablas ── */}
+      {showTablas && <ConsultarTablaModal onClose={() => setShowTablas(false)} />}
+
+      {/* ── Modal Buscador ── */}
+      {searchOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 pt-16 px-4">
+          <div
+            ref={searchRef}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+          >
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+              <span className="text-gray-400 text-lg">🔍</span>
+              <input
+                ref={searchInput}
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && setSearchOpen(false)}
+                placeholder="Buscar chofer, producto, ficha…"
+                className="flex-1 text-sm text-gray-800 outline-none placeholder-gray-400"
+              />
+              <button
+                onClick={() => setSearchOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-sm font-bold px-1 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto">
+              {searchLoading && (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-sm text-gray-400 animate-pulse">Cargando índice…</p>
+                </div>
+              )}
+              {!searchLoading && q.length < 2 && (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-sm text-gray-400">Escribe al menos 2 caracteres para buscar.</p>
+                  <p className="text-xs text-gray-300 mt-1">Busca por nombre, ficha o producto.</p>
+                </div>
+              )}
+              {!searchLoading && q.length >= 2 && searchResults.length === 0 && (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-sm text-gray-400">Sin resultados para <strong>"{searchQuery}"</strong></p>
+                </div>
+              )}
+              {searchResults.map((item, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => handleSearchSelect(item)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50
+                    transition text-left border-b border-gray-50 last:border-0"
+                >
+                  <span className="text-xl flex-shrink-0">
+                    {item.kind === "chofer" ? "👤" : "📦"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">
+                      {item.kind === "chofer" ? item.data.nombre : item.nombre}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {item.kind === "chofer"
+                        ? `Chofer${item.data.ficha ? ` · ficha ${item.data.ficha}` : ""}`
+                        : item.tipo === "puntos" ? "Tabla de puntos" : "Tabla de precios"}
+                    </p>
+                  </div>
+                  <span className="text-gray-300 text-sm">›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Botón flotante ── */}
+      <FloatingFAB />
     </div>
   );
 }

@@ -13,6 +13,8 @@ import Comparar      from "@/components/despachador/Comparar";
 import Historial     from "@/components/despachador/Historial";
 import InformeCierre         from "@/components/despachador/InformeCierre";
 import AnomaliasDespachador  from "@/components/admin/AnomaliasDespachador";
+import FloatingFAB          from "@/components/shared/FloatingFAB";
+import ConsultarTablaModal  from "@/components/shared/ConsultarTablaModal";
 
 type Tab = "cuartofrio" | "choferes" | "comparar" | "historial" | "cierre" | "anomalias";
 
@@ -60,6 +62,7 @@ export default function DespachadorDashboard() {
   const [resetPwd,    setResetPwd]    = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMsg,    setResetMsg]    = useState<{ type: "ok"|"err"; text: string }|null>(null);
+  const [showTablas,  setShowTablas]  = useState(false);
 
   const flashReset = (type: "ok"|"err", text: string) => {
     setResetMsg({ type, text });
@@ -144,7 +147,15 @@ export default function DespachadorDashboard() {
           </nav>
 
           {/* Acciones */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              onClick={() => setShowTablas(true)}
+              title="Consultar tablas"
+              className="bg-white/10 hover:bg-white/20 active:scale-95 w-8 h-8 rounded-lg
+                flex items-center justify-center text-base transition-all duration-100"
+            >
+              📋
+            </button>
             <button
               onClick={() => { setShowReset(true); setResetPwd(""); setResetMsg(null); }}
               title="Restablecer día"
@@ -344,6 +355,11 @@ export default function DespachadorDashboard() {
         </div>
       )}
 
+      {/* ── Modal Tablas ── */}
+      {showTablas && <ConsultarTablaModal onClose={() => setShowTablas(false)} />}
+
+      {/* ── Botón flotante ── */}
+      <FloatingFAB />
     </div>
   );
 }
