@@ -7,6 +7,9 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { UserProfile, LoteLoker, toDate, fmtDate } from "@/lib/types";
+import { ShareBar }           from "@/components/shared/ShareButtons";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 
 const API_KEY  = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
 const AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
@@ -124,6 +127,46 @@ export default function GestionEncargados() {
     const sinFactura = detalle.lotes.filter(l => !l.facturaEntregada).length;
     return { totalLotes, totalUnidades, sinFactura };
   })() : null;
+
+  const buildEncMsg = () => {
+    if (!detalle) return "";
+    const lines = [pbHeader(), "", `🏭 *ENCARGADO — ${detalle.enc.nombre}*`, ""];
+    if (detalleStats) {
+      lines.push(`Lotes: *${detalleStats.totalLotes}* · Unidades: *${detalleStats.totalUnidades}* · Sin factura: *${detalleStats.sinFactura}*`, "");
+    }
+    if (detalle.lotes.length > 0) {
+      lines.push("📦 *Lotes registrados:*");
+      detalle.lotes.slice(0, 10).forEach((lote) => {
+        const totalUds = lote.productos.reduce((s, p) => s + p.total, 0);
+        lines.push(`• ${lote.numero} — ${totalUds} uds — ${lote.facturaEntregada ? "✅ Factura OK" : "⏳ Sin factura"}${lote.proveedor ? ` — ${lote.proveedor}` : ""}`);
+      });
+      if (detalle.lotes.length > 10) lines.push(`… y ${detalle.lotes.length - 10} lotes más`);
+    }
+    lines.push("", pbFooter());
+    return lines.join("\n");
+  };
+
+  const buildEncHtml = () => {
+    if (!detalle) return "";
+    const rows = detalle.lotes.slice(0, 30).map((lote) => {
+      const totalUds = lote.productos.reduce((s, p) => s + p.total, 0);
+      return [
+        lote.numero,
+        lote.facturaEntregada ? "✅ Entregada" : "⏳ Pendiente",
+        lote.proveedor ?? "—",
+        lote.productos.map(p => p.nombre.split(" ")[0]).join(", "),
+        `<b>+${totalUds}</b>`,
+      ];
+    });
+    const stats = detalleStats
+      ? `Lotes: ${detalleStats.totalLotes} · Unidades: ${detalleStats.totalUnidades} · Sin factura: ${detalleStats.sinFactura}`
+      : "";
+    return pbPrintDoc(
+      `Encargado — ${detalle.enc.nombre}`,
+      stats,
+      pbTable(["Lote", "Factura", "Proveedor", "Productos", "Unidades"], rows),
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -298,8 +341,8 @@ export default function GestionEncargados() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center gap-3 px-5 py-4 border-b flex-shrink-0">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg
+            <div className="flex items-center gap-2 px-5 py-4 border-b flex-shrink-0">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-base
                 flex-shrink-0 ${detalle.enc.activo !== false ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
                 {detalle.enc.nombre.charAt(0).toUpperCase()}
               </div>
@@ -313,6 +356,7 @@ export default function GestionEncargados() {
                   {detalle.enc.activo !== false ? "Activo" : "Dado de baja"}
                 </span>
               </div>
+              <ShareBar getMessage={buildEncMsg} getPrintHtml={buildEncHtml} className="flex-shrink-0" />
               <button
                 onClick={() => setDetalle(null)}
                 className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95

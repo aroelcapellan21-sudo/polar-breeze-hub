@@ -9,6 +9,9 @@ import { useAuth } from "@/lib/auth-context";
 import {
   MovimientoLoker, TalonarioDoc, LoteLoker, NotaCredito, toDate, fmtDate, toProductoId,
 } from "@/lib/types";
+import { ShareBar }           from "@/components/shared/ShareButtons";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
 
@@ -493,6 +496,126 @@ export default function Inventario() {
   const hoyLabel = new Date().toLocaleDateString("es-MX", {
     weekday: "long", day: "numeric", month: "long",
   });
+
+  // ── Mensajes para modales ─────────────────────────────────────────────────
+  const getInvModalMsg = (): string => {
+    if (!invModal) return "";
+    const lines = [pbHeader(), ""];
+    if (invModal.type === "stat" && invModal.key === "loker") {
+      lines.push("📦 *STOCK EN EL LOKER*", "");
+      saldoConDetalle.forEach((p) => {
+        const icon = p.saldo < 0 ? "🚨" : p.saldo === 0 ? "⚠️" : "✅";
+        lines.push(`${icon} ${p.nombre}: *${p.saldo > 0 ? "+" : ""}${p.saldo}*`);
+      });
+    } else if (invModal.type === "stat" && invModal.key === "despachado") {
+      lines.push("🚚 *DESPACHADO HOY*", "");
+      saldoConDetalle.filter((p) => p.despachHoy > 0).forEach((p) => {
+        lines.push(`• ${p.nombre}: *${p.despachHoy} uds*`);
+      });
+    } else if (invModal.type === "stat" && invModal.key === "vendido") {
+      lines.push("✅ *VENDIDO HOY*", "");
+      resumenChoferes.filter((c) => c.reportado).forEach((ch) => {
+        lines.push(`\n🚛 *${ch.choferNombre}* — vendido: ${ch.totalVendido}`);
+        ch.productos.forEach((p) => lines.push(`  • ${p.nombre}: ${p.vendido} vend. / ${p.despachado} desp.`));
+      });
+    } else if (invModal.type === "stat" && invModal.key === "facturado") {
+      lines.push("💰 *FACTURADO HOY*", "");
+      const items = talonarioHoy.filter((t) => t.tipo === "retirada").flatMap((t) =>
+        t.productos.filter((p) => p.precio != null && p.precio! > 0).map((p) => ({
+          chofer: t.choferNombre, nombre: p.nombre,
+          cantidad: p.cantidad ?? 0, precio: p.precio!,
+          subtotal: p.precio! * (p.cantidad ?? 0),
+        }))
+      );
+      items.forEach((it) => lines.push(`• ${it.nombre} (${it.chofer}): ${it.cantidad} × $${it.precio} = *$${it.subtotal.toLocaleString()}*`));
+      if (items.length > 0) lines.push(`\nTotal: *$${dashboard.moneyHoy.toLocaleString("es-MX")}*`);
+    } else if (invModal.type === "producto") {
+      lines.push(`📊 *HISTORIAL — ${invModal.nombre}*`, "");
+      const movProd = movimientos.filter((m) => m.producto_id === invModal.pid).slice(0, 20);
+      movProd.forEach((m) => {
+        const cfg = TIPO_CFG[m.tipo] ?? TIPO_CFG.ajuste;
+        lines.push(`• ${cfg.label}: *${m.cantidad > 0 ? "+" : ""}${m.cantidad}* — ${m.responsable} ${fmtDate(m.timestamp)}`);
+      });
+    } else if (invModal.type === "chofer") {
+      const ch = invModal.ch;
+      lines.push(`🚛 *${ch.choferNombre}*`, "");
+      lines.push(`Despachado: ${ch.totalDespachado} · Sobrante: ${ch.reportado ? ch.totalSobrante : "—"} · Vendido: ${ch.reportado ? ch.totalVendido : "—"}`, "");
+      ch.productos.forEach((p) => lines.push(`• ${p.nombre}: ${p.despachado} desp.${ch.reportado ? ` / ${p.vendido} vend.` : ""}`));
+    } else if (invModal.type === "lote") {
+      const lote = invModal.lote;
+      const fecha = toDate(lote.timestamp).toLocaleDateString("es-MX");
+      lines.push(`🏭 *LOTE ${lote.numero}*`, "");
+      lines.push(`Registrado por: ${lote.registradoPor} · ${fecha}`);
+      if (lote.proveedor) lines.push(`Proveedor: ${lote.proveedor}`);
+      lines.push(`Factura: ${lote.facturaEntregada ? `✅ ${lote.facturaNumero ?? ""}` : "⏳ pendiente"}`, "");
+      lote.productos.forEach((p) => {
+        const uds = [p.cajas > 0 ? `${p.cajas} caj` : "", p.unidades > 0 ? `${p.unidades} uds` : ""].filter(Boolean).join("+") || `${p.total} uds`;
+        lines.push(`• ${p.nombre}: *${uds}* (total: ${p.total})`);
+      });
+      lines.push(`\nTotal entradas: *+${lote.productos.reduce((s, p) => s + p.total, 0)} unidades*`);
+    } else if (invModal.type === "nota") {
+      const nc = invModal.nc;
+      lines.push(`📝 *${nc.numero}*`, "");
+      lines.push(`Motivo: ${nc.motivo}`);
+      if (nc.proveedor) lines.push(`Proveedor: ${nc.proveedor}`);
+      lines.push(`Estado: *${nc.estado}*`, "");
+      nc.productos.forEach((p) => lines.push(`• ${p.nombre}: ${p.cantidad} uds${p.subtotal ? ` ($${p.subtotal.toFixed(2)})` : ""}`));
+      if (nc.totalMonto) lines.push(`\nMonto total: *$${nc.totalMonto.toFixed(2)}*`);
+    }
+    lines.push("", pbFooter());
+    return lines.join("\n");
+  };
+
+  const getInvModalHtml = (): string => {
+    if (!invModal) return "";
+    if (invModal.type === "stat" && invModal.key === "loker") {
+      const rows = saldoConDetalle.map((p) => [
+        p.nombre,
+        `<b style="color:${p.saldo < 0 ? "#dc2626" : p.saldo === 0 ? "#d97706" : "#16a34a"}">${p.saldo > 0 ? "+" : ""}${p.saldo}</b>`,
+        p.despachHoy > 0 ? `${p.despachHoy} hoy` : "—",
+      ]);
+      return pbPrintDoc("Stock en el Loker", hoyLabel, pbTable(["Producto", "Saldo", "Despachado hoy"], rows));
+    }
+    if (invModal.type === "stat" && invModal.key === "despachado") {
+      const rows = saldoConDetalle.filter((p) => p.despachHoy > 0).map((p) => [p.nombre, `<b>${p.despachHoy}</b>`]);
+      return pbPrintDoc("Despachado Hoy", hoyLabel, pbTable(["Producto", "Unidades"], rows));
+    }
+    if (invModal.type === "stat" && invModal.key === "facturado") {
+      const items = talonarioHoy.filter((t) => t.tipo === "retirada").flatMap((t) =>
+        t.productos.filter((p) => p.precio != null && p.precio! > 0).map((p) => ({
+          chofer: t.choferNombre, nombre: p.nombre,
+          cantidad: p.cantidad ?? 0, precio: p.precio!,
+          subtotal: p.precio! * (p.cantidad ?? 0),
+        }))
+      );
+      const rows = items.map((it) => [it.nombre, it.chofer, it.cantidad, `$${it.precio.toLocaleString()}`, `<b>$${it.subtotal.toLocaleString()}</b>`]);
+      const tot: (string|number)[] = ["<b>Total</b>", "", "", "", `<b>$${dashboard.moneyHoy.toLocaleString("es-MX")}</b>`];
+      return pbPrintDoc("Facturado Hoy", hoyLabel, pbTable(["Producto", "Chofer", "Uds", "Precio", "Subtotal"], rows, tot));
+    }
+    if (invModal.type === "lote") {
+      const lote = invModal.lote;
+      const fecha = toDate(lote.timestamp).toLocaleDateString("es-MX");
+      const rows = lote.productos.map((p) => [
+        p.nombre,
+        p.cajas > 0 ? p.cajas : "—",
+        p.unidades > 0 ? p.unidades : "—",
+        `<b>+${p.total}</b>`,
+        p.costoUnitario != null ? `$${p.costoUnitario.toFixed(2)}/ud` : "—",
+      ]);
+      const totalUds  = lote.productos.reduce((s, p) => s + p.total, 0);
+      const totalCost = lote.productos.reduce((s, p) => s + (p.costoUnitario ?? 0) * p.total, 0);
+      const tot: (string|number)[] = ["<b>Total</b>", "", "", `<b>+${totalUds}</b>`, totalCost > 0 ? `<b>$${totalCost.toFixed(2)}</b>` : "—"];
+      const sub = `Registrado por ${lote.registradoPor} · ${fecha}${lote.proveedor ? ` · ${lote.proveedor}` : ""} · Factura: ${lote.facturaEntregada ? "✅" : "⏳ Pendiente"}`;
+      return pbPrintDoc(`Lote ${lote.numero}`, sub, pbTable(["Producto", "Cajas", "Unidades", "Total", "Costo/ud"], rows, tot));
+    }
+    if (invModal.type === "chofer") {
+      const ch = invModal.ch;
+      const rows = ch.productos.map((p) => [p.nombre, p.despachado, ch.reportado ? p.sobrante : "—", ch.reportado ? `<b>${p.vendido}</b>` : "—"]);
+      const tot: (string|number)[] = ["<b>Total</b>", `<b>${ch.totalDespachado}</b>`, ch.reportado ? `<b>${ch.totalSobrante}</b>` : "—", ch.reportado ? `<b>${ch.totalVendido}</b>` : "—"];
+      return pbPrintDoc(`Detalle — ${ch.choferNombre}`, hoyLabel, pbTable(["Producto", "Despachado", "Sobrante", "Vendido"], rows, tot));
+    }
+    return pbPrintDoc("Inventario", hoyLabel, `<p>${getInvModalMsg()}</p>`);
+  };
 
   return (
     <div className="space-y-4">
@@ -1687,8 +1810,8 @@ export default function Inventario() {
       {invModal !== null && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setInvModal(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
-              <h3 className="font-bold text-gray-800">
+            <div className="flex items-center gap-2 px-5 py-4 border-b flex-shrink-0">
+              <h3 className="font-bold text-gray-800 flex-1 min-w-0 truncate">
                 {invModal.type === "stat" && invModal.key === "loker"      && "📦 Stock en el loker"}
                 {invModal.type === "stat" && invModal.key === "despachado" && "🚚 Despachado hoy"}
                 {invModal.type === "stat" && invModal.key === "vendido"    && "✅ Vendido hoy"}
@@ -1698,7 +1821,12 @@ export default function Inventario() {
                 {invModal.type === "lote"     && `🏭 Lote ${invModal.lote.numero}`}
                 {invModal.type === "nota"     && `📝 ${invModal.nc.numero}`}
               </h3>
-              <button onClick={() => setInvModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95 transition-all">×</button>
+              <ShareBar
+                getMessage={getInvModalMsg}
+                getPrintHtml={getInvModalHtml}
+                className="flex-shrink-0"
+              />
+              <button onClick={() => setInvModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95 transition-all flex-shrink-0">×</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
 

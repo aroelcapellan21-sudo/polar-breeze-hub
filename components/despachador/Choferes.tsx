@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ProductoItem, UserProfile, FsDriver, FsSession, MovimientoLoker, PrecioProducto, toProductoId } from "@/lib/types";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
+import { ShareBar } from "@/components/shared/ShareButtons";
 import {
   ImageUploader, ProductTable, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
@@ -447,6 +448,56 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
   const selEntregas: ProductoItem[] = Array.isArray(selDriver?.entregas)
     ? (selDriver!.entregas as ProductoItem[])
     : [];
+
+  // ── Mensajes para modales ─────────────────────────────────────────────────
+  const buildChofModalMsg = () => {
+    if (!chofModal) return "";
+    const chofer = sel?.nombre ?? "Chofer";
+    const lines = [pbHeader(), ""];
+    if (chofModal.type === "entrega") {
+      const e = chofModal.item;
+      lines.push(`📋 *PRODUCTO EN LISTA*`, `🚛 ${chofer}`, "", `• ${e.nombre}: *${e.cantidad} ${e.unidad ?? "uds"}*`);
+      if ((e.precio ?? 0) > 0) lines.push(`  Precio: $${e.precio!.toLocaleString()}`);
+      if (e.visto) lines.push(`  Estado: ${e.visto === "ok" ? "✅ Verificado" : e.visto === "mal" ? "❌ Problema" : "⏳ Sin verificar"}`);
+    } else {
+      const r = chofModal.item;
+      const cat = r.categoria === "retiro_despacho" ? "📦 Producto Retirado" : r.categoria === "agregado_1" ? "✅ Con Puntos" : "⚪ Sin Puntos";
+      lines.push(`${cat}`, `🚛 ${chofer}`, "", `• ${r.nombre}: *${r.categoria === "retiro_despacho" ? `+${r.cantidad}` : `×${Math.abs(r.cantidad)}`}*`);
+      if (r.motivo) lines.push(`  Motivo: ${r.motivo}`);
+    }
+    lines.push("", pbFooter());
+    return lines.join("\n");
+  };
+
+  const buildConfrMsg = () => {
+    const lines = [pbHeader(), "", "⚖️ *CONFRONTA — Cuarto Frío vs. Facturas*", ""];
+    const totalCF   = cuartoFrio.reduce((s, p) => s + (p.cantidad ?? 0), 0);
+    const totalEntr = Object.values(entregaMap).reduce((s, v) => s + v, 0);
+    lines.push(`Total C.Frío: *${totalCF}* · Total Facturas: *${totalEntr}*`, "");
+    confrontaFilas.forEach((f) => {
+      const icon = f.diff === 0 ? "✅" : f.diff > 0 ? "🟡" : "🚨";
+      const dif  = f.diff === 0 ? "justo" : f.diff > 0 ? `+${f.diff} sobra` : `${f.diff} falta`;
+      lines.push(`${icon} ${f.nombre}: CF=${f.cf} / Fact=${f.entr} → *${dif}*`);
+    });
+    lines.push("", pbFooter());
+    return lines.join("\n");
+  };
+
+  const buildConfrHtml = () => {
+    const rows = confrontaFilas.map((f) => {
+      const icon = f.diff === 0 ? "✅" : f.diff > 0 ? "🟡" : "🚨";
+      const dif  = f.diff === 0 ? "justo" : f.diff > 0 ? `+${f.diff} sobra` : `${f.diff} falta`;
+      return [f.nombre, f.cf, f.entr, `<b>${dif}</b>`, icon];
+    });
+    const totalCF   = cuartoFrio.reduce((s, p) => s + (p.cantidad ?? 0), 0);
+    const totalEntr = Object.values(entregaMap).reduce((s, v) => s + v, 0);
+    const total: (string|number)[] = ["<b>Total</b>", `<b>${totalCF}</b>`, `<b>${totalEntr}</b>`, "", ""];
+    return pbPrintDoc(
+      "Confronta — Cuarto Frío vs. Facturas",
+      "Verificación antes del despacho",
+      pbTable(["Producto", "C.Frío", "Facturas", "Diferencia", "Estado"], rows, total),
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -928,15 +979,16 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
       {chofModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setChofModal(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b">
-              <h3 className="font-bold text-gray-800">
+            <div className="flex items-center gap-2 px-5 py-4 border-b">
+              <h3 className="font-bold text-gray-800 flex-1 min-w-0 truncate">
                 {chofModal.type === "entrega" ? "📋 Producto en lista" : (
                   chofModal.item.categoria === "retiro_despacho" ? "📦 Producto Retirado"
                   : chofModal.item.categoria === "agregado_1"    ? "✅ Agregado 1 — Con Puntos"
                   :                                                "⚪ Agregado 0 — Sin Puntos"
                 )}
               </h3>
-              <button onClick={() => setChofModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95">×</button>
+              <ShareBar getMessage={buildChofModalMsg} className="flex-shrink-0" />
+              <button onClick={() => setChofModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95 flex-shrink-0">×</button>
             </div>
             <div className="p-5 space-y-3">
               {chofModal.type === "entrega" && (() => {
@@ -1009,12 +1061,13 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
       {showConfronta && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowConfronta(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
-              <div>
+            <div className="flex items-center gap-2 px-5 py-4 border-b flex-shrink-0">
+              <div className="flex-1 min-w-0">
                 <h2 className="font-bold text-gray-800 text-lg">⚖️ Confrontar antes de despachar</h2>
                 <p className="text-xs text-gray-500">Cuarto Frío vs. facturas registradas de choferes</p>
               </div>
-              <button onClick={() => setShowConfronta(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95">×</button>
+              <ShareBar getMessage={buildConfrMsg} getPrintHtml={buildConfrHtml} className="flex-shrink-0" />
+              <button onClick={() => setShowConfronta(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95 flex-shrink-0">×</button>
             </div>
             <div className="flex-1 overflow-y-auto p-5">
               {cuartoFrio.length === 0 && Object.keys(entregaMap).length === 0 ? (

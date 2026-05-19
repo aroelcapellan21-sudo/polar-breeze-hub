@@ -11,7 +11,9 @@ import {
 import SobrantesChofer       from "@/components/chofer/SobrantesChofer";
 import FloatingFAB           from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
+import { ShareBar }          from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 
 function getTodayStart() {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d;
@@ -225,6 +227,64 @@ export default function ChoferDashboard() {
   const fechaHoy = new Date().toLocaleDateString("es-MX", {
     weekday: "long", day: "numeric", month: "long",
   });
+
+  // ── Mensajes para modales ────────────────────────────────────────────────────
+  const buildPuntosMsg = () => {
+    const lines = [pbHeader(), "", `⭐ *PUNTOS QUINCENA*`, `🚛 ${profile?.nombre ?? "Chofer"}`, `📅 ${quincena.label}`, ""];
+    lines.push(`Total: *${puntosTotal} / ${meta} pts* (${pct.toFixed(0)}%)`);
+    if (puntosDetalle.length > 0) {
+      lines.push("");
+      puntosDetalle.forEach((d) => lines.push(`• ${d.nombre}: ${d.cantidad} uds × ${d.pts} pts = *${d.total} pts*`));
+    }
+    lines.push("", pbFooter());
+    return lines.join("\n");
+  };
+
+  const buildPuntosHtml = () => {
+    const rows = puntosDetalle.map((d) => [d.nombre, d.cantidad, d.pts, `<b>${d.total}</b>`]);
+    const total: (string|number)[] = ["<b>Total</b>", "", "", `<b>${puntosTotal} / ${meta} pts</b>`];
+    return pbPrintDoc(
+      `Puntos — ${quincena.label}`,
+      `${profile?.nombre ?? "Chofer"} · ${pct.toFixed(0)}% de la meta`,
+      pbTable(["Producto", "Cantidad", "Pts/ud", "Total"], rows, total),
+    );
+  };
+
+  const buildMontoMsg = () => {
+    const talHoy = talonarios.filter((t) => toDate(t.timestamp) >= todayStart && t.tipo === "retirada");
+    const items  = talHoy.flatMap((t) =>
+      t.productos.filter((p) => p.precio != null && p.precio! > 0).map((p) => ({
+        nombre: p.nombre, cantidad: p.cantidad ?? 0, precio: p.precio!,
+        subtotal: p.precio! * (p.cantidad ?? 0),
+      }))
+    );
+    const lines = [pbHeader(), "", "💰 *MONTO ESTIMADO DEL DÍA*", `🚛 ${profile?.nombre ?? "Chofer"}`, ""];
+    if (items.length === 0) {
+      lines.push("Sin precios configurados.");
+    } else {
+      items.forEach((it) => lines.push(`• ${it.nombre}: ${it.cantidad} × $${it.precio} = *$${it.subtotal.toLocaleString("es-MX")}*`));
+      lines.push("", `Total: *$${montoHoy.total.toLocaleString("es-MX")}*`);
+    }
+    lines.push("", pbFooter());
+    return lines.join("\n");
+  };
+
+  const buildMontoHtml = () => {
+    const talHoy = talonarios.filter((t) => toDate(t.timestamp) >= todayStart && t.tipo === "retirada");
+    const items  = talHoy.flatMap((t) =>
+      t.productos.filter((p) => p.precio != null && p.precio! > 0).map((p) => ({
+        nombre: p.nombre, cantidad: p.cantidad ?? 0, precio: p.precio!,
+        subtotal: p.precio! * (p.cantidad ?? 0),
+      }))
+    );
+    const rows  = items.map((it) => [it.nombre, it.cantidad, `$${it.precio.toLocaleString()}`, `<b>$${it.subtotal.toLocaleString("es-MX")}</b>`]);
+    const total: (string|number)[] = ["<b>Total estimado</b>", "", "", `<b>$${montoHoy.total.toLocaleString("es-MX")}</b>`];
+    return pbPrintDoc(
+      "Monto Estimado del Día",
+      profile?.nombre ?? "Chofer",
+      rows.length > 0 ? pbTable(["Producto", "Cantidad", "Precio", "Subtotal"], rows, total) : "<p>Sin precios configurados.</p>",
+    );
+  };
 
   // ── Render: sin despacho activo ───────────────────────────────────────────────
   if (!hayDespacho) {
@@ -441,16 +501,22 @@ export default function ChoferDashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0">
-              <h3 className="font-bold text-gray-800">
+            <div className="flex items-center gap-2 px-5 py-4 border-b flex-shrink-0">
+              <h3 className="font-bold text-gray-800 flex-1 min-w-0 truncate">
                 {modal === "semaforo" ? "🚦 Estado del semáforo"
                  : modal === "puntos" ? `⭐ Puntos — ${quincena.label}`
                  : modal === "monto"  ? "💰 Monto estimado"
                  : `📦 ${typeof modal === "object" ? modal.nombre : ""}`}
               </h3>
+              {modal === "puntos" && (
+                <ShareBar getMessage={buildPuntosMsg} getPrintHtml={buildPuntosHtml} className="flex-shrink-0" />
+              )}
+              {modal === "monto" && (
+                <ShareBar getMessage={buildMontoMsg} getPrintHtml={buildMontoHtml} className="flex-shrink-0" />
+              )}
               <button
                 onClick={() => setModal(null)}
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95 transition-all"
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none active:scale-95 transition-all flex-shrink-0"
               >×</button>
             </div>
 

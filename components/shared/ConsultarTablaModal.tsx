@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { PuntosConfig, PreciosConfig } from "@/lib/types";
+import { ShareBar } from "@/components/shared/ShareButtons";
+import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 
 type TabView = "puntos" | "precios";
 
@@ -12,6 +15,50 @@ export default function ConsultarTablaModal({ onClose }: { onClose: () => void }
   const [puntos,  setPuntos]  = useState<PuntosConfig | null>(null);
   const [precios, setPrecios] = useState<PreciosConfig | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const getTablaMsg = () => {
+    const lines = [pbHeader(), ""];
+    if (tab === "puntos" && puntos?.productos?.length) {
+      lines.push("🏆 *TABLA DE PUNTOS POR PRODUCTO*", "");
+      if (puntos.meta != null) lines.push(`Meta quincena: *${puntos.meta} pts*`, "");
+      [...puntos.productos].sort((a, b) => b.puntos - a.puntos).forEach((p) => {
+        lines.push(`• ${p.nombre}: *${p.puntos} pts/ud*`);
+      });
+    } else if (tab === "precios" && precios?.productos?.length) {
+      lines.push("💰 *TABLA DE PRECIOS DE VENTA*", "");
+      [...precios.productos].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")).forEach((p) => {
+        lines.push(`• ${p.nombre}: *${p.moneda ?? precios!.moneda} ${p.precio.toLocaleString("es-MX")}*`);
+      });
+    } else {
+      lines.push("Sin datos cargados.");
+    }
+    lines.push("", pbFooter());
+    return lines.join("\n");
+  };
+
+  const getTablaHtml = () => {
+    if (tab === "puntos" && puntos?.productos?.length) {
+      const subtitle = puntos.meta != null ? `Meta quincena: ${puntos.meta} pts` : "";
+      const rows = [...puntos.productos]
+        .sort((a, b) => b.puntos - a.puntos)
+        .map((p) => [p.nombre, `<span class="td-r">${p.puntos}</span>`]);
+      return pbPrintDoc(
+        "Tabla de Puntos por Producto",
+        subtitle,
+        pbTable(["Producto", "Pts / unidad"], rows),
+      );
+    } else if (tab === "precios" && precios?.productos?.length) {
+      const rows = [...precios.productos]
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+        .map((p) => [p.nombre, `<span class="td-r">${p.moneda ?? precios!.moneda} ${p.precio.toLocaleString("es-MX")}</span>`]);
+      return pbPrintDoc(
+        "Tabla de Precios de Venta",
+        "",
+        pbTable(["Producto", "Precio"], rows),
+      );
+    }
+    return pbPrintDoc("Tablas de Referencia", "", "<p>Sin datos cargados.</p>");
+  };
 
   useEffect(() => {
     Promise.all([
@@ -31,12 +78,19 @@ export default function ConsultarTablaModal({ onClose }: { onClose: () => void }
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-bold text-gray-800 text-base">📋 Tablas de referencia</h2>
+        <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+          <h2 className="font-bold text-gray-800 text-base flex-1 min-w-0">📋 Tablas de referencia</h2>
+          {!loading && (
+            <ShareBar
+              getMessage={getTablaMsg}
+              getPrintHtml={getTablaHtml}
+              className="flex-shrink-0"
+            />
+          )}
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center
-              justify-center text-gray-500 text-sm font-bold transition"
+              justify-center text-gray-500 text-sm font-bold transition flex-shrink-0"
           >
             ✕
           </button>
