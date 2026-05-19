@@ -12,6 +12,7 @@ import {
 import { ShareBar }           from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
+import { useRegisterModal }   from "@/components/shared/ModalShareContext";
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
 
@@ -616,6 +617,8 @@ export default function Inventario() {
     }
     return pbPrintDoc("Inventario", hoyLabel, `<p>${getInvModalMsg()}</p>`);
   };
+
+  useRegisterModal(invModal !== null, getInvModalMsg, getInvModalHtml);
 
   return (
     <div className="space-y-4">

@@ -10,6 +10,7 @@ import { UserProfile, LoteLoker, toDate, fmtDate } from "@/lib/types";
 import { ShareBar }           from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
+import { useRegisterModal }   from "@/components/shared/ModalShareContext";
 
 const API_KEY  = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
 const AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
@@ -167,6 +168,8 @@ export default function GestionEncargados() {
       pbTable(["Lote", "Factura", "Proveedor", "Productos", "Unidades"], rows),
     );
   };
+
+  useRegisterModal(detalle !== null, buildEncMsg, buildEncHtml);
 
   return (
     <div className="space-y-4">

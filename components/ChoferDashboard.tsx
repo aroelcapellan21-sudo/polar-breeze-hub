@@ -12,6 +12,7 @@ import SobrantesChofer       from "@/components/chofer/SobrantesChofer";
 import FloatingFAB           from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 import { ShareBar }          from "@/components/shared/ShareButtons";
+import { useRegisterModal } from "@/components/shared/ModalShareContext";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
 
@@ -215,19 +216,6 @@ export default function ChoferDashboard() {
     }
   };
 
-  // ── Render: pantalla de carga ─────────────────────────────────────────────────
-  if (cargando) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-400 text-sm animate-pulse">Cargando…</p>
-      </div>
-    );
-  }
-
-  const fechaHoy = new Date().toLocaleDateString("es-MX", {
-    weekday: "long", day: "numeric", month: "long",
-  });
-
   // ── Mensajes para modales ────────────────────────────────────────────────────
   const buildPuntosMsg = () => {
     const lines = [pbHeader(), "", `⭐ *PUNTOS QUINCENA*`, `🚛 ${profile?.nombre ?? "Chofer"}`, `📅 ${quincena.label}`, ""];
@@ -285,6 +273,27 @@ export default function ChoferDashboard() {
       rows.length > 0 ? pbTable(["Producto", "Cantidad", "Precio", "Subtotal"], rows, total) : "<p>Sin precios configurados.</p>",
     );
   };
+
+  // ── Registra modal activo en el FAB flotante (antes de cualquier return) ──────
+  const modalHasShare = modal === "puntos" || modal === "monto";
+  useRegisterModal(
+    modalHasShare,
+    modal === "puntos" ? buildPuntosMsg : buildMontoMsg,
+    modal === "puntos" ? buildPuntosHtml : buildMontoHtml,
+  );
+
+  // ── Render: pantalla de carga ─────────────────────────────────────────────────
+  if (cargando) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-400 text-sm animate-pulse">Cargando…</p>
+      </div>
+    );
+  }
+
+  const fechaHoy = new Date().toLocaleDateString("es-MX", {
+    weekday: "long", day: "numeric", month: "long",
+  });
 
   // ── Render: sin despacho activo ───────────────────────────────────────────────
   if (!hayDespacho) {

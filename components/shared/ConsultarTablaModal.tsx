@@ -7,6 +7,7 @@ import { PuntosConfig, PreciosConfig } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
+import { useRegisterModal } from "./ModalShareContext";
 
 type TabView = "puntos" | "precios";
 
@@ -59,6 +60,9 @@ export default function ConsultarTablaModal({ onClose }: { onClose: () => void }
     }
     return pbPrintDoc("Tablas de Referencia", "", "<p>Sin datos cargados.</p>");
   };
+
+  // Registra en el FAB flotante mientras este modal está montado
+  useRegisterModal(true, getTablaMsg, getTablaHtml);
 
   useEffect(() => {
     Promise.all([

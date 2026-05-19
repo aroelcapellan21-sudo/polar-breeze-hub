@@ -11,6 +11,7 @@ import { ProductoItem, UserProfile, FsDriver, FsSession, MovimientoLoker, Precio
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
 import { ShareBar } from "@/components/shared/ShareButtons";
+import { useRegisterModal } from "@/components/shared/ModalShareContext";
 import {
   ImageUploader, ProductTable, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
@@ -498,6 +499,11 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
       pbTable(["Producto", "C.Frío", "Facturas", "Diferencia", "Estado"], rows, total),
     );
   };
+
+  const modalAbierto = chofModal !== null || showConfronta;
+  const activeModalMsg  = () => showConfronta ? buildConfrMsg()  : buildChofModalMsg();
+  const activeModalHtml = () => showConfronta ? buildConfrHtml() : "";
+  useRegisterModal(modalAbierto, activeModalMsg, activeModalHtml);
 
   return (
     <div className="space-y-4">

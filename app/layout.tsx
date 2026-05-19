@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import ErrorBoundary from "@/components/shared/ErrorBoundary";
+import { ModalShareProvider } from "@/components/shared/ModalShareContext";
 
 const geist = Geist({ subsets: ["latin"] });
 
@@ -16,7 +17,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className={geist.className}>
       <body>
         <ErrorBoundary>
-          <AuthProvider>{children}</AuthProvider>
+          <ModalShareProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ModalShareProvider>
         </ErrorBoundary>
       </body>
     </html>
