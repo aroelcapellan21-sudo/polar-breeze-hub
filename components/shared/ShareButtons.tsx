@@ -85,17 +85,32 @@ function WaButton({ getMessage }: { getMessage: () => string }) {
 
 export function ShareBar({
   getMessage,
+  getPrintHtml,
   className = "",
 }: {
   getMessage: () => string;
+  getPrintHtml?: () => string;
   className?: string;
 }) {
+  const handlePrint = () => {
+    if (getPrintHtml) {
+      const html = getPrintHtml();
+      const win = window.open("", "_blank");
+      if (!win) return;
+      win.document.write(html);
+      win.document.close();
+      win.onload = () => win.print();
+    } else {
+      window.print();
+    }
+  };
+
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <WaButton getMessage={getMessage} />
       <button
         type="button"
-        onClick={() => window.print()}
+        onClick={handlePrint}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-600 hover:bg-gray-700
           active:scale-95 text-white rounded-lg text-xs font-medium transition-all duration-100"
       >

@@ -14,6 +14,7 @@ import {
 } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 
 interface Props {
   onVerChofer: (c: UserProfile) => void;
@@ -266,17 +267,33 @@ export default function Overview({ onVerChofer }: Props) {
 
       {/* ── Compartir ── */}
       <div className="flex justify-end">
-        <ShareBar getMessage={() => [
-          pbHeader(),
-          `📊 *Resumen Admin Polar Breeze*`,
-          `• Choferes activos: ${chofActivos}`,
-          `• Despachos hoy: ${kpiDespachos}`,
-          `• Facturado hoy: RD$${kpiFacturado.toLocaleString("es-DO")}`,
-          `• Alertas críticas: ${alertasCrit}`,
-          `• Peso total: ${kpiPeso.toFixed(1)} kg`,
-          "",
-          pbFooter(),
-        ].join("\n")} />
+        <ShareBar
+          getMessage={() => [
+            pbHeader(),
+            `📊 *Resumen Admin Polar Breeze*`,
+            `• Choferes activos: ${chofActivos}`,
+            `• Despachos hoy: ${kpiDespachos}`,
+            `• Facturado hoy: RD$${kpiFacturado.toLocaleString("es-DO")}`,
+            `• Alertas críticas: ${alertasCrit}`,
+            `• Peso total: ${kpiPeso.toFixed(1)} kg`,
+            "",
+            pbFooter(),
+          ].join("\n")}
+          getPrintHtml={() => pbPrintDoc(
+            "RESUMEN ADMIN",
+            new Date().toLocaleDateString("es-DO", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+            pbTable(
+              ["Indicador", "Valor"],
+              [
+                ["Choferes activos", chofActivos],
+                ["Despachos hoy",    kpiDespachos],
+                ["Facturado hoy",    `RD$${kpiFacturado.toLocaleString("es-DO")}`],
+                ["Alertas críticas", alertasCrit],
+                ["Peso total (kg)",  kpiPeso.toFixed(1)],
+              ],
+            ),
+          )}
+        />
       </div>
 
       {/* ── KPI Cards — Hub + FacturaScan session/despacho ── */}

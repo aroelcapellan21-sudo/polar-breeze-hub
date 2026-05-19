@@ -14,6 +14,7 @@ import {
 } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 import { auth } from "@/lib/firebase";
 
 interface Props {
@@ -361,38 +362,68 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
           ))}
         </div>
         <div className="flex justify-end">
-          <ShareBar getMessage={() => {
-            const periodo = fechaBuscar || `últimos ${rango} días`;
-            const lines = [
-              pbHeader(),
-              `📦 *${chofer.nombre}* — ficha ${chofer.ficha ?? "—"}`,
-              "",
-            ];
-            // Inventario base
-            if (activeInvBase.length > 0) {
-              lines.push("📋 *Inventario Base:*");
-              activeInvBase.forEach((p) => lines.push(`  • ${p.nombre}: ${p.cantidad} uds`));
-              if (totalInvRD != null) lines.push(`  💵 Total: RD$${totalInvRD.toLocaleString("es-DO")}`);
-              if (totalInvPts != null) lines.push(`  ⭐ Puntos: ${totalInvPts.toLocaleString()}`);
-              lines.push("");
-            }
-            // Stats del período
-            lines.push(
-              `📊 *Estadísticas — ${periodo}:*`,
-              `• Cargado: ${totalCargado} uds`,
-              `• Entregado: ${totalEntregado} uds`,
-              `• Diferencia: ${diferencia}`,
-            );
-            if (totalMonto > 0)          lines.push(`• Monto: RD$${totalMonto.toLocaleString("es-DO")}`);
-            if (totalPuntosRecientes > 0) lines.push(`• Puntos período: ${totalPuntosRecientes.toLocaleString()}`);
-            if (Object.keys(porProducto).length) {
-              lines.push("", "Productos:");
-              Object.entries(porProducto).forEach(([prod, d]) =>
-                lines.push(`  • ${prod}: ${d.entregado}/${d.cargado} entregado`));
-            }
-            lines.push("", pbFooter());
-            return lines.join("\n");
-          }} />
+          <ShareBar
+            getMessage={() => {
+              const periodo = fechaBuscar || `últimos ${rango} días`;
+              const lines = [pbHeader(), `📦 *${chofer.nombre}* — ficha ${chofer.ficha ?? "—"}`, ""];
+              if (activeInvBase.length > 0) {
+                lines.push("📋 *Inventario Base:*");
+                activeInvBase.forEach((p) => lines.push(`  • ${p.nombre}: ${p.cantidad} uds`));
+                if (totalInvRD != null) lines.push(`  💵 Total: RD$${totalInvRD.toLocaleString("es-DO")}`);
+                if (totalInvPts != null) lines.push(`  ⭐ Puntos: ${totalInvPts.toLocaleString()}`);
+                lines.push("");
+              }
+              lines.push(`📊 *Estadísticas — ${periodo}:*`,
+                `• Cargado: ${totalCargado} uds`, `• Entregado: ${totalEntregado} uds`, `• Diferencia: ${diferencia}`);
+              if (totalMonto > 0)           lines.push(`• Monto: RD$${totalMonto.toLocaleString("es-DO")}`);
+              if (totalPuntosRecientes > 0) lines.push(`• Puntos período: ${totalPuntosRecientes.toLocaleString()}`);
+              if (Object.keys(porProducto).length) {
+                lines.push("", "Productos:");
+                Object.entries(porProducto).forEach(([prod, d]) =>
+                  lines.push(`  • ${prod}: ${d.entregado}/${d.cargado} entregado`));
+              }
+              lines.push("", pbFooter());
+              return lines.join("\n");
+            }}
+            getPrintHtml={() => {
+              const periodo = fechaBuscar || `últimos ${rango} días`;
+              const invSection = activeInvBase.length > 0 ? `
+                <div class="sec-title">Inventario Base</div>
+                ${pbTable(
+                  ["Producto", "Cantidad"],
+                  activeInvBase.map((p) => [p.nombre, p.cantidad]),
+                  totalInvRD != null
+                    ? ["TOTAL", `RD$${totalInvRD.toLocaleString("es-DO")} · ${totalInvPts?.toLocaleString() ?? "—"} pts`]
+                    : undefined,
+                )}` : "";
+              const statsSection = `
+                <div class="sec-title">Estadísticas — ${periodo}</div>
+                ${pbTable(
+                  ["Concepto", "Valor"],
+                  [
+                    ["Unidades cargadas",   totalCargado],
+                    ["Unidades entregadas", totalEntregado],
+                    ["Diferencia",          diferencia],
+                    ...(totalMonto > 0          ? [["Monto RD$",        `RD$${totalMonto.toLocaleString("es-DO")}`]] : []),
+                    ...(totalPuntosRecientes > 0 ? [["Puntos del período", totalPuntosRecientes.toLocaleString()]]  : []),
+                  ],
+                )}`;
+              const prodsSection = Object.keys(porProducto).length > 0 ? `
+                <div class="sec-title">Detalle por Producto</div>
+                ${pbTable(
+                  ["Producto", "Cargado", "Entregado", "Diferencia", "Monto RD$"],
+                  Object.entries(porProducto).map(([prod, d]) => [
+                    prod, d.cargado, d.entregado, d.cargado - d.entregado,
+                    d.monto > 0 ? `RD$${d.monto.toLocaleString("es-DO")}` : "—",
+                  ]),
+                )}` : "";
+              return pbPrintDoc(
+                `CHOFER: ${chofer.nombre}`,
+                `Ficha: ${chofer.ficha ?? "—"} · Período: ${periodo}`,
+                invSection + statsSection + prodsSection,
+              );
+            }}
+          />
         </div>
       </div>
 

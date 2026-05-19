@@ -5,6 +5,7 @@ import { collection, query, limit, onSnapshot, doc, getDoc, setDoc } from "fireb
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { db } from "@/lib/firebase";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 
 type ServiceStatus = "ok" | "warning" | "error" | "unknown" | "verificando";
 
@@ -286,12 +287,27 @@ export default function StatusDashboard() {
               : "🔄"
             } Verificar ahora
           </button>
-          <ShareBar getMessage={() => {
-            const lines = [pbHeader(), `🖥️ *Estado del Sistema*`, ""];
-            services.forEach((s) => lines.push(`• ${s.icon} ${s.label}: ${SEM[s.check.status].label} — ${s.check.message}`));
-            lines.push("", pbFooter());
-            return lines.join("\n");
-          }} />
+          <ShareBar
+            getMessage={() => {
+              const lines = [pbHeader(), `🖥️ *Estado del Sistema*`, ""];
+              services.forEach((s) => lines.push(`• ${s.icon} ${s.label}: ${SEM[s.check.status].label} — ${s.check.message}`));
+              lines.push("", pbFooter());
+              return lines.join("\n");
+            }}
+            getPrintHtml={() => pbPrintDoc(
+              "ESTADO DEL SISTEMA",
+              "",
+              pbTable(
+                ["Servicio", "Estado", "Mensaje", "Tiempo (ms)"],
+                services.map((s) => [
+                  `${s.icon} ${s.label}`,
+                  SEM[s.check.status].label,
+                  s.check.message,
+                  s.check.ms ?? "—",
+                ]),
+              ),
+            )}
+          />
           <button
             onClick={() => { setOwnerChangePw(!ownerChangePw); setOwnerPwd(""); setOwnerPwdNew(""); setOwnerPwdNew2(""); }}
             className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 active:scale-95 text-purple-700 rounded-lg text-xs font-medium transition"

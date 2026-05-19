@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ProductoItem, PuntoProducto } from "@/lib/types";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, openPrint, pbTable } from "@/lib/print-template";
 import {
   ImageUploader, ProductTable, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
@@ -163,6 +164,16 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
     if (observaciones) lines.push(`\n📝 ${observaciones}`);
     lines.push("", pbFooter());
     return lines.join("\n");
+  };
+
+  const getPrintHtml = () => {
+    const rows = productos.map((p) => [p.nombre, p.cajas ?? 0, p.cantidad ?? 0]);
+    const body = pbTable(
+      ["Producto", "Cajas", "Unidades"],
+      rows,
+      ["TOTAL", totalCajas, totalUnid],
+    ) + (observaciones ? `<div class="obs-box">📝 ${observaciones}</div>` : "");
+    return pbPrintDoc("CUARTO FRÍO", `Despachador: ${despNombre}`, body);
   };
 
   const resetMode = (m: "foto" | "manual") => {
@@ -382,7 +393,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
           </button>
 
           {productos.length > 0 && (
-            <WhatsAppPrint getMessage={getWhatsAppMsg} />
+            <WhatsAppPrint getMessage={getWhatsAppMsg} getPrintHtml={getPrintHtml} />
           )}
         </div>
       </div>

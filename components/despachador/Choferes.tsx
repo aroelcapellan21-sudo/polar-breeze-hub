@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ProductoItem, UserProfile, FsDriver, FsSession, MovimientoLoker, PrecioProducto, toProductoId } from "@/lib/types";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 import {
   ImageUploader, ProductTable, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
@@ -385,6 +386,27 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     return lines.join("\n");
   };
 
+  const getPrintHtml = () => {
+    if (!sel) return "";
+    const totalMonto = productos.reduce((s, p) => s + ((p.precio ?? 0) * (p.cantidad ?? 0)), 0);
+    const rows = productos.map((p) => {
+      const estado = p.visto === "ok" ? "✓ OK" : p.visto === "mal" ? "✗ Mal" : "—";
+      const precio = p.precio != null ? `RD$${p.precio}` : "—";
+      return [p.nombre, p.cantidad ?? 0, p.unidad ?? "", precio, estado];
+    });
+    const table = pbTable(
+      ["Producto", "Cant.", "Unidad", "Precio u.", "Estado"],
+      rows,
+      ["TOTAL", totalUnid, "", totalMonto > 0 ? `RD$${totalMonto.toLocaleString("es-DO")}` : "—", ""],
+    );
+    const body = table + (observaciones ? `<div class="obs-box">📝 ${observaciones}</div>` : "");
+    return pbPrintDoc(
+      `ENTREGA — ${sel.nombre}`,
+      `Ficha: ${sel.ficha ?? "—"} · Despachador: ${despNombre}`,
+      body,
+    );
+  };
+
   // Confrontar: cuarto frío vs suma de entregas por producto
   const cuartoFrio: ProductoItem[] = Array.isArray(session?.cuartoFrio)
     ? (session!.cuartoFrio as ProductoItem[])
@@ -662,7 +684,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
           </button>
 
           {productos.length > 0 && sel && (
-            <WhatsAppPrint getMessage={getWhatsAppMsg} />
+            <WhatsAppPrint getMessage={getWhatsAppMsg} getPrintHtml={getPrintHtml} />
           )}
         </div>
       </div>

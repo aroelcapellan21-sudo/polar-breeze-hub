@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { collection, query, orderBy, onSnapshot, Timestamp, where, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toDate } from "@/lib/types";
+import { pbPrintDoc, openPrint, pbTable } from "@/lib/print-template";
 
 // ─── Types (reflejo de lo que guarda InformeCierre) ───────────────────────────
 
@@ -94,103 +95,70 @@ export default function InformesHistorial() {
 
   // ── Imprimir un informe ───────────────────────────────────────────────────
   const handlePrint = (inf: InformeCierre) => {
-    const fecha = toDate(inf.cerradoAt).toLocaleDateString("es-MX", {
+    const fechaDoc = toDate(inf.cerradoAt).toLocaleDateString("es-DO", {
       weekday: "long", day: "numeric", month: "long", year: "numeric",
     });
-    const emp = empresa;
 
-    const choferRows = inf.choferes.map((c) => `
-      <h3 style="margin:12px 0 6px;background:#e8f0fe;padding:4px 8px;border-radius:4px">
-        🚛 ${c.nombre}${c.ficha ? ` — Ficha ${c.ficha}` : ""}
-      </h3>
-      <p style="font-weight:600;margin:8px 0 4px">Productos Retirados:</p>
-      <table>
-        <thead><tr><th>Producto</th><th>Cant.</th><th>Unidad</th></tr></thead>
-        <tbody>
-          ${c.retirados.map((p) => `<tr><td>${p.nombre}</td><td>${p.cantidad ?? 0}</td><td>${p.unidad ?? ""}</td></tr>`).join("")}
-        </tbody>
-      </table>
-      ${c.agregado1.length > 0 ? `
-        <p style="font-weight:600;margin:8px 0 4px">Agregado 1 (con puntos):</p>
-        <table>
-          <thead><tr><th>Producto</th><th>Cant.</th></tr></thead>
-          <tbody>${c.agregado1.map((p) => `<tr><td>${p.nombre}</td><td>${p.cantidad}</td></tr>`).join("")}</tbody>
-        </table>` : ""}
-      ${c.agregado0.length > 0 ? `
-        <p style="font-weight:600;margin:8px 0 4px">Agregado 0 (informativo):</p>
-        <table>
-          <thead><tr><th>Producto</th><th>Cant.</th></tr></thead>
-          <tbody>${c.agregado0.map((p) => `<tr><td>${p.nombre}</td><td>${p.cantidad}</td></tr>`).join("")}</tbody>
-        </table>` : ""}
-      ${c.faltantes.length > 0 ? `
-        <p style="font-weight:600;margin:8px 0 4px;color:#c0392b">Faltantes (Agr. 1):</p>
-        <table>
-          <thead><tr><th>Producto</th><th>Cant.</th></tr></thead>
-          <tbody>${c.faltantes.map((p) => `<tr><td>${p.nombre}</td><td>${p.cantidad}</td></tr>`).join("")}</tbody>
-        </table>` : ""}
-    `).join("");
+    const choferSections = inf.choferes.map((c) => {
+      const retiradosTable = pbTable(
+        ["Producto", "Cant.", "Unidad"],
+        c.retirados.map((p) => [p.nombre, p.cantidad ?? 0, p.unidad ?? ""]),
+      );
+      const agr1 = c.agregado1.length > 0
+        ? `<div class="sec-title" style="font-size:10px;margin:10px 0 5px">Agregado 1 (con puntos)</div>
+           ${pbTable(["Producto", "Cant."], c.agregado1.map((p) => [p.nombre, p.cantidad]))}`
+        : "";
+      const agr0 = c.agregado0.length > 0
+        ? `<div class="sec-title" style="font-size:10px;margin:10px 0 5px">Agregado 0 (informativo)</div>
+           ${pbTable(["Producto", "Cant."], c.agregado0.map((p) => [p.nombre, p.cantidad]))}`
+        : "";
+      const falt = c.faltantes.length > 0
+        ? `<div class="sec-title" style="font-size:10px;margin:10px 0 5px;background:#c0392b">Faltantes del chofer</div>
+           ${pbTable(["Producto", "Cant."], c.faltantes.map((p) => [p.nombre, p.cantidad]))}`
+        : "";
+      return `<div class="sec-title">🚛 ${c.nombre}${c.ficha ? ` — Ficha ${c.ficha}` : ""}</div>
+              <p style="font-weight:700;font-size:10px;margin:8px 0 4px">Productos Retirados:</p>
+              ${retiradosTable}${agr1}${agr0}${falt}`;
+    }).join("");
 
-    const html = `<!DOCTYPE html>
-    <html><head><title>Informe de Cierre — ${emp?.nombre ?? "Polar Breeze"}</title>
-    <style>
-      body  { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #222; }
-      .co   { border-bottom: 2px solid #374151; padding-bottom: 10px; margin-bottom: 14px; }
-      .co-n { font-size: 17px; font-weight: bold; margin: 0 0 3px; }
-      .co-i { font-size: 9.5px; color: #6b7280; margin: 0; }
-      h1    { font-size: 14px; margin: 0 0 4px; }
-      h2    { font-size: 13px; background: #374151; color: white; padding: 5px 8px;
-              margin: 16px 0 8px; border-radius: 3px; }
-      h3    { font-size: 12px; }
-      table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-      th, td { border: 1px solid #d1d5db; padding: 5px 7px; text-align: left; }
-      th    { background: #f3f4f6; font-weight: 600; }
-      tr:nth-child(even) { background: #f9fafb; }
-      .meta { color: #6b7280; font-size: 10px; margin-bottom: 16px; }
-      .obs  { border: 1px solid #d1d5db; border-radius: 4px; padding: 8px;
-              background: #f9fafb; font-style: italic; margin-top: 12px; }
-    </style></head><body>
-      <div class="co">
-        <p class="co-n">${emp?.nombre ?? "Polar Breeze E.I.R.L."}</p>
-        <p class="co-i">RNC: ${emp?.rnc ?? ""} &nbsp;·&nbsp; ${emp?.direccion ?? ""} &nbsp;·&nbsp; Tel: ${emp?.telefono ?? ""}</p>
-      </div>
-      <h1>📋 INFORME DE CIERRE DEL DÍA</h1>
-      <p class="meta">${fecha} — Despachador: ${inf.despachadorNombre}</p>
+    const body = `
+      <p style="font-size:10px;color:#555;margin-bottom:14px">Fecha: ${fechaDoc} — Despachador: ${inf.despachadorNombre}</p>
 
-      <h2>1. Productos Faltantes del Despacho</h2>
-      ${inf.faltantesDespacho.length === 0
-        ? "<p>Sin faltantes.</p>"
-        : `<table><thead><tr><th>Producto</th><th>Cant. Faltante</th><th>Chofer Afectado</th></tr></thead>
-           <tbody>${inf.faltantesDespacho.map((r) => `<tr><td>${r.producto}</td><td>${r.cantFaltante}</td><td>${r.choferAfectado}</td></tr>`).join("")}</tbody></table>`}
+      <div class="sec-title">1. Productos Faltantes del Despacho</div>
+      ${inf.faltantesDespacho.length === 0 ? "<p>Sin faltantes.</p>"
+        : pbTable(
+            ["Producto", "Cant. Faltante", "Chofer Afectado"],
+            inf.faltantesDespacho.map((r) => [r.producto, r.cantFaltante, r.choferAfectado]),
+          )}
 
-      <h2>2. Productos Dañados No Recibidos</h2>
-      ${inf.danadosNoRecibidos.length === 0
-        ? "<p>Sin dañados.</p>"
-        : `<table><thead><tr><th>Producto</th><th>Cant.</th><th>Chofer</th><th>Motivo</th></tr></thead>
-           <tbody>${inf.danadosNoRecibidos.map((r) => `<tr><td>${r.producto}</td><td>${r.cantidad}</td><td>${r.choferRechazo}</td><td>${r.motivo || "—"}</td></tr>`).join("")}</tbody></table>`}
+      <div class="sec-title">2. Productos Dañados No Recibidos</div>
+      ${inf.danadosNoRecibidos.length === 0 ? "<p>Sin dañados.</p>"
+        : pbTable(
+            ["Producto", "Cant.", "Chofer", "Motivo"],
+            inf.danadosNoRecibidos.map((r) => [r.producto, r.cantidad, r.choferRechazo, r.motivo || "—"]),
+          )}
 
-      <h2>3. Sobrantes del Despacho</h2>
-      ${inf.sobrantesDespacho.length === 0
-        ? "<p>Sin sobrantes.</p>"
-        : `<table><thead><tr><th>Producto</th><th>Sobrante</th><th>Fuente</th></tr></thead>
-           <tbody>${inf.sobrantesDespacho.map((r) => `<tr><td>${r.producto}</td><td>+${r.cantidad}</td><td>${r.fuente}</td></tr>`).join("")}</tbody></table>`}
+      <div class="sec-title">3. Sobrantes del Despacho</div>
+      ${inf.sobrantesDespacho.length === 0 ? "<p>Sin sobrantes.</p>"
+        : pbTable(
+            ["Producto", "Sobrante", "Fuente"],
+            inf.sobrantesDespacho.map((r) => [r.producto, `+${r.cantidad}`, r.fuente]),
+          )}
 
-      <h2>4. Cuarto Frío No Entregado a Despacho</h2>
-      ${inf.cfNoEntregados.length === 0
-        ? "<p>Sin registros.</p>"
-        : `<table><thead><tr><th>Producto</th><th>Cant.</th><th>Persona</th><th>Motivo</th></tr></thead>
-           <tbody>${inf.cfNoEntregados.map((r) => `<tr><td>${r.producto}</td><td>${r.cantidad}</td><td>${r.persona || "—"}</td><td>${r.motivo || "—"}</td></tr>`).join("")}</tbody></table>`}
+      <div class="sec-title">4. Cuarto Frío No Entregado a Despacho</div>
+      ${inf.cfNoEntregados.length === 0 ? "<p>Sin registros.</p>"
+        : pbTable(
+            ["Producto", "Cant.", "Persona", "Motivo"],
+            inf.cfNoEntregados.map((r) => [r.producto, r.cantidad, r.persona || "—", r.motivo || "—"]),
+          )}
 
-      <h2>5. Facturas por Chofer</h2>
-      ${choferRows || "<p>Sin choferes con entregas.</p>"}
+      <div class="sec-title">5. Facturas por Chofer</div>
+      ${choferSections || "<p>Sin choferes con entregas.</p>"}
 
-      ${inf.observacionesGenerales ? `<div class="obs">📝 ${inf.observacionesGenerales}</div>` : ""}
-    </body></html>`;
+      ${inf.observacionesGenerales ? `<div class="obs-box">📝 ${inf.observacionesGenerales}</div>` : ""}
+    `;
 
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-    win.onload = () => win.print();
+    openPrint(pbPrintDoc("INFORME DE CIERRE DEL DÍA", "", body));
   };
 
   // ── Render ────────────────────────────────────────────────────────────────

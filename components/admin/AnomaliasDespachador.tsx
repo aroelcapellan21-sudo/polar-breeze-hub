@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { UserProfile, toDate } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, openPrint, pbTable } from "@/lib/print-template";
 
 interface AnomaliaDespacho {
   id: string;
@@ -121,6 +122,29 @@ export default function AnomaliasDespachador({ mode, registradorNombre }: Props)
     });
     lines.push("", pbFooter());
     return lines.join("\n");
+  };
+
+  const getPrintHtml = () => {
+    const cols = mode === "admin"
+      ? ["Fecha", "Producto", "Cant.", "Costo/u", "Total RD$", "Chofer afectado", "Registrado por", "Notas"]
+      : ["Fecha", "Producto", "Cant.", "Costo/u", "Total RD$", "Chofer afectado", "Notas"];
+    const rows = filtradas.map((a) => {
+      const base = [
+        a.fecha, a.producto, a.cantidad,
+        `RD$${a.costoUnitario}`,
+        a.total > 0 ? `RD$${a.total.toLocaleString("es-DO")}` : "—",
+        a.receptorNombre,
+      ];
+      if (mode === "admin") base.push(a.registradoPorNombre ?? "—");
+      base.push(a.notas || "—");
+      return base;
+    });
+    const totalRow = ["TOTAL", "", filtradas.reduce((s, a) => s + a.cantidad, 0),
+      "", `RD$${totalRD.toLocaleString("es-DO")}`, "", ...(mode === "admin" ? [""] : []), ""];
+    const body = rows.length
+      ? pbTable(cols, rows, totalRow)
+      : "<p>Sin anomalías registradas.</p>";
+    return pbPrintDoc("ANOMALÍAS DE DESPACHO", `${filtradas.length} registros`, body);
   };
 
   const chofActivos = choferes.filter((c) => c.activo !== false);
@@ -266,15 +290,7 @@ export default function AnomaliasDespachador({ mode, registradorNombre }: Props)
           <p className="text-xs text-red-500 mt-0.5">Total en pérdidas</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-center sm:col-span-1 col-span-2">
-          <div className="flex items-center gap-3">
-            <ShareBar getMessage={getWhatsAppMsg} />
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-medium active:scale-95 transition-all duration-100"
-            >
-              🖨️ Imprimir
-            </button>
-          </div>
+          <ShareBar getMessage={getWhatsAppMsg} getPrintHtml={getPrintHtml} />
         </div>
       </div>
 

@@ -12,6 +12,7 @@ import { UserProfile, PuntosConfig, PuntoProducto } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import ProyeccionesChoferes from "@/components/admin/ProyeccionesChoferes";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 
 const API_KEY  = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
 const AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
@@ -327,7 +328,27 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
               </button>
             ))}
           </div>
-          <ShareBar getMessage={getWhatsAppMsg} />
+          <ShareBar
+            getMessage={getWhatsAppMsg}
+            getPrintHtml={() => {
+              const activos = choferes.filter((c) => c.activo !== false);
+              const bajas   = choferes.filter((c) => c.activo === false);
+              const body = `
+                <div class="sec-title">Choferes Activos (${activos.length})</div>
+                ${activos.length ? pbTable(
+                  ["Nombre", "Ficha", "Estado"],
+                  activos.map((c) => [c.nombre, c.ficha ?? "—", "Activo"]),
+                ) : "<p>Sin choferes activos.</p>"}
+                ${bajas.length ? `
+                <div class="sec-title">Choferes en Baja (${bajas.length})</div>
+                ${pbTable(
+                  ["Nombre", "Ficha", "Estado"],
+                  bajas.map((c) => [c.nombre, c.ficha ?? "—", "Baja"]),
+                )}` : ""}
+              `;
+              return pbPrintDoc("CHOFERES POLAR BREEZE", `Total: ${choferes.length} registros`, body);
+            }}
+          />
           </div>
         </div>
 

@@ -259,8 +259,14 @@ export function AiButton({
 }
 
 // ── WhatsAppPrint — delegado a ShareBar (número con memoria localStorage) ──────
-export function WhatsAppPrint({ getMessage }: { getMessage: () => string }) {
-  return <ShareBar getMessage={getMessage} className="mt-1" />;
+export function WhatsAppPrint({
+  getMessage,
+  getPrintHtml,
+}: {
+  getMessage: () => string;
+  getPrintHtml?: () => string;
+}) {
+  return <ShareBar getMessage={getMessage} getPrintHtml={getPrintHtml} className="mt-1" />;
 }
 
 // ── ProgressSteps — pasos con colores pastel ──────────────────────────────────

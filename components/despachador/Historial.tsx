@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { FsHistory, ProductoItem, toDate, fmtDate } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 
 const TIPO_CFG: Record<string, { icon: string; label: string; color: string }> = {
   cuarto_frio:    { icon: "🥶", label: "Cuarto Frío",   color: "bg-blue-50   text-blue-700   border-blue-200"   },
@@ -70,6 +71,22 @@ export default function Historial() {
     return lines.join("\n");
   };
 
+  const getPrintHtml = () => {
+    const filtroLabel = filtro === "todos" ? "Todos" : (TIPO_CFG[filtro]?.label ?? filtro);
+    const rows = filtrados.map((r) => {
+      const fecha = toDate(r.timestamp).toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric" });
+      const quien = r.choferNombre ?? r.despachadorNombre ?? "—";
+      const tipo  = TIPO_CFG[r.tipo ?? ""]?.label ?? r.tipo ?? "—";
+      const prods = (Array.isArray(r.productos) ? (r.productos as ProductoItem[]) : [])
+        .map((p) => `${p.nombre}×${p.cantidad}`).join(", ") || "—";
+      return [fecha, tipo, quien, prods];
+    });
+    const body = rows.length
+      ? pbTable(["Fecha", "Tipo", "Quién", "Productos"], rows)
+      : "<p>Sin registros.</p>";
+    return pbPrintDoc(`HISTORIAL — ${filtroLabel}`, `${filtrados.length} registros`, body);
+  };
+
   return (
     <div className="space-y-4">
       {/* Filtros */}
@@ -86,7 +103,7 @@ export default function Historial() {
             </FiltroBtn>
           );
         })}
-        <ShareBar getMessage={getWhatsAppMsg} className="ml-auto" />
+        <ShareBar getMessage={getWhatsAppMsg} getPrintHtml={getPrintHtml} className="ml-auto" />
       </div>
 
       {Object.keys(porDia).length === 0 ? (

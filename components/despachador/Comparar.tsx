@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { ProductoItem, FsSession, FsDriver, calcSemaforo, toDate } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 
 const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
 
@@ -123,6 +124,19 @@ export default function Comparar() {
     return lines.join("\n");
   };
 
+  const getPrintHtml = () => {
+    const rows = filas.map((f) => {
+      const icon = Math.abs(f.pct) < 5 ? "✓" : Math.abs(f.pct) < 15 ? "⚠" : "✗";
+      return [f.nombre, f.cuartoFrio, f.entregado, f.diferencia, `${f.pct.toFixed(1)}%`, icon];
+    });
+    const body = pbTable(
+      ["Producto", "Cuarto Frío", "Entregado", "Diferencia", "% Diff", "Estado"],
+      rows,
+      ["TOTAL", totalCF, totalEntr, totalDiff, "", ""],
+    );
+    return pbPrintDoc("COMPARATIVO DESPACHO", `C.Frío: ${totalCF} · Entregado: ${totalEntr} · Diferencia: ${totalDiff}`, body);
+  };
+
   return (
     <div className="space-y-4">
       {/* ── Resumen global ── */}
@@ -166,7 +180,7 @@ export default function Comparar() {
             <h3 className="font-bold text-gray-800">Cuarto Frío vs. Choferes</h3>
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-400">{filas.length} productos</span>
-              <ShareBar getMessage={getWhatsAppMsg} />
+              <ShareBar getMessage={getWhatsAppMsg} getPrintHtml={getPrintHtml} />
             </div>
           </div>
 
