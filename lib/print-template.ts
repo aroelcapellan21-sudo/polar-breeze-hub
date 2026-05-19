@@ -11,11 +11,12 @@ const CSS = `
 body  { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111;
         padding-bottom: 36px; }
 /* ── Encabezado ── */
-.pb-hdr       { display: flex; justify-content: space-between; align-items: flex-start;
+.pb-hdr       { position: relative; text-align: center;
                 border-bottom: 2.5px solid #1e3a5f; padding-bottom: 10px; margin-bottom: 14px; }
-.pb-logo      { font-size: 17px; font-weight: 900; color: #1e3a5f; letter-spacing: -0.3px; }
-.pb-info      { font-size: 9px; color: #555; margin-top: 3px; line-height: 1.6; }
-.pb-meta      { text-align: right; font-size: 9px; color: #555; line-height: 1.6; }
+.pb-logo      { font-size: 18px; font-weight: 900; color: #1e3a5f; letter-spacing: -0.3px; }
+.pb-info      { font-size: 9px; color: #555; margin-top: 3px; line-height: 1.7; }
+.pb-meta      { position: absolute; top: 0; right: 0;
+                text-align: right; font-size: 8.5px; color: #777; line-height: 1.6; }
 /* ── Título ── */
 .pb-title     { font-size: 14px; font-weight: 900; color: #1e3a5f; margin-bottom: 3px; }
 .pb-subtitle  { font-size: 10px; color: #555; margin-bottom: 14px; }
@@ -70,11 +71,12 @@ export function pbPrintDoc(
 <style>${CSS}</style>
 </head><body>
 <div class="pb-hdr">
-  <div>
-    <div class="pb-logo">${PB.nombre}</div>
-    <div class="pb-info">${PB.direccion}<br>Tel: ${PB.telefono} &nbsp;·&nbsp; RNC: ${PB.rnc}</div>
+  <div class="pb-meta">Impreso:<br>${fecha}<br>${hora}</div>
+  <div class="pb-logo">${PB.nombre}</div>
+  <div class="pb-info">
+    ${PB.direccion}<br>
+    Tel: ${PB.telefono} &nbsp;&nbsp;·&nbsp;&nbsp; RNC: ${PB.rnc}
   </div>
-  <div class="pb-meta">Impreso: ${fecha}<br>${hora}</div>
 </div>
 <div class="pb-title">${title}</div>
 ${subtitle ? `<div class="pb-subtitle">${subtitle}</div>` : ""}
