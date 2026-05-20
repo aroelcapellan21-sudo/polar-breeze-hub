@@ -99,14 +99,16 @@ export default function RegistroLote() {
 
       const loteData: Omit<LoteLoker, "id"> = {
         numero,
-        proveedor:        proveedor.trim() || undefined,
-        facturaNumero:    factNum.trim()   || undefined,
+        ...(proveedor.trim() ? { proveedor: proveedor.trim() } : {}),
+        ...(factNum.trim()   ? { facturaNumero: factNum.trim() } : {}),
         facturaEntregada: factOk,
-        productos:        items,
-        registradoPor:    nombre,
-        registradoPorId:  uid,
-        timestamp:        ts,
-        notas:            notas.trim() || undefined,
+        productos: items.map(({ costoUnitario, ...rest }) =>
+          costoUnitario != null ? { ...rest, costoUnitario } : rest
+        ),
+        registradoPor:   nombre,
+        registradoPorId: uid,
+        timestamp:       ts,
+        ...(notas.trim() ? { notas: notas.trim() } : {}),
       };
 
       const loteRef = await addDoc(collection(db, "lotes_loker"), loteData);
