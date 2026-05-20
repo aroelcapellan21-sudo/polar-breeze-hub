@@ -38,26 +38,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (devActiveRef.current) return;
-      if (firebaseUser) {
-        const snap = await getDoc(doc(db, "usuarios", firebaseUser.uid));
-        if (snap.exists()) {
-          const data = snap.data() as UserProfile;
-          // Bloquear choferes dados de baja
-          if (data.activo === false) {
-            await signOut(auth);
-            setUser(null);
-            setProfile(null);
-            setLoading(false);
-            return;
-          }
-          setProfile(data);
-        }
-        setUser(firebaseUser);
-      } else {
+
+      // En dev mode, limpiar cualquier sesión real cacheada y mostrar panel naranja
+      if (IS_DEV && firebaseUser) {
+        await signOut(auth).catch(() => {});
         setUser(null);
         setProfile(null);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+
+      try {
+        if (firebaseUser) {
+          const snap = await getDoc(doc(db, "usuarios", firebaseUser.uid));
+          if (snap.exists()) {
+            const data = snap.data() as UserProfile;
+            // Bloquear choferes dados de baja
+            if (data.activo === false) {
+              await signOut(auth);
+              setUser(null);
+              setProfile(null);
+              return;
+            }
+            setProfile(data);
+          }
+          setUser(firebaseUser);
+        } else {
+          setUser(null);
+          setProfile(null);
+        }
+      } catch {
+        setUser(null);
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
     });
     return unsub;
   }, []);
