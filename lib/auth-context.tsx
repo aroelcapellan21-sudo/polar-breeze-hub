@@ -6,7 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { UserProfile, UserRole } from "./types";
 
-const IS_DEV = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+const IS_DEV = process.env.NODE_ENV === "development";
 
 const DEV_PROFILES: Record<UserRole, UserProfile> = {
   admin:       { uid: "dev-admin",   email: "admin@dev.local",   role: "admin",       nombre: "Admin Dev",       createdAt: new Date(), activo: true },

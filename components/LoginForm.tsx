@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { UserRole } from "@/lib/types";
 
-const IS_DEV = process.env.NEXT_PUBLIC_DEV_MODE === "true";
+const IS_DEV = process.env.NODE_ENV === "development";
 
 const ROLES = [
   {
