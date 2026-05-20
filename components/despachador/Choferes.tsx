@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   collection, query, where, onSnapshot,
   doc, setDoc, addDoc, updateDoc, increment, Timestamp, getDoc, getDocs,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { ProductoItem, UserProfile, FsDriver, FsSession, MovimientoLoker, PrecioProducto, toProductoId } from "@/lib/types";
+import { ProductoItem, UserProfile, FsDriver, FsSession, MovimientoLoker, PrecioProducto, TalonarioDoc, toProductoId, toDate } from "@/lib/types";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
 import { ShareBar } from "@/components/shared/ShareButtons";
@@ -76,6 +76,10 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
   const [consigChofer, setConsigChofer] = useState<{ nombre: string; cantidad: number }[]>([]);
   const [consigAbierto, setConsigAbierto] = useState(true);
 
+  // Despachos del día
+  const [talonarioHoy,   setTalonarioHoy]   = useState<TalonarioDoc[]>([]);
+  const [despachosAb,    setDespachosAb]    = useState(true);
+
   // Confrontar modal
   const [showConfronta,  setShowConfronta]  = useState(false);
 
@@ -84,6 +88,10 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     | { type: "extra"; item: ExtraLoker }
     | null;
   const [chofModal, setChofModal] = useState<ChofModal>(null);
+
+  const todayStart = useMemo(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d;
+  }, []);
 
   useEffect(() => {
     const uChof = onSnapshot(
@@ -99,6 +107,18 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     const uSess = onSnapshot(doc(db, "session", "despacho"), (snap) => {
       setSession(snap.exists() ? (snap.data() as FsSession) : null);
     });
+    // Talonario de hoy — fuente para "Despachos del día"
+    const uTal = onSnapshot(
+      query(
+        collection(db, "talonario"),
+        where("timestamp", ">=", Timestamp.fromDate(todayStart))
+      ),
+      (s) => setTalonarioHoy(
+        s.docs
+          .map((d) => ({ id: d.id, ...d.data() } as TalonarioDoc))
+          .filter((t) => t.tipo === "retirada")
+      )
+    );
     // Cargar precios de venta desde config/precios
     getDoc(doc(db, "config", "precios")).then((snap) => {
       if (snap.exists()) {
@@ -107,8 +127,8 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
         if (lista.length > 0) setManualProdCh(lista[0].nombre);
       }
     });
-    return () => { uChof(); uDrv(); uSess(); };
-  }, []);
+    return () => { uChof(); uDrv(); uSess(); uTal(); };
+  }, [todayStart]);
 
   // Cargar movimientos del chofer seleccionado (extras hoy + consignación total)
   useEffect(() => {
@@ -381,6 +401,39 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
 
   const driverMap: Record<string, FsDriver> = {};
   drivers.forEach((d) => { if (d.id) driverMap[d.id] = d; });
+
+  // ── Despachos del día agrupados por chofer ────────────────────────────────────
+  const despachosHoy = useMemo(() => {
+    type DEntry = {
+      uid: string; choferNombre: string; choferFicha?: string;
+      prods: Map<string, { nombre: string; cantidad: number; monto: number }>;
+      totalUnidades: number; totalMonto: number;
+    };
+    const map = new Map<string, DEntry>();
+    talonarioHoy.forEach((t) => {
+      if (!map.has(t.choferId)) {
+        map.set(t.choferId, {
+          uid: t.choferId, choferNombre: t.choferNombre, choferFicha: t.choferFicha,
+          prods: new Map(), totalUnidades: 0, totalMonto: 0,
+        });
+      }
+      const e = map.get(t.choferId)!;
+      t.productos.forEach((p) => {
+        const cant  = p.cantidad ?? 0;
+        const monto = (p.precio ?? 0) * cant;
+        const prev  = e.prods.get(p.nombre) ?? { nombre: p.nombre, cantidad: 0, monto: 0 };
+        e.prods.set(p.nombre, { nombre: p.nombre, cantidad: prev.cantidad + cant, monto: prev.monto + monto });
+        e.totalUnidades += cant;
+        e.totalMonto    += monto;
+      });
+    });
+    return Array.from(map.values())
+      .map((e) => ({ ...e, prods: Array.from(e.prods.values()) }))
+      .sort((a, b) => a.choferNombre.localeCompare(b.choferNombre));
+  }, [talonarioHoy]);
+
+  const totalDiaUnidades = despachosHoy.reduce((s, d) => s + d.totalUnidades, 0);
+  const totalDiaMonto    = despachosHoy.reduce((s, d) => s + d.totalMonto, 0);
 
   const canAnalyze  = mode === "foto" ? !!imgData : texto.trim().length > 10;
   const totalUnid   = productos.reduce((s, p) => s + (p.cantidad ?? 0), 0);
@@ -826,6 +879,102 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
             <WhatsAppPrint getMessage={getWhatsAppMsg} getPrintHtml={getPrintHtml} />
           )}
         </div>
+      </div>
+
+      {/* ── Despachos del día ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden">
+        <button
+          onClick={() => setDespachosAb((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3
+            bg-gradient-to-r from-indigo-50 to-indigo-100 hover:from-indigo-100
+            hover:to-indigo-200 transition-colors duration-100"
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-bold text-indigo-800">📋 Despachos del día</span>
+            <span className="text-xs bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full font-bold">
+              {despachosHoy.length} {despachosHoy.length === 1 ? "chofer" : "choferes"}
+            </span>
+            {totalDiaUnidades > 0 && (
+              <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
+                {totalDiaUnidades} uds
+              </span>
+            )}
+            {totalDiaMonto > 0 && (
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                RD${totalDiaMonto.toLocaleString("es-DO")}
+              </span>
+            )}
+          </div>
+          <span className="text-indigo-500 text-sm flex-shrink-0 ml-2">
+            {despachosAb ? "▲" : "▼"}
+          </span>
+        </button>
+
+        {despachosAb && (
+          despachosHoy.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <p className="text-2xl mb-2">📦</p>
+              <p className="text-sm">Sin despachos registrados hoy</p>
+              <p className="text-xs mt-1 text-gray-300">Guarda una entrega para verla aquí</p>
+            </div>
+          ) : (
+            <div>
+              <div className="divide-y divide-gray-50">
+                {despachosHoy.map((d) => (
+                  <div key={d.uid} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center
+                          text-white text-xs font-bold flex-shrink-0">
+                          {d.choferNombre.charAt(0).toUpperCase()}
+                        </div>
+                        <p className="text-sm font-semibold text-gray-800 truncate">{d.choferNombre}</p>
+                        {d.choferFicha && (
+                          <span className="text-xs text-gray-400 flex-shrink-0">#{d.choferFicha}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                          {d.totalUnidades} uds
+                        </span>
+                        {d.totalMonto > 0 && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                            RD${d.totalMonto.toLocaleString("es-DO")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 ml-9">
+                      {d.prods.map((p, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 text-xs
+                          bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
+                          <span className="text-gray-700">{p.nombre}</span>
+                          <span className="font-bold text-indigo-600">×{p.cantidad}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Total general */}
+              <div className="px-4 py-3 bg-indigo-50 border-t border-indigo-100
+                flex items-center justify-between flex-wrap gap-2">
+                <span className="text-sm font-bold text-indigo-800">
+                  Total del día — {despachosHoy.length} {despachosHoy.length === 1 ? "chofer" : "choferes"}
+                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-indigo-700">{totalDiaUnidades} uds</span>
+                  {totalDiaMonto > 0 && (
+                    <span className="text-base font-bold text-green-700">
+                      RD${totalDiaMonto.toLocaleString("es-DO")}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        )}
       </div>
 
       {/* ── Consignación actual del chofer ── */}
