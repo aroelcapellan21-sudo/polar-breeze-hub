@@ -400,20 +400,27 @@ export default function Inventario() {
   function ncAgregarItem() {
     const cant = parseInt(ncCantidad) || 0;
     if (!ncNombre.trim() || cant <= 0) return;
-    const costo = parseFloat(ncCosto) || undefined;
+    const costo = parseFloat(ncCosto) || null;
     setNcItems((prev) => {
       const pid = toProductoId(ncNombre.trim());
       const idx = prev.findIndex((i) => i.producto_id === pid);
       if (idx >= 0) {
-        return prev.map((it, i) => i === idx
-          ? { ...it, cantidad: it.cantidad + cant, costoUnitario: costo ?? it.costoUnitario,
-              subtotal: (costo ?? it.costoUnitario ?? 0) * (it.cantidad + cant) }
-          : it
-        );
+        return prev.map((it, i) => {
+          if (i !== idx) return it;
+          const newCost = costo ?? it.costoUnitario ?? null;
+          return {
+            ...it,
+            cantidad: it.cantidad + cant,
+            ...(newCost != null ? {
+              costoUnitario: newCost,
+              subtotal: newCost * (it.cantidad + cant),
+            } : {}),
+          };
+        });
       }
       return [...prev, {
         nombre: ncNombre.trim(), producto_id: pid, cantidad: cant,
-        costoUnitario: costo, subtotal: costo != null ? costo * cant : undefined,
+        ...(costo != null ? { costoUnitario: costo, subtotal: costo * cant } : {}),
       }];
     });
     setNcNombre(""); setNcCantidad(""); setNcCosto("");
@@ -433,21 +440,28 @@ export default function Inventario() {
       const totalMon  = ncItems.reduce((s, i) => s + (i.subtotal ?? 0), 0);
       const loteRef   = lotes.find((l) => l.id === ncLoteId);
 
+      const factNum  = ncFactura.trim()   || loteRef?.facturaNumero;
+      const provName = ncProveedor.trim() || loteRef?.proveedor;
+
       const nc: Omit<NotaCredito, "id"> = {
         numero,
-        loteId:      ncLoteId   || undefined,
-        loteNumero:  loteRef?.numero ?? undefined,
-        facturaNumero: ncFactura.trim()   || loteRef?.facturaNumero || undefined,
-        proveedor:   ncProveedor.trim() || loteRef?.proveedor     || undefined,
-        motivo:      ncMotivo.trim(),
-        productos:   ncItems,
-        totalUnidades: totalUnid,
-        totalMonto:  totalMon > 0 ? totalMon : undefined,
+        ...(ncLoteId   ? { loteId:        ncLoteId } : {}),
+        ...(loteRef?.numero ? { loteNumero: loteRef.numero } : {}),
+        ...(factNum    ? { facturaNumero: factNum }  : {}),
+        ...(provName   ? { proveedor:     provName } : {}),
+        motivo:          ncMotivo.trim(),
+        productos:       ncItems.map(({ costoUnitario, subtotal, ...rest }) => ({
+          ...rest,
+          ...(costoUnitario != null ? { costoUnitario } : {}),
+          ...(subtotal       != null ? { subtotal }      : {}),
+        })),
+        totalUnidades:   totalUnid,
+        ...(totalMon > 0 ? { totalMonto: totalMon } : {}),
         registradoPor:   profile?.nombre ?? "Admin",
         registradoPorId: profile?.uid    ?? "",
-        timestamp:   Timestamp.now(),
-        notas:       ncNotas.trim() || undefined,
-        estado:      "pendiente",
+        timestamp:       Timestamp.now(),
+        ...(ncNotas.trim() ? { notas: ncNotas.trim() } : {}),
+        estado:          "pendiente",
       };
       await addDoc(collection(db, "notas_credito"), nc);
       setNcItems([]); setNcLoteId(""); setNcProveedor(""); setNcFactura(""); setNcNotas("");
@@ -479,7 +493,7 @@ export default function Inventario() {
       cantidad:    sign * qty,
       responsable: profile?.nombre ?? "—",
       timestamp:   Timestamp.now(),
-      notas:       notas.trim() || undefined,
+      ...(notas.trim() ? { notas: notas.trim() } : {}),
     };
     try {
       await addDoc(collection(db, "movimientos_loker"), mov);

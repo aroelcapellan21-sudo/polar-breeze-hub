@@ -62,7 +62,7 @@ export default function RegistroLote() {
       return;
     }
     setMsg(null);
-    const costo = parseFloat(costoStr) || undefined;
+    const costo = parseFloat(costoStr) || null;
     const pid   = toProductoId(selProd);
     const total = cajas + unids;
     setItems(prev => {
@@ -74,7 +74,8 @@ export default function RegistroLote() {
           : it
         );
       }
-      return [...prev, { nombre: selProd, producto_id: pid, cajas, unidades: unids, total, costoUnitario: costo }];
+      return [...prev, { nombre: selProd, producto_id: pid, cajas, unidades: unids, total,
+        ...(costo != null ? { costoUnitario: costo } : {}) }];
     });
     setCajasStr(""); setUnidsStr(""); setCostoStr("");
   }
