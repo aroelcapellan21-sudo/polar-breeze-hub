@@ -59,6 +59,10 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
   const [stockAlerta,   setStockAlerta]   = useState<{ nombre: string; necesita: number; disponible: number }[] | null>(null);
   const [precios,       setPrecios]       = useState<PrecioProducto[]>([]);
 
+  // ─── Modo manual: entrada por catálogo ───────────────────────────────────────
+  const [manualProdCh,  setManualProdCh]  = useState("");
+  const [manualCantCh,  setManualCantCh]  = useState(1);
+
   // ─── Extras por factura ──────────────────────────────────────────────────────
   const [extrasHoy,    setExtrasHoy]    = useState<ExtraLoker[]>([]);
   const [retiroForm,   setRetiroForm]   = useState({ nombre: "", cantidad: 1, nota: "" });
@@ -98,7 +102,9 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     // Cargar precios de venta desde config/precios
     getDoc(doc(db, "config", "precios")).then((snap) => {
       if (snap.exists()) {
-        setPrecios((snap.data().productos as PrecioProducto[]) ?? []);
+        const lista = (snap.data().productos as PrecioProducto[]) ?? [];
+        setPrecios(lista);
+        if (lista.length > 0) setManualProdCh(lista[0].nombre);
       }
     });
     return () => { uChof(); uDrv(); uSess(); };
@@ -168,6 +174,22 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     setRetiroForm({ nombre: "", cantidad: 1, nota: "" });
     setAgr1Form({ nombre: "", cantidad: 1, nota: "" });
     setAgr0Form({ nombre: "", cantidad: 1, nota: "" });
+    setManualCantCh(1);
+  };
+
+  const addManualCh = () => {
+    if (!manualProdCh || manualCantCh <= 0) return;
+    const precio = precios.find((p) => p.nombre === manualProdCh)?.precio ?? null;
+    setProductos((prev) => {
+      const idx = prev.findIndex((p) => p.nombre === manualProdCh);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], cantidad: (next[idx].cantidad ?? 0) + manualCantCh };
+        return next;
+      }
+      return [...prev, { nombre: manualProdCh, cantidad: manualCantCh, unidad: "pz", precio }];
+    });
+    setManualCantCh(1);
   };
 
   const selectChofer = (c: UserProfile) => {
@@ -615,16 +637,74 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                   onClear={() => { setPreview(null); setImgData(null); }}
                 />
               ) : (
-                <textarea
-                  value={texto}
-                  onChange={(e) => setTexto(e.target.value)}
-                  placeholder={"Pega o escribe la factura / lista.\nEjemplo:\n- Leche 12 cajas $120\n- Queso 6 piezas"}
-                  className="w-full h-44 px-3 py-2 border border-gray-300 rounded-lg text-sm
-                    text-gray-800 focus:ring-2 focus:ring-blue-400 outline-none resize-none"
-                />
+                /* ── Modo manual: catálogo de productos ── */
+                precios.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400 text-sm">
+                    <p className="text-2xl mb-2">📋</p>
+                    <p>Sin catálogo de precios configurado.</p>
+                    <p className="text-xs mt-1">El Admin debe cargar precios en<br/>Gestión → Precios.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Producto</label>
+                      <select
+                        value={manualProdCh}
+                        onChange={(e) => setManualProdCh(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm
+                          text-gray-800 outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                      >
+                        {precios.map((p) => {
+                          const yaAgregado = productos.some((pr) => pr.nombre === p.nombre);
+                          return (
+                            <option key={p.producto_id} value={p.nombre}>
+                              {yaAgregado ? `✓ ${p.nombre}` : p.nombre}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    {/* Precio auto-fill */}
+                    {(() => {
+                      const p = precios.find((pr) => pr.nombre === manualProdCh);
+                      return p ? (
+                        <div className="flex items-center justify-between bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+                          <span className="text-xs text-green-700 font-medium">💰 Precio unitario</span>
+                          <span className="text-sm font-bold text-green-700">
+                            RD${p.precio.toLocaleString("es-DO")}
+                          </span>
+                        </div>
+                      ) : null;
+                    })()}
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
+                      <input
+                        type="number" min={1}
+                        value={manualCantCh || ""}
+                        onChange={(e) => setManualCantCh(Math.max(1, Number(e.target.value)))}
+                        placeholder="0"
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm
+                          text-gray-800 outline-none focus:ring-2 focus:ring-blue-400 text-center"
+                      />
+                    </div>
+
+                    <button
+                      onClick={addManualCh}
+                      disabled={!manualProdCh || manualCantCh <= 0}
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white
+                        rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-50"
+                    >
+                      + Agregar a lista
+                    </button>
+                  </div>
+                )
               )}
 
-              <AiButton onClick={analizar} loading={analizando} disabled={!canAnalyze} label="Leer factura con IA" />
+              {mode === "foto" && (
+                <AiButton onClick={analizar} loading={analizando} disabled={!canAnalyze} label="Leer factura con IA" />
+              )}
 
               {msg && (
                 <div className={`text-sm px-3 py-2 rounded-lg ${
@@ -825,13 +905,26 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
               )}
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Producto"
-                    value={retiroForm.nombre}
-                    onChange={(e) => setRetiroForm((f) => ({ ...f, nombre: e.target.value }))}
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-300"
-                  />
+                  {precios.length > 0 ? (
+                    <select
+                      value={retiroForm.nombre}
+                      onChange={(e) => setRetiroForm((f) => ({ ...f, nombre: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-300 bg-white"
+                    >
+                      <option value="">Elegir producto…</option>
+                      {precios.map((p) => (
+                        <option key={p.producto_id} value={p.nombre}>{p.nombre}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Producto"
+                      value={retiroForm.nombre}
+                      onChange={(e) => setRetiroForm((f) => ({ ...f, nombre: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-300"
+                    />
+                  )}
                   <input
                     type="number" min={1}
                     placeholder="Cant."
@@ -885,13 +978,26 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
               )}
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Producto"
-                    value={agr1Form.nombre}
-                    onChange={(e) => setAgr1Form((f) => ({ ...f, nombre: e.target.value }))}
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-300"
-                  />
+                  {precios.length > 0 ? (
+                    <select
+                      value={agr1Form.nombre}
+                      onChange={(e) => setAgr1Form((f) => ({ ...f, nombre: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-300 bg-white"
+                    >
+                      <option value="">Elegir producto…</option>
+                      {precios.map((p) => (
+                        <option key={p.producto_id} value={p.nombre}>{p.nombre}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Producto"
+                      value={agr1Form.nombre}
+                      onChange={(e) => setAgr1Form((f) => ({ ...f, nombre: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-300"
+                    />
+                  )}
                   <input
                     type="number" min={1}
                     placeholder="Cant."
@@ -946,13 +1052,26 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
               )}
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Producto"
-                    value={agr0Form.nombre}
-                    onChange={(e) => setAgr0Form((f) => ({ ...f, nombre: e.target.value }))}
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-slate-300"
-                  />
+                  {precios.length > 0 ? (
+                    <select
+                      value={agr0Form.nombre}
+                      onChange={(e) => setAgr0Form((f) => ({ ...f, nombre: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-slate-300 bg-white"
+                    >
+                      <option value="">Elegir producto…</option>
+                      {precios.map((p) => (
+                        <option key={p.producto_id} value={p.nombre}>{p.nombre}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Producto"
+                      value={agr0Form.nombre}
+                      onChange={(e) => setAgr0Form((f) => ({ ...f, nombre: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-slate-300"
+                    />
+                  )}
                   <input
                     type="number" min={1}
                     placeholder="Cant."

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { doc, setDoc, addDoc, collection, Timestamp, getDoc } from "firebase/firestore";
+import { doc, setDoc, addDoc, collection, Timestamp, getDoc, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ProductoItem, PuntoProducto, toProductoId } from "@/lib/types";
@@ -14,6 +14,17 @@ import {
 
 interface Props {
   despachadorActivo?: string;
+}
+
+interface HistorialCFEntry {
+  id: string;
+  timestamp: { seconds: number } | Date;
+  despachadorNombre: string;
+  productos: ProductoItem[];
+  totalUnidades: number;
+  totalCajas?: number | null;
+  observaciones?: string | null;
+  estados?: Record<string, { estado: "pendiente" | "recibido" | "no_recibido"; motivo: string }>;
 }
 
 const STEPS_FOTO   = [{ label: "Foto" }, { label: "Analizar IA" }, { label: "Revisar" }, { label: "Guardar" }];
@@ -42,6 +53,28 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
   const [estados,       setEstados]       = useState<Record<string, EstadoRecepcion>>({});
   const [motivoAbierto, setMotivoAbierto] = useState<string | null>(null);
   const [motivoTemp,    setMotivoTemp]    = useState("");
+
+  const [historial,   setHistorial]   = useState<HistorialCFEntry[]>([]);
+  const [histAbierto, setHistAbierto] = useState(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, "history"), where("tipo", "==", "cuarto_frio")),
+      (snap) => {
+        setHistorial(
+          snap.docs
+            .map((d) => ({ id: d.id, ...d.data() } as HistorialCFEntry))
+            .sort((a, b) => {
+              const ta = a.timestamp && "seconds" in a.timestamp ? a.timestamp.seconds : 0;
+              const tb = b.timestamp && "seconds" in b.timestamp ? b.timestamp.seconds : 0;
+              return tb - ta;
+            })
+            .slice(0, 15)
+        );
+      }
+    );
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     getDoc(doc(db, "config", "puntos")).then((snap) => {
@@ -146,6 +179,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
         despachadorId:     profile.uid,
         despachadorNombre: despNombre,
         timestamp:         ts,
+        ...(mode === "manual" && Object.keys(estados).length > 0 ? { estados } : {}),
       });
 
       // Movimientos al loker — solo en modo manual con estados confirmados
@@ -163,7 +197,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
               cantidad,
               responsable: despNombre,
               timestamp:   ts,
-              notas:       "Cuarto frío — recibido ✅",
+              notas:       "Cuarto frío — despachado ✅",
             });
           } else if (est.estado === "no_recibido") {
             await addDoc(collection(db, "movimientos_loker"), {
@@ -421,7 +455,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                         {/* ✅ Recibido */}
                         <button
                           onClick={() => marcarRecibido(p.nombre)}
-                          title="Marcar como recibido"
+                          title="Marcar como despachado"
                           className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm transition-all active:scale-95 ${
                             est.estado === "recibido"
                               ? "bg-green-500 text-white shadow-sm"
@@ -527,6 +561,86 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
             <WhatsAppPrint getMessage={getWhatsAppMsg} getPrintHtml={getPrintHtml} />
           )}
         </div>
+      </div>
+
+      {/* ── Historial de cuarto frío ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <button
+          onClick={() => setHistAbierto((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors duration-100"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-gray-700">📋 Historial de cuarto frío</span>
+            {historial.length > 0 && (
+              <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">
+                {historial.length}
+              </span>
+            )}
+          </div>
+          <span className="text-gray-400 text-sm">{histAbierto ? "▲" : "▼"}</span>
+        </button>
+
+        {histAbierto && (
+          <div className="divide-y divide-gray-50 max-h-[520px] overflow-y-auto">
+            {historial.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">Sin registros previos</p>
+            ) : historial.map((h) => {
+              const ts = h.timestamp && "seconds" in h.timestamp
+                ? new Date((h.timestamp as { seconds: number }).seconds * 1000)
+                : h.timestamp instanceof Date ? h.timestamp : new Date(0);
+              return (
+                <div key={h.id} className="px-4 py-3">
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">
+                        {ts.toLocaleDateString("es-DO", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                        {" · "}
+                        {ts.toLocaleTimeString("es-DO", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                      <p className="text-xs text-gray-400">{h.despachadorNombre}</p>
+                    </div>
+                    <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
+                      {h.totalUnidades} uds{h.totalCajas ? ` · ${h.totalCajas} caj` : ""}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {h.productos.map((p, i) => {
+                      const est = h.estados?.[p.nombre];
+                      const estadoLabel =
+                        est?.estado === "recibido"    ? "✅ Despachado" :
+                        est?.estado === "no_recibido" ? "❌ No despachado" :
+                        est?.estado === "pendiente"   ? "⏳ Pendiente" : null;
+                      const estadoColor =
+                        est?.estado === "recibido"    ? "text-green-600" :
+                        est?.estado === "no_recibido" ? "text-red-600"   : "text-gray-400";
+                      return (
+                        <div key={i} className="flex items-center gap-2 text-xs px-2 py-1.5 bg-gray-50 rounded-lg">
+                          <span className="text-gray-700 font-medium flex-1 truncate min-w-0">{p.nombre}</span>
+                          <span className="text-gray-400 flex-shrink-0">
+                            {p.cajas ? `${p.cajas}caj · ` : ""}{p.cantidad ?? 0}uds
+                          </span>
+                          {estadoLabel && (
+                            <span className={`flex-shrink-0 font-semibold ${estadoColor}`}>
+                              {estadoLabel}
+                            </span>
+                          )}
+                          {est?.estado === "no_recibido" && est.motivo && (
+                            <span className="text-red-400 italic truncate max-w-[80px] flex-shrink-0" title={est.motivo}>
+                              · {est.motivo}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {h.observaciones && (
+                    <p className="mt-1.5 text-xs text-gray-400 italic px-2">📝 {h.observaciones}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
