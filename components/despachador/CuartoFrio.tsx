@@ -53,6 +53,9 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
   const [estados,       setEstados]       = useState<Record<string, EstadoRecepcion>>({});
   const [motivoAbierto, setMotivoAbierto] = useState<string | null>(null);
   const [motivoTemp,    setMotivoTemp]    = useState("");
+  const [editando,      setEditando]      = useState<string | null>(null);
+  const [editCajas,     setEditCajas]     = useState(0);
+  const [editUnids,     setEditUnids]     = useState(0);
 
   const [historial,   setHistorial]   = useState<HistorialCFEntry[]>([]);
   const [histAbierto, setHistAbierto] = useState(false);
@@ -255,8 +258,16 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
 
   const toggleMotivoInput = (nombre: string) => {
     if (motivoAbierto === nombre) { setMotivoAbierto(null); return; }
+    setEditando(null);
     setMotivoAbierto(nombre);
     setMotivoTemp(estados[nombre]?.motivo ?? "");
+  };
+
+  const confirmarEdicion = (nombre: string) => {
+    setProductos((prev) =>
+      prev.map((p) => p.nombre === nombre ? { ...p, cajas: editCajas, cantidad: editUnids } : p)
+    );
+    setEditando(null);
   };
 
   const confirmarNoRecibido = (nombre: string) => {
@@ -271,6 +282,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
     setProductos([]); setObservaciones("");
     setManualCajas(0); setManualUnids(0);
     setEstados({}); setMotivoAbierto(null); setMotivoTemp("");
+    setEditando(null);
   };
 
   return (
@@ -411,9 +423,9 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
               {productos.map((p, i) => {
                 const est = estados[p.nombre] ?? { estado: "pendiente", motivo: "" };
                 const bgCls =
-                  est.estado === "recibido"    ? "bg-green-50 border-green-200" :
-                  est.estado === "no_recibido" ? "bg-red-50 border-red-200"    :
-                                                  "bg-blue-50 border-blue-100";
+                  est.estado === "recibido"    ? "bg-green-50 border-green-300" :
+                  est.estado === "no_recibido" ? "bg-red-50 border-red-300"    :
+                                                  "bg-blue-100 border-blue-300";
                 return (
                   <div key={i}>
                     <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-colors duration-200 ${bgCls}`}>
@@ -436,19 +448,22 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
 
                       {/* Acciones */}
                       <div className="flex gap-1 flex-shrink-0 items-center">
-                        {/* Editar (solo si pendiente o no_recibido) */}
+                        {/* ✏️ Editar inline */}
                         {est.estado !== "recibido" && (
                           <button
                             onClick={() => {
-                              setManualProd(p.nombre);
-                              setProductos(prev => prev.filter((_, idx) => idx !== i));
-                              setEstados(prev => { const n = { ...prev }; delete n[p.nombre]; return n; });
+                              if (editando === p.nombre) { setEditando(null); return; }
                               setMotivoAbierto(null);
-                              setManualCajas(p.cajas ?? 0);
-                              setManualUnids(p.cantidad ?? 0);
+                              setEditCajas(p.cajas ?? 0);
+                              setEditUnids(p.cantidad ?? 0);
+                              setEditando(p.nombre);
                             }}
-                            className="text-xs text-blue-400 hover:text-blue-600 active:scale-95 transition-all px-1"
-                            title="Editar"
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all active:scale-95 ${
+                              editando === p.nombre
+                                ? "bg-blue-500 text-white shadow-sm"
+                                : "bg-white border border-blue-200 text-blue-500 hover:bg-blue-50"
+                            }`}
+                            title="Editar cantidad y cajas"
                           >✏️</button>
                         )}
 
@@ -474,15 +489,16 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                           }`}
                         >✕</button>
 
-                        {/* Eliminar */}
+                        {/* × Eliminar de lista */}
                         <button
                           onClick={() => {
-                            setProductos(prev => prev.filter((_, idx) => idx !== i));
-                            setEstados(prev => { const n = { ...prev }; delete n[p.nombre]; return n; });
+                            setProductos((prev) => prev.filter((_, idx) => idx !== i));
+                            setEstados((prev) => { const n = { ...prev }; delete n[p.nombre]; return n; });
                             if (motivoAbierto === p.nombre) setMotivoAbierto(null);
+                            if (editando === p.nombre) setEditando(null);
                           }}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 active:scale-95 transition-all text-xl leading-none"
-                          title="Eliminar"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center border border-red-200 text-red-400 hover:bg-red-50 hover:border-red-400 active:scale-95 transition-all text-base font-bold leading-none"
+                          title="Eliminar de la lista"
                         >×</button>
                       </div>
                     </div>
@@ -493,8 +509,8 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                         <input
                           type="text"
                           value={motivoTemp}
-                          onChange={e => setMotivoTemp(e.target.value)}
-                          onKeyDown={e => e.key === "Enter" && confirmarNoRecibido(p.nombre)}
+                          onChange={(e) => setMotivoTemp(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && confirmarNoRecibido(p.nombre)}
                           placeholder="Motivo del rechazo (opcional)…"
                           autoFocus
                           className="flex-1 px-3 py-1.5 border border-red-300 rounded-lg text-xs text-gray-700 outline-none focus:ring-2 focus:ring-red-300"
@@ -505,6 +521,42 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                         >
                           Confirmar
                         </button>
+                      </div>
+                    )}
+
+                    {/* Edición inline de cajas/unidades */}
+                    {editando === p.nombre && (
+                      <div className="mt-1 mb-1 pl-8 pr-1 space-y-1.5">
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <label className="block text-xs text-gray-500 mb-0.5">📦 Cajas</label>
+                            <input
+                              type="number" min={0}
+                              value={editCajas || ""}
+                              onChange={(e) => setEditCajas(Math.max(0, Number(e.target.value)))}
+                              placeholder="0"
+                              autoFocus
+                              className="w-full px-2 py-1.5 border border-blue-300 rounded-lg text-xs text-gray-700 outline-none focus:ring-2 focus:ring-blue-300 text-center"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-xs text-gray-500 mb-0.5">🔢 Unidades</label>
+                            <input
+                              type="number" min={0}
+                              value={editUnids || ""}
+                              onChange={(e) => setEditUnids(Math.max(0, Number(e.target.value)))}
+                              onKeyDown={(e) => e.key === "Enter" && confirmarEdicion(p.nombre)}
+                              placeholder="0"
+                              className="w-full px-2 py-1.5 border border-blue-300 rounded-lg text-xs text-gray-700 outline-none focus:ring-2 focus:ring-blue-300 text-center"
+                            />
+                          </div>
+                          <button
+                            onClick={() => confirmarEdicion(p.nombre)}
+                            className="self-end px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg font-semibold active:scale-95 transition-all whitespace-nowrap"
+                          >
+                            Guardar
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
