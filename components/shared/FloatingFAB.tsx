@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useModalShare } from "./ModalShareContext";
 
 const LS_KEY = "wa_last_number";
@@ -15,12 +16,16 @@ interface Props {
 export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
   const { isOpen: modalOpen, fnsRef } = useModalShare();
 
-  const [open,   setOpen]   = useState(false);
-  const [waOpen, setWaOpen] = useState(false);
-  const [num,    setNum]    = useState("");
+  const [open,    setOpen]    = useState(false);
+  const [waOpen,  setWaOpen]  = useState(false);
+  const [num,     setNum]     = useState("");
+  const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setNum(localStorage.getItem(LS_KEY) ?? ""); }, []);
+  useEffect(() => {
+    setNum(localStorage.getItem(LS_KEY) ?? "");
+    setMounted(true);
+  }, []);
 
   // Cierra al hacer clic fuera
   useEffect(() => {
@@ -69,9 +74,15 @@ export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
     setOpen(false);
   };
 
-  return (
-    /* z-[60] — por encima de cualquier modal (z-50) */
-    <div ref={ref} className="fixed bottom-5 right-5 z-[60] flex flex-col items-end gap-2 select-none">
+  if (!mounted) return null;
+
+  // Portal a <body> + zIndex inline — el FAB queda SIEMPRE encima de cualquier modal,
+  // sin importar el stacking context del árbol de componentes.
+  return createPortal(
+    <div
+      ref={ref}
+      style={{ zIndex: 9999 }}
+      className="fixed bottom-5 right-5 flex flex-col items-end gap-2 select-none">
 
       {/* Popover número WhatsApp */}
       {waOpen && (
@@ -152,6 +163,7 @@ export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
             rounded-full border-2 border-white" />
         )}
       </button>
-    </div>
+    </div>,
+    document.body
   );
 }
