@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { doc, setDoc, addDoc, collection, Timestamp, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { ProductoItem, PuntoProducto } from "@/lib/types";
+import { ProductoItem, PuntoProducto, toProductoId } from "@/lib/types";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, openPrint, pbTable } from "@/lib/print-template";
 import {
@@ -36,6 +36,12 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
   const [manualProd,    setManualProd]    = useState("");
   const [manualCajas,   setManualCajas]   = useState(0);
   const [manualUnids,   setManualUnids]   = useState(0);
+
+  // Estado de recepción por producto (solo modo manual)
+  type EstadoRecepcion = { estado: "pendiente" | "recibido" | "no_recibido"; motivo: string };
+  const [estados,       setEstados]       = useState<Record<string, EstadoRecepcion>>({});
+  const [motivoAbierto, setMotivoAbierto] = useState<string | null>(null);
+  const [motivoTemp,    setMotivoTemp]    = useState("");
 
   useEffect(() => {
     getDoc(doc(db, "config", "puntos")).then((snap) => {
@@ -113,6 +119,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
       const totalUnidades = productos.reduce((s, p) => s + (p.cantidad ?? 0), 0);
       const totalCajas    = productos.reduce((s, p) => s + (p.cajas    ?? 0), 0);
       const totalPeso     = productos.reduce((s, p) => s + (p.peso     ?? 0), 0);
+      const ts            = Timestamp.now();
 
       await setDoc(doc(db, "session", "despacho"), {
         cuartoFrio:        productos,
@@ -124,7 +131,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
         despachadorNombre: despNombre,
         despachador:       despNombre,
         observaciones:     observaciones || null,
-        fecha:             Timestamp.now(),
+        fecha:             ts,
         estado:            "activa",
         totalDespachos:    0,
         totalMonto:        0,
@@ -138,8 +145,39 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
         observaciones:     observaciones || null,
         despachadorId:     profile.uid,
         despachadorNombre: despNombre,
-        timestamp:         Timestamp.now(),
+        timestamp:         ts,
       });
+
+      // Movimientos al loker — solo en modo manual con estados confirmados
+      if (mode === "manual") {
+        for (const p of productos) {
+          const est     = estados[p.nombre];
+          const cantidad = (p.cajas ?? 0) + (p.cantidad ?? 0);
+          if (!est || est.estado === "pendiente") continue;
+
+          if (est.estado === "recibido" && cantidad > 0) {
+            await addDoc(collection(db, "movimientos_loker"), {
+              tipo:        "entrada_interior",
+              producto_id: toProductoId(p.nombre),
+              nombre:      p.nombre,
+              cantidad,
+              responsable: despNombre,
+              timestamp:   ts,
+              notas:       "Cuarto frío — recibido ✅",
+            });
+          } else if (est.estado === "no_recibido") {
+            await addDoc(collection(db, "movimientos_loker"), {
+              tipo:        "recepcion_pendiente",
+              producto_id: toProductoId(p.nombre),
+              nombre:      p.nombre,
+              cantidad:    0,
+              responsable: despNombre,
+              timestamp:   ts,
+              notas:       est.motivo ? `No recibido: ${est.motivo}` : "No recibido ❌",
+            });
+          }
+        }
+      }
 
       flash("ok", `Cuarto frío guardado — ${totalUnidades} uds · ${totalCajas} cajas · ${productos.length} productos`);
     } catch (e) {
@@ -176,11 +214,29 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
     return pbPrintDoc("CUARTO FRÍO", `Despachador: ${despNombre}`, body);
   };
 
+  const marcarRecibido = (nombre: string) => {
+    setEstados(prev => ({ ...prev, [nombre]: { estado: "recibido", motivo: "" } }));
+    if (motivoAbierto === nombre) setMotivoAbierto(null);
+  };
+
+  const toggleMotivoInput = (nombre: string) => {
+    if (motivoAbierto === nombre) { setMotivoAbierto(null); return; }
+    setMotivoAbierto(nombre);
+    setMotivoTemp(estados[nombre]?.motivo ?? "");
+  };
+
+  const confirmarNoRecibido = (nombre: string) => {
+    setEstados(prev => ({ ...prev, [nombre]: { estado: "no_recibido", motivo: motivoTemp } }));
+    setMotivoAbierto(null);
+    setMotivoTemp("");
+  };
+
   const resetMode = (m: "foto" | "manual") => {
     setMode(m);
     setPreview(null); setImgData(null); setTexto("");
     setProductos([]); setObservaciones("");
     setManualCajas(0); setManualUnids(0);
+    setEstados({}); setMotivoAbierto(null); setMotivoTemp("");
   };
 
   return (
@@ -295,7 +351,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
             {productos.length > 0 && (
               <button
                 type="button"
-                onClick={() => setProductos([])}
+                onClick={() => { setProductos([]); setEstados({}); setMotivoAbierto(null); }}
                 className="text-xs text-gray-400 hover:text-red-400 active:scale-95 transition-all duration-100"
               >
                 Limpiar
@@ -316,35 +372,110 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
               )}
             </div>
           ) : mode === "manual" ? (
-            /* Vista especial para modo manual: cajas + unidades separados */
-            <div className="space-y-2 max-h-72 overflow-y-auto">
-              {productos.map((p, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 rounded-xl border border-blue-100">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{p.nombre}</p>
-                    <div className="flex gap-3 mt-0.5 text-xs text-gray-500">
-                      <span>📦 {p.cajas ?? 0} cajas</span>
-                      <span>🔢 {p.cantidad ?? 0} uds</span>
+            /* Vista especial para modo manual: sombreado + check/X */
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {productos.map((p, i) => {
+                const est = estados[p.nombre] ?? { estado: "pendiente", motivo: "" };
+                const bgCls =
+                  est.estado === "recibido"    ? "bg-green-50 border-green-200" :
+                  est.estado === "no_recibido" ? "bg-red-50 border-red-200"    :
+                                                  "bg-blue-50 border-blue-100";
+                return (
+                  <div key={i}>
+                    <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-colors duration-200 ${bgCls}`}>
+                      {/* Ícono de estado */}
+                      <span className="text-base flex-shrink-0 w-5 text-center">
+                        {est.estado === "recibido" ? "✅" : est.estado === "no_recibido" ? "❌" : "⏳"}
+                      </span>
+
+                      {/* Info del producto */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{p.nombre}</p>
+                        <div className="flex gap-3 mt-0.5 text-xs text-gray-500">
+                          <span>📦 {p.cajas ?? 0} cajas</span>
+                          <span>🔢 {p.cantidad ?? 0} uds</span>
+                        </div>
+                        {est.estado === "no_recibido" && est.motivo && (
+                          <p className="text-xs text-red-600 mt-0.5 italic truncate">💬 {est.motivo}</p>
+                        )}
+                      </div>
+
+                      {/* Acciones */}
+                      <div className="flex gap-1 flex-shrink-0 items-center">
+                        {/* Editar (solo si pendiente o no_recibido) */}
+                        {est.estado !== "recibido" && (
+                          <button
+                            onClick={() => {
+                              setManualProd(p.nombre);
+                              setProductos(prev => prev.filter((_, idx) => idx !== i));
+                              setEstados(prev => { const n = { ...prev }; delete n[p.nombre]; return n; });
+                              setMotivoAbierto(null);
+                              setManualCajas(p.cajas ?? 0);
+                              setManualUnids(p.cantidad ?? 0);
+                            }}
+                            className="text-xs text-blue-400 hover:text-blue-600 active:scale-95 transition-all px-1"
+                            title="Editar"
+                          >✏️</button>
+                        )}
+
+                        {/* ✅ Recibido */}
+                        <button
+                          onClick={() => marcarRecibido(p.nombre)}
+                          title="Marcar como recibido"
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm transition-all active:scale-95 ${
+                            est.estado === "recibido"
+                              ? "bg-green-500 text-white shadow-sm"
+                              : "bg-white border border-green-300 text-green-600 hover:bg-green-50"
+                          }`}
+                        >✓</button>
+
+                        {/* ❌ No recibido */}
+                        <button
+                          onClick={() => toggleMotivoInput(p.nombre)}
+                          title="Marcar como no recibido"
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm transition-all active:scale-95 ${
+                            est.estado === "no_recibido"
+                              ? "bg-red-500 text-white shadow-sm"
+                              : "bg-white border border-red-300 text-red-500 hover:bg-red-50"
+                          }`}
+                        >✕</button>
+
+                        {/* Eliminar */}
+                        <button
+                          onClick={() => {
+                            setProductos(prev => prev.filter((_, idx) => idx !== i));
+                            setEstados(prev => { const n = { ...prev }; delete n[p.nombre]; return n; });
+                            if (motivoAbierto === p.nombre) setMotivoAbierto(null);
+                          }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 active:scale-95 transition-all text-xl leading-none"
+                          title="Eliminar"
+                        >×</button>
+                      </div>
                     </div>
+
+                    {/* Campo de motivo inline */}
+                    {motivoAbierto === p.nombre && (
+                      <div className="mt-1 mb-1 flex gap-2 pl-8 pr-1">
+                        <input
+                          type="text"
+                          value={motivoTemp}
+                          onChange={e => setMotivoTemp(e.target.value)}
+                          onKeyDown={e => e.key === "Enter" && confirmarNoRecibido(p.nombre)}
+                          placeholder="Motivo del rechazo (opcional)…"
+                          autoFocus
+                          className="flex-1 px-3 py-1.5 border border-red-300 rounded-lg text-xs text-gray-700 outline-none focus:ring-2 focus:ring-red-300"
+                        />
+                        <button
+                          onClick={() => confirmarNoRecibido(p.nombre)}
+                          className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg font-semibold active:scale-95 transition-all"
+                        >
+                          Confirmar
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    {/* Quick edit inline */}
-                    <button
-                      onClick={() => {
-                        setManualProd(p.nombre);
-                        setProductos((prev) => prev.filter((_, idx) => idx !== i));
-                        setManualCajas(p.cajas ?? 0);
-                        setManualUnids(p.cantidad ?? 0);
-                      }}
-                      className="text-xs text-blue-500 hover:text-blue-700 active:scale-95 transition-all px-1"
-                    >✏️</button>
-                    <button
-                      onClick={() => setProductos((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="text-gray-300 hover:text-red-400 active:scale-95 transition-all text-lg leading-none"
-                    >×</button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <>
