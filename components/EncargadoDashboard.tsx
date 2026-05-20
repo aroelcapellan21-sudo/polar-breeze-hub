@@ -6,10 +6,11 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { MovimientoLoker } from "@/lib/types";
 import RegistroLote          from "@/components/encargado/RegistroLote";
+import ConsultaChoferes      from "@/components/encargado/ConsultaChoferes";
 import FloatingFAB           from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 
-type Tab = "lote" | "stock";
+type Tab = "lote" | "stock" | "choferes";
 
 export default function EncargadoDashboard() {
   const { profile, logout } = useAuth();
@@ -45,8 +46,9 @@ export default function EncargadoDashboard() {
   }, [movimientos]);
 
   const TABS: { key: Tab; icon: string; label: string }[] = [
-    { key: "lote",  icon: "📦", label: "Registrar lote" },
-    { key: "stock", icon: "📊", label: "Stock"          },
+    { key: "lote",     icon: "📦", label: "Registrar lote" },
+    { key: "stock",    icon: "📊", label: "Stock"          },
+    { key: "choferes", icon: "👥", label: "Choferes"       },
   ];
 
   return (
@@ -103,12 +105,9 @@ export default function EncargadoDashboard() {
 
         <div className="border-t border-white/10 bg-black/10">
           <div className="max-w-2xl mx-auto px-4 py-1.5 text-xs text-emerald-200">
-            {tab === "lote"  && (
-              <span className="text-white font-medium">📦 Registrar lote — entrada de mercancía al loker</span>
-            )}
-            {tab === "stock" && (
-              <span className="text-white font-medium">📊 Stock actual — saldo del loker en tiempo real</span>
-            )}
+            {tab === "lote"     && <span className="text-white font-medium">📦 Registrar lote — entrada de mercancía al loker</span>}
+            {tab === "stock"    && <span className="text-white font-medium">📊 Stock actual — saldo del loker en tiempo real</span>}
+            {tab === "choferes" && <span className="text-white font-medium">👥 Choferes — puntos quincena e inventario</span>}
           </div>
         </div>
       </header>
@@ -116,7 +115,8 @@ export default function EncargadoDashboard() {
       {/* ── Contenido ── */}
       <main className="max-w-2xl mx-auto px-4 py-5">
 
-        {tab === "lote" && <RegistroLote />}
+        {tab === "lote"     && <RegistroLote />}
+        {tab === "choferes" && <ConsultaChoferes />}
 
         {tab === "stock" && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
