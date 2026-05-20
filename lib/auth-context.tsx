@@ -6,7 +6,9 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { UserProfile, UserRole } from "./types";
 
-const IS_DEV = process.env.NODE_ENV === "development";
+const IS_DEV =
+  process.env.NODE_ENV === "development" ||
+  process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
 const DEV_PROFILES: Record<UserRole, UserProfile> = {
   admin:       { uid: "dev-admin",   email: "admin@dev.local",   role: "admin",       nombre: "Admin Dev",       createdAt: new Date(), activo: true },
@@ -36,7 +38,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const devActiveRef = useRef(false);
 
   useEffect(() => {
+    // Fallback: si onAuthStateChanged no dispara (Firebase inalcanzable), desbloquear igual
+    const fallback = setTimeout(() => setLoading(false), 6000);
+
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(fallback);
       if (devActiveRef.current) return;
 
       // En dev mode, limpiar cualquier sesión real cacheada y mostrar panel naranja
@@ -74,7 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     });
-    return unsub;
+
+    return () => { clearTimeout(fallback); unsub(); };
   }, []);
 
   const login = async (email: string, password: string) => {

@@ -83,8 +83,10 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
 
   useEffect(() => {
     const uChof = onSnapshot(
-      query(collection(db, "usuarios"), where("role", "==", "chofer"), where("activo", "!=", false)),
-      (s) => setChoferes(s.docs.map((d) => d.data() as UserProfile))
+      query(collection(db, "usuarios"), where("role", "==", "chofer")),
+      (s) => setChoferes(
+        s.docs.map((d) => d.data() as UserProfile).filter((u) => u.activo !== false)
+      )
     );
     const uDrv = onSnapshot(
       collection(db, "drivers"),
