@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { collection, query, where, onSnapshot, getDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -38,6 +38,8 @@ export default function ConsultaChoferes() {
   const [meta,        setMeta]        = useState(100);
   const [selChofer,   setSelChofer]   = useState("todos");
   const [cargando,    setCargando]    = useState(true);
+
+  const rankingRef = useRef<HTMLDivElement>(null);
 
   const quincena   = useMemo(() => getQuincena(), []);
   const todayStart = useMemo(() => getTodayStart(), []);
@@ -159,7 +161,11 @@ export default function ConsultaChoferes() {
           <label className="text-xs font-semibold text-gray-600 flex-shrink-0">Filtrar:</label>
           <select
             value={selChofer}
-            onChange={(e) => setSelChofer(e.target.value)}
+            onChange={(e) => {
+              setSelChofer(e.target.value);
+              if (e.target.value !== "todos")
+                setTimeout(() => rankingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+            }}
             className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-800
               outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
           >
@@ -178,7 +184,7 @@ export default function ConsultaChoferes() {
       </div>
 
       {/* ── Ranking de puntos ── */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div ref={rankingRef} className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="px-4 py-3 bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-between">
           <h2 className="text-white font-bold text-sm">⭐ Puntos — {quincena.label}</h2>
           {selChofer !== "todos" && (

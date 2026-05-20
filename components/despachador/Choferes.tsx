@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   collection, query, where, onSnapshot,
   doc, setDoc, addDoc, updateDoc, increment, Timestamp, getDoc, getDocs,
@@ -88,6 +88,8 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     | { type: "extra"; item: ExtraLoker }
     | null;
   const [chofModal, setChofModal] = useState<ChofModal>(null);
+
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const todayStart = useMemo(() => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
@@ -215,6 +217,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
   const selectChofer = (c: UserProfile) => {
     setSel(c); resetEntrada(); setMode("foto");
     onChoferSelect?.(c);
+    setTimeout(() => panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const analizar = async () => {
@@ -667,7 +670,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
         </div>
 
         {/* ── Panel de entrada ── */}
-        <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+        <div ref={panelRef} className="bg-white rounded-xl shadow-sm p-5 space-y-4">
           {!sel ? (
             <div className="flex flex-col items-center justify-center h-full py-16 text-gray-400">
               <p className="text-3xl mb-2">👈</p>
