@@ -144,7 +144,7 @@ export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
         </div>
       )}
 
-      {/* Botón principal — muestra un indicador cuando hay modal activo */}
+      {/* Botón principal — rojo Polar Breeze con pulso sutil */}
       <button
         type="button"
         title={modalOpen ? "Compartir contenido del modal" : "Imprimir / WhatsApp"}
@@ -152,9 +152,10 @@ export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
         className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center
           text-2xl transition-all duration-200 active:scale-90 relative ${
           open
-            ? "bg-gray-600 hover:bg-gray-700 text-white"
-            : "bg-purple-700 hover:bg-purple-800 text-white"
+            ? "bg-gray-700 hover:bg-gray-800 text-white"
+            : "bg-[#D42B2B] hover:bg-[#b82424] text-white animate-pulse"
         }`}
+        style={open ? {} : { animationDuration: "3s" }}
       >
         {open ? "✕" : "📤"}
         {/* Punto verde cuando hay modal con contenido activo */}
