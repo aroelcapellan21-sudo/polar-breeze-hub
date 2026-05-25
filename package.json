@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.95.1",
     "firebase": "^12.13.0",
     "firebase-admin": "^13.9.0",
+    "googleapis": "^172.0.0",
     "jsbarcode": "^3.12.3",
     "next": "16.2.6",
     "qrcode": "^1.5.4",
