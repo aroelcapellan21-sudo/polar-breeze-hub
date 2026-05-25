@@ -16,6 +16,7 @@ import {
   ImageUploader, ProductTable, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
 } from "./shared";
+import ScannerBar from "./ScannerBar";
 
 const STEPS = [
   { label: "Seleccionar" },
@@ -60,8 +61,9 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
   const [precios,       setPrecios]       = useState<PrecioProducto[]>([]);
 
   // ─── Modo manual: entrada por catálogo ───────────────────────────────────────
-  const [manualProdCh,  setManualProdCh]  = useState("");
-  const [manualCantCh,  setManualCantCh]  = useState(1);
+  const [manualProdCh,   setManualProdCh]   = useState("");
+  const [manualCantCh,   setManualCantCh]   = useState(1);
+  const [scannerActivo,  setScannerActivo]  = useState(false);
 
   // ─── Extras por factura ──────────────────────────────────────────────────────
   const [extrasHoy,    setExtrasHoy]    = useState<ExtraLoker[]>([]);
@@ -678,13 +680,47 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <h3 className="font-bold text-blue-700">{sel.nombre}</h3>
                   <p className="text-xs text-gray-400">Ficha {sel.ficha ?? "—"}</p>
                 </div>
-                <ModeToggle mode={mode} onChange={(m) => { setMode(m); resetEntrada(); }} />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setScannerActivo((v) => !v)}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all active:scale-95 ${
+                      scannerActivo
+                        ? "bg-[#F5C800] text-[#1A1A1A]"
+                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    }`}
+                  >
+                    🔲 Escáner
+                  </button>
+                  <ModeToggle mode={mode} onChange={(m) => { setMode(m); resetEntrada(); }} />
+                </div>
               </div>
+
+              {/* ── Modo Escáner HID ── */}
+              {scannerActivo && (
+                <ScannerBar
+                  labelAgregar="Agregar al despacho"
+                  onAgregar={(nombre, cajas, unidades) => {
+                    setProductos((prev) => {
+                      const idx = prev.findIndex((p) => p.nombre === nombre);
+                      if (idx >= 0) {
+                        const next = [...prev];
+                        next[idx] = {
+                          ...next[idx],
+                          cajas:    (next[idx].cajas    ?? 0) + cajas,
+                          cantidad: (next[idx].cantidad ?? 0) + unidades,
+                        };
+                        return next;
+                      }
+                      return [...prev, { nombre, cantidad: unidades, cajas, unidad: "pz" }];
+                    });
+                  }}
+                />
+              )}
 
               {mode === "foto" ? (
                 <ImageUploader

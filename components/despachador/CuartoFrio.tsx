@@ -11,6 +11,7 @@ import {
   ImageUploader, ProductTable, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
 } from "./shared";
+import ScannerBar from "./ScannerBar";
 
 interface Props {
   despachadorActivo?: string;
@@ -57,8 +58,9 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
   const [editCajas,     setEditCajas]     = useState(0);
   const [editUnids,     setEditUnids]     = useState(0);
 
-  const [historial,   setHistorial]   = useState<HistorialCFEntry[]>([]);
-  const [histAbierto, setHistAbierto] = useState(false);
+  const [historial,    setHistorial]    = useState<HistorialCFEntry[]>([]);
+  const [histAbierto,  setHistAbierto]  = useState(false);
+  const [scannerActivo, setScannerActivo] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -296,10 +298,44 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
 
         {/* ── Panel izquierdo: entrada ── */}
         <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="font-bold text-blue-700">🥶 Cuarto Frío</h2>
-            <ModeToggle mode={mode} onChange={resetMode} />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setScannerActivo((v) => !v)}
+                className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all active:scale-95 ${
+                  scannerActivo
+                    ? "bg-[#F5C800] text-[#1A1A1A]"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+              >
+                🔲 Escáner
+              </button>
+              <ModeToggle mode={mode} onChange={resetMode} />
+            </div>
           </div>
+
+          {/* ── Modo Escáner HID ── */}
+          {scannerActivo && (
+            <ScannerBar
+              labelAgregar="Agregar al Cuarto Frío"
+              onAgregar={(nombre, cajas, unidades) => {
+                setProductos((prev) => {
+                  const idx = prev.findIndex((p) => p.nombre === nombre);
+                  if (idx >= 0) {
+                    const next = [...prev];
+                    next[idx] = {
+                      ...next[idx],
+                      cajas:    (next[idx].cajas    ?? 0) + cajas,
+                      cantidad: (next[idx].cantidad ?? 0) + unidades,
+                    };
+                    return next;
+                  }
+                  return [...prev, { nombre, cantidad: unidades, cajas, unidad: "pz" }];
+                });
+              }}
+            />
+          )}
 
           {/* ── Modo Foto ── */}
           {mode === "foto" && (
