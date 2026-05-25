@@ -282,3 +282,40 @@ export function fmtDate(ts: Date | { seconds: number } | undefined): string {
   if (!d.getTime()) return "—";
   return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
+
+// ─── Polar Breeze Weight ─────────────────────────────────────────────────────
+
+/** Registro de un código de barras conocido (colección codigos_cajas) */
+export interface CodigoCaja {
+  codigo:          string;   // código de barras (document ID)
+  producto:        string;   // nombre del producto
+  unidadesPorCaja: number;   // unidades dentro de cada caja/fardo
+  pesoCajaKg?:     number;   // peso de referencia de la caja (kg)
+  creadoEn?:       Date | { seconds: number };
+  creadoPor?:      string;
+}
+
+/** Un ítem dentro de un lote Weight */
+export interface WeightItem {
+  codigo:     string;
+  producto:   string;
+  nCajas:     number;
+  unidades:   number;          // nCajas × unidadesPorCaja
+  peso_kg:    number | null;   // peso total capturado por la báscula
+  timestamp:  Date | { seconds: number };
+}
+
+/** Un lote de recepción de mercancía (colección lotes_weight) */
+export interface LoteWeight {
+  id?:             string;
+  numero:          string;   // "#W001", "#W002", …
+  proveedor?:      string;
+  items:           WeightItem[];
+  totalUnidades:   number;
+  totalPesoKg:     number | null;
+  encargadoId:     string;
+  encargadoNombre: string;
+  timestamp:       Date | { seconds: number };
+  estado:          "activo" | "cerrado";
+  notas?:          string;
+}

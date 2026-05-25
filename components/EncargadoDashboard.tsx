@@ -7,10 +7,11 @@ import { useAuth } from "@/lib/auth-context";
 import { MovimientoLoker } from "@/lib/types";
 import RegistroLote          from "@/components/encargado/RegistroLote";
 import ConsultaChoferes      from "@/components/encargado/ConsultaChoferes";
+import PolarBreezeWeight     from "@/components/encargado/PolarBreezeWeight";
 import FloatingFAB           from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 
-type Tab = "lote" | "stock" | "choferes";
+type Tab = "lote" | "stock" | "choferes" | "weight";
 
 export default function EncargadoDashboard() {
   const { profile, logout } = useAuth();
@@ -46,9 +47,10 @@ export default function EncargadoDashboard() {
   }, [movimientos]);
 
   const TABS: { key: Tab; icon: string; label: string }[] = [
-    { key: "lote",     icon: "📦", label: "Registrar lote" },
-    { key: "stock",    icon: "📊", label: "Stock"          },
-    { key: "choferes", icon: "👥", label: "Choferes"       },
+    { key: "lote",     icon: "📦", label: "Lote"      },
+    { key: "weight",   icon: "⚖️",  label: "Weight"    },
+    { key: "stock",    icon: "📊", label: "Stock"     },
+    { key: "choferes", icon: "👥", label: "Choferes"  },
   ];
 
   return (
@@ -105,9 +107,10 @@ export default function EncargadoDashboard() {
 
         <div className="border-t border-white/10 bg-black/10">
           <div className="max-w-2xl mx-auto px-4 py-1.5 text-xs text-emerald-200">
-            {tab === "lote"     && <span className="text-white font-medium">📦 Registrar lote — entrada de mercancía al loker</span>}
-            {tab === "stock"    && <span className="text-white font-medium">📊 Stock actual — saldo del loker en tiempo real</span>}
-            {tab === "choferes" && <span className="text-white font-medium">👥 Choferes — puntos quincena e inventario</span>}
+            {tab === "lote"     && <span className="text-[#F5C800] font-medium">📦 Registrar lote — entrada de mercancía al loker</span>}
+            {tab === "weight"   && <span className="text-[#F5C800] font-medium">⚖️ Weight — recepción con escáner + báscula BT</span>}
+            {tab === "stock"    && <span className="text-[#F5C800] font-medium">📊 Stock actual — saldo del loker en tiempo real</span>}
+            {tab === "choferes" && <span className="text-[#F5C800] font-medium">👥 Choferes — puntos quincena e inventario del día</span>}
           </div>
         </div>
       </header>
@@ -116,6 +119,7 @@ export default function EncargadoDashboard() {
       <main className="max-w-2xl mx-auto px-4 py-5">
 
         {tab === "lote"     && <RegistroLote />}
+        {tab === "weight"   && <PolarBreezeWeight />}
         {tab === "choferes" && <ConsultaChoferes />}
 
         {tab === "stock" && (
