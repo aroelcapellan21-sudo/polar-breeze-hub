@@ -116,35 +116,50 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
 
   // ── Cargar config puntos + choferes + talonario + movimientos ───────────────
   useEffect(() => {
-    getDoc(doc(db, "config", "puntos")).then((snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const map: Record<string, number> = {};
-      (data.productos as PuntoProducto[] ?? []).forEach((p) => {
-        map[p.nombre.toLowerCase().trim()] = p.puntos;
-      });
-      setPuntosMap(map);
-      if (data.meta) setMeta(data.meta as number);
-    });
+    // Timeout de seguridad: si algún snapshot no responde en 8 s, desbloquear UI
+    const safetyTimer = setTimeout(() => setCargando(false), 8_000);
+
+    getDoc(doc(db, "config", "puntos"))
+      .then((snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+        const map: Record<string, number> = {};
+        (data.productos as PuntoProducto[] ?? []).forEach((p) => {
+          map[p.nombre.toLowerCase().trim()] = p.puntos;
+        });
+        setPuntosMap(map);
+        if (data.meta) setMeta(data.meta as number);
+      })
+      .catch(() => {/* config opcional */});
 
     const unsubChof = onSnapshot(
       query(collection(db, "usuarios"), where("role", "==", "chofer")),
       (snap) => setChoferes(
         snap.docs.map((d) => d.data() as UserProfile).filter((u) => u.activo !== false)
-      )
+      ),
+      (err) => { console.warn("ConsultaChoferes [usuarios]:", err); setCargando(false); }
     );
+
     const unsubTal = onSnapshot(
       query(collection(db, "talonario"), where("tipo", "==", "retirada")),
       (snap) => {
         setTalonarios(snap.docs.map((d) => ({ id: d.id, ...d.data() } as TalonarioDoc)));
+        clearTimeout(safetyTimer);
         setCargando(false);
-      }
+      },
+      (err) => { console.warn("ConsultaChoferes [talonario]:", err); setCargando(false); }
     );
+
     const unsubMov = onSnapshot(
       query(collection(db, "movimientos_loker"), where("generaPuntos", "==", true)),
-      (snap) => setExtras(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MovimientoLoker)))
+      (snap) => setExtras(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MovimientoLoker))),
+      (err) => console.warn("ConsultaChoferes [movimientos_loker]:", err)
     );
-    return () => { unsubChof(); unsubTal(); unsubMov(); };
+
+    return () => {
+      clearTimeout(safetyTimer);
+      unsubChof(); unsubTal(); unsubMov();
+    };
   }, []);
 
   // ── Listener inventarios del día seleccionado ───────────────────────────────
@@ -223,8 +238,9 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
   if (cargando) {
     return (
       <div className="text-center py-16 text-gray-400">
-        <p className="text-2xl animate-pulse mb-2">⭐</p>
-        <p className="text-sm">Cargando datos…</p>
+        <p className="text-2xl animate-spin mb-2">⭐</p>
+        <p className="text-sm font-medium">Cargando datos…</p>
+        <p className="text-xs mt-2 text-gray-300">Conectando con Firebase</p>
       </div>
     );
   }
