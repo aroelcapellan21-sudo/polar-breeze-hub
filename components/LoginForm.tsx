@@ -125,8 +125,11 @@ export default function LoginForm() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-900/50">
-            <span className="text-white text-3xl font-black tracking-tight">PB</span>
+          <div
+            className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-black/40"
+            style={{ background: "linear-gradient(135deg, rgba(245,200,0,0.92) 33%, rgba(212,43,43,0.92) 33% 66%, rgba(30,140,58,0.92) 66%)" }}
+          >
+            <span className="text-4xl relative z-10">🧊</span>
           </div>
           <h1 className="text-white text-2xl font-bold">Polar Breeze Hub</h1>
           <p className="text-blue-300 text-sm mt-1">¿Quién eres?</p>

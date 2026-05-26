@@ -117,13 +117,14 @@ export default function DespachadorDashboard() {
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* ── Header ── */}
-      <header className="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-lg sticky top-0 z-30">
+      {/* ── Header Polar Breeze ── */}
+      <header className="bg-[#1A1A1A] text-white shadow-lg sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
 
-          {/* Logo */}
-          <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center font-black text-sm flex-shrink-0">
-            PB
+          {/* Logo tricolor 🧊 */}
+          <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 relative flex items-center justify-center"
+               style={{ background: "linear-gradient(135deg, rgba(245,200,0,0.85) 33%, rgba(212,43,43,0.85) 33% 66%, rgba(30,140,58,0.85) 66%)" }}>
+            <span className="text-lg relative z-10">🧊</span>
           </div>
 
           {/* Tabs */}
@@ -136,8 +137,8 @@ export default function DespachadorDashboard() {
                   font-medium whitespace-nowrap transition-all duration-100 active:scale-95
                   flex-shrink-0 ${
                   tab === t.key
-                    ? "bg-white text-blue-800 shadow-sm"
-                    : "text-blue-200 hover:bg-white/10 hover:text-white"
+                    ? "bg-[#F5C800] text-[#1A1A1A] shadow-sm font-bold"
+                    : "text-gray-300 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <span>{t.icon}</span>
@@ -166,7 +167,7 @@ export default function DespachadorDashboard() {
             </button>
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium leading-tight">{profile?.nombre}</p>
-              <span className="text-xs text-blue-300">Despachador</span>
+              <span className="text-xs text-[#F5C800]">Despachador</span>
             </div>
             <button
               onClick={logout}
@@ -178,14 +179,17 @@ export default function DespachadorDashboard() {
           </div>
         </div>
 
+        {/* Banda tricolor */}
+        <div className="pb-tricolor" />
+
         {/* Breadcrumb */}
-        <div className="border-t border-white/10 bg-black/10">
-          <div className="max-w-6xl mx-auto px-4 py-1.5 flex items-center gap-1.5 text-xs text-blue-200 overflow-x-auto">
+        <div className="border-t border-white/10 bg-black/20">
+          <div className="max-w-6xl mx-auto px-4 py-1.5 flex items-center gap-1.5 text-xs text-gray-300 overflow-x-auto">
             {/* Tab name */}
             <button
               onClick={() => { if (tab === "choferes") setSelChofer(null); }}
               className={`whitespace-nowrap font-medium ${
-                tab === "choferes" && selChofer ? "hover:text-white transition-colors" : "text-white"
+                tab === "choferes" && selChofer ? "hover:text-white transition-colors" : "text-[#F5C800]"
               }`}
             >
               {TABS.find((t) => t.key === tab)?.icon}{" "}
@@ -209,7 +213,7 @@ export default function DespachadorDashboard() {
               </>
             )}
             <span className="ml-auto flex items-center gap-1 flex-shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F5C800] animate-pulse" />
               Firebase polar-breeze
             </span>
           </div>

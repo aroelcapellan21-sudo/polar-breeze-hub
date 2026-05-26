@@ -7,6 +7,14 @@ import {
   UserProfile, TalonarioDoc, MovimientoLoker,
   PuntoProducto, InventarioBaseItem, toDate,
 } from "@/lib/types";
+import RegistrarInventario from "@/components/encargado/RegistrarInventario";
+
+// ── Tipo de inventario guardado (solo lectura para la lista) ─────────────────
+type InvGuardadoResumen = {
+  ficha:    string;
+  totales?: { sobrante: number; vendido: number; total_rd: number };
+  bloqueado?: boolean;
+};
 
 function getQuincena() {
   const now = new Date();
@@ -22,6 +30,11 @@ function getTodayStart() {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d;
 }
 
+function getTodayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 type ChoferPuntos = {
   uid: string;
   nombre: string;
@@ -29,6 +42,9 @@ type ChoferPuntos = {
   puntos: number;
   detalle: { nombre: string; cantidad: number; ptsUnitario: number; total: number }[];
 };
+
+// ── Sección activa del tab ───────────────────────────────────────────────────
+type Seccion = "puntos" | "inventario" | "cierre";
 
 export default function ConsultaChoferes() {
   const [choferes,    setChoferes]    = useState<UserProfile[]>([]);
@@ -38,11 +54,18 @@ export default function ConsultaChoferes() {
   const [meta,        setMeta]        = useState(100);
   const [selChofer,   setSelChofer]   = useState("todos");
   const [cargando,    setCargando]    = useState(true);
+  const [seccion,     setSeccion]     = useState<Seccion>("cierre");
+
+  // Inventarios guardados del día
+  const [invGuardados, setInvGuardados] = useState<Record<string, InvGuardadoResumen>>({});
+  // Modal de registro
+  const [modalChofer, setModalChofer] = useState<{ uid: string; nombre: string; ficha: string } | null>(null);
 
   const rankingRef = useRef<HTMLDivElement>(null);
 
   const quincena   = useMemo(() => getQuincena(), []);
   const todayStart = useMemo(() => getTodayStart(), []);
+  const fechaKey   = useMemo(() => getTodayKey(),   []);
 
   useEffect(() => {
     getDoc(doc(db, "config", "puntos")).then((snap) => {
@@ -79,7 +102,25 @@ export default function ConsultaChoferes() {
     return () => { unsubChof(); unsubTal(); unsubMov(); };
   }, []);
 
-  // ── Puntos por chofer en la quincena ──────────────────────────────────────────
+  // ── Listener inventarios guardados del día ────────────────────────────────
+  useEffect(() => {
+    const invRef = collection(db, "inventarios", fechaKey, "choferes");
+    const unsub = onSnapshot(invRef, (snap) => {
+      const map: Record<string, InvGuardadoResumen> = {};
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        map[d.id] = {
+          ficha:    d.id,
+          totales:  data.totales,
+          bloqueado: data.bloqueado,
+        };
+      });
+      setInvGuardados(map);
+    });
+    return unsub;
+  }, [fechaKey]);
+
+  // ── Puntos por chofer en la quincena ──────────────────────────────────────
   const ranking = useMemo((): ChoferPuntos[] => {
     const map = new Map<string, ChoferPuntos>();
 
@@ -114,11 +155,10 @@ export default function ConsultaChoferes() {
       acumular(m.choferId, m.choferNombre ?? "", undefined, m.nombre, Math.abs(m.cantidad));
     });
 
-    return Array.from(map.values())
-      .sort((a, b) => b.puntos - a.puntos);
+    return Array.from(map.values()).sort((a, b) => b.puntos - a.puntos);
   }, [choferes, talonarios, extras, puntosMap, quincena]);
 
-  // ── Inventario del día por chofer ─────────────────────────────────────────────
+  // ── Inventario del día por chofer ─────────────────────────────────────────
   const invHoy = useMemo(() => {
     const map = new Map<string, Map<string, { nombre: string; cantidad: number }>>();
     talonarios
@@ -134,7 +174,7 @@ export default function ConsultaChoferes() {
     return map;
   }, [talonarios, todayStart]);
 
-  // ── Vista filtrada ────────────────────────────────────────────────────────────
+  // ── Vista filtrada ─────────────────────────────────────────────────────────
   const rankingVista = selChofer === "todos"
     ? ranking
     : ranking.filter((r) => r.uid === selChofer);
@@ -142,6 +182,10 @@ export default function ConsultaChoferes() {
   const choferesVista = selChofer === "todos"
     ? choferes
     : choferes.filter((c) => c.uid === selChofer);
+
+  // ── Contadores para el cierre ─────────────────────────────────────────────
+  const cerrados  = Object.keys(invGuardados).length;
+  const pendientes = choferes.length - cerrados;
 
   if (cargando) {
     return (
@@ -155,224 +199,377 @@ export default function ConsultaChoferes() {
   return (
     <div className="space-y-4">
 
-      {/* ── Selector de chofer ── */}
-      <div className="bg-white rounded-xl shadow-sm p-4 space-y-2">
-        <div className="flex items-center gap-3">
-          <label className="text-xs font-semibold text-gray-600 flex-shrink-0">Filtrar:</label>
-          <select
-            value={selChofer}
-            onChange={(e) => {
-              setSelChofer(e.target.value);
-              if (e.target.value !== "todos")
-                setTimeout(() => rankingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-            }}
-            className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-800
-              outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
-          >
-            <option value="todos">Todos los choferes ({choferes.length})</option>
-            {choferes.map((c) => (
-              <option key={c.uid} value={c.uid}>
-                {c.nombre}{c.ficha ? ` · Ficha ${c.ficha}` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center justify-between text-xs text-gray-400">
-          <span>📅 {quincena.label} actual</span>
-          <span>Meta: <strong className="text-gray-600">{meta} pts</strong></span>
+      {/* ── Sub-tabs de sección ── */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="flex border-b border-gray-100">
+          {([
+            { key: "cierre",     icon: "📋", label: "Cierre del día" },
+            { key: "puntos",     icon: "⭐", label: "Puntos"         },
+            { key: "inventario", icon: "🚛", label: "Despachado"     },
+          ] as { key: Seccion; icon: string; label: string }[]).map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setSeccion(s.key)}
+              className={`flex-1 py-2.5 text-xs font-semibold flex flex-col items-center gap-0.5
+                transition-all active:scale-95 ${
+                  seccion === s.key
+                    ? "bg-[#F5C800] text-[#1A1A1A] border-b-2 border-[#D42B2B]"
+                    : "text-gray-500 hover:bg-gray-50"
+                }`}
+            >
+              <span className="text-base">{s.icon}</span>
+              <span>{s.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ── Ranking de puntos ── */}
-      <div ref={rankingRef} className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="px-4 py-3 bg-gradient-to-r from-amber-400 to-yellow-500 flex items-center justify-between">
-          <h2 className="text-white font-bold text-sm">⭐ Puntos — {quincena.label}</h2>
-          {selChofer !== "todos" && (
-            <button
-              onClick={() => setSelChofer("todos")}
-              className="text-xs text-yellow-100 hover:text-white underline"
-            >
-              Ver todos
-            </button>
-          )}
-        </div>
+      {/* ═══════════════════════════════════════════════════════════
+          SECCIÓN: CIERRE DEL DÍA
+      ═══════════════════════════════════════════════════════════ */}
+      {seccion === "cierre" && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
 
-        {rankingVista.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">Sin datos de puntos esta quincena</p>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {rankingVista.map((c, i) => {
-              const realRank = ranking.findIndex((r) => r.uid === c.uid);
-              const pct      = meta > 0 ? Math.min((c.puntos / meta) * 100, 100) : 0;
-              const medal    = realRank === 0 ? "🥇" : realRank === 1 ? "🥈" : realRank === 2 ? "🥉" : null;
-              const barColor = pct >= 100 ? "bg-green-500" : pct >= 60 ? "bg-amber-400" : pct >= 30 ? "bg-blue-400" : "bg-gray-300";
+          {/* Encabezado con resumen */}
+          <div className="px-4 py-3 bg-[#1A1A1A] flex items-center justify-between">
+            <div>
+              <h2 className="text-white font-bold text-sm">📋 Cierre de inventario</h2>
+              <p className="text-gray-400 text-xs">Toca un chofer para registrar</p>
+            </div>
+            <div className="flex gap-2">
+              <span className="bg-[#1E8C3A]/20 text-[#4ade80] text-xs font-bold px-2 py-0.5 rounded-full border border-[#1E8C3A]/30">
+                ✅ {cerrados}
+              </span>
+              <span className="bg-amber-500/20 text-amber-300 text-xs font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
+                ⏳ {pendientes}
+              </span>
+            </div>
+          </div>
 
-              return (
-                <div key={c.uid}>
+          {/* Banda tricolor */}
+          <div className="h-0.5 flex">
+            <div className="flex-1 bg-[#F5C800]" />
+            <div className="flex-1 bg-[#D42B2B]" />
+            <div className="flex-1 bg-[#1E8C3A]" />
+          </div>
+
+          {choferes.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">Sin choferes activos</p>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {choferes.map((c) => {
+                const inv       = c.ficha ? invGuardados[c.ficha] : undefined;
+                const guardado  = !!inv;
+                const tot       = inv?.totales;
+
+                return (
                   <button
-                    onClick={() => setSelChofer(c.uid === selChofer ? "todos" : c.uid)}
-                    className={`w-full px-4 py-3 text-left hover:bg-gray-50 active:scale-[0.99] transition-all ${
-                      selChofer === c.uid ? "bg-amber-50" : ""
-                    }`}
+                    key={c.uid}
+                    onClick={() => {
+                      if (!c.ficha) return;
+                      setModalChofer({ uid: c.uid, nombre: c.nombre, ficha: c.ficha });
+                    }}
+                    disabled={!c.ficha}
+                    className={`w-full px-4 py-3 flex items-center gap-3 text-left
+                      hover:bg-gray-50 active:scale-[0.99] transition-all ${
+                        guardado ? "bg-green-50/40" : ""
+                      }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl flex-shrink-0 w-8 text-center">
-                        {medal ?? <span className="text-sm text-gray-400">{realRank + 1}</span>}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-sm font-semibold text-gray-800 truncate mr-2">{c.nombre}</p>
-                          <span className={`text-base font-bold flex-shrink-0 ${
-                            c.puntos >= meta ? "text-green-600" : "text-gray-700"
-                          }`}>
-                            {c.puntos} <span className="text-xs font-normal text-gray-400">pts</span>
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-gray-400 flex-shrink-0 w-8 text-right">
-                            {Math.round(pct)}%
-                          </span>
-                        </div>
-                        {pct >= 100 && (
-                          <p className="text-xs text-green-600 font-medium mt-0.5">✅ Meta alcanzada</p>
-                        )}
-                      </div>
-                      {c.ficha && (
-                        <span className="text-xs text-gray-400 flex-shrink-0">#{c.ficha}</span>
+                    {/* Avatar */}
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center
+                      text-white text-xs font-bold flex-shrink-0 ${
+                        guardado ? "bg-[#1E8C3A]" : "bg-gray-400"
+                      }`}>
+                      {guardado ? "✅" : c.nombre.charAt(0).toUpperCase()}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{c.nombre}</p>
+                      <p className="text-xs text-gray-400">
+                        {c.ficha ? `Ficha #${c.ficha}` : "Sin ficha"}
+                      </p>
+                      {guardado && tot && (
+                        <p className="text-xs text-[#1E8C3A] font-medium mt-0.5">
+                          {tot.vendido} vendidos · RD${tot.total_rd.toLocaleString("es-DO", { maximumFractionDigits: 0 })}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Estado */}
+                    <div className="flex-shrink-0 text-right">
+                      {guardado ? (
+                        <span className="text-xs bg-green-100 text-[#1E8C3A] font-bold px-2 py-0.5 rounded-full border border-green-200">
+                          Ver detalle
+                        </span>
+                      ) : c.ficha ? (
+                        <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                          Registrar
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">Sin ficha</span>
                       )}
                     </div>
                   </button>
-
-                  {/* Detalle de puntos cuando está seleccionado */}
-                  {selChofer === c.uid && c.detalle.length > 0 && (
-                    <div className="px-4 pb-3 pt-1 bg-amber-50 border-t border-amber-100">
-                      <p className="text-xs font-semibold text-amber-700 mb-1.5">Desglose por producto</p>
-                      <div className="space-y-1">
-                        {c.detalle
-                          .sort((a, b) => b.total - a.total)
-                          .map((d, j) => (
-                            <div key={j} className="flex items-center justify-between text-xs bg-white rounded-lg px-3 py-1.5 border border-amber-100">
-                              <span className="text-gray-700 flex-1 truncate mr-2">{d.nombre}</span>
-                              <span className="text-gray-400 flex-shrink-0 mr-2">{d.cantidad} × {d.ptsUnitario}</span>
-                              <span className="font-bold text-amber-600 flex-shrink-0">{d.total} pts</span>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                  {selChofer === c.uid && c.detalle.length === 0 && (
-                    <p className="text-xs text-gray-400 italic px-4 pb-2 pt-1 bg-amber-50 border-t border-amber-100">
-                      Sin entregas con puntos esta quincena
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ── Inventario ── */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-700 flex items-center justify-between">
-          <h2 className="text-white font-bold text-sm">📋 Inventario por chofer</h2>
-          {selChofer !== "todos" && (
-            <button
-              onClick={() => setSelChofer("todos")}
-              className="text-xs text-blue-100 hover:text-white underline"
-            >
-              Ver todos
-            </button>
+                );
+              })}
+            </div>
           )}
         </div>
+      )}
 
-        {choferesVista.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">Sin choferes activos</p>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {choferesVista.map((c) => {
-              const base: InventarioBaseItem[] = c.inventario_base ?? [];
-              const hoyMap = invHoy.get(c.uid);
-              const hoyList = hoyMap ? Array.from(hoyMap.values()) : [];
-              const totalBase = base.reduce((s, i) => s + i.cantidad, 0);
-              const totalHoy  = hoyList.reduce((s, i) => s + i.cantidad, 0);
-
-              return (
-                <div key={c.uid}>
-                  {/* Cabecera del chofer */}
-                  <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50">
-                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center
-                      text-white text-xs font-bold flex-shrink-0">
-                      {c.nombre.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{c.nombre}</p>
-                      {c.ficha && <p className="text-xs text-gray-400">Ficha #{c.ficha}</p>}
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0 text-xs">
-                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                        Base: {totalBase}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full font-medium ${
-                        totalHoy > 0
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-400"
-                      }`}>
-                        Hoy: {totalHoy}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Detalle base + hoy */}
-                  <div className="grid grid-cols-2 gap-3 px-4 py-3">
-                    {/* Inventario base */}
-                    <div>
-                      <p className="text-xs font-semibold text-blue-600 mb-1.5">📦 Base asignada</p>
-                      {base.length === 0 ? (
-                        <p className="text-xs text-gray-400 italic">Sin asignar</p>
-                      ) : (
-                        <div className="space-y-1">
-                          {base.map((item, j) => (
-                            <div key={j} className="flex items-center justify-between text-xs
-                              bg-blue-50 border border-blue-100 rounded-lg px-2 py-1.5">
-                              <span className="text-gray-700 truncate mr-1 flex-1 min-w-0">{item.nombre}</span>
-                              <span className="font-bold text-blue-700 flex-shrink-0">{item.cantidad}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Hoy */}
-                    <div>
-                      <p className="text-xs font-semibold text-green-600 mb-1.5">🚛 Hoy despachado</p>
-                      {hoyList.length === 0 ? (
-                        <p className="text-xs text-gray-400 italic">Sin despacho hoy</p>
-                      ) : (
-                        <div className="space-y-1">
-                          {hoyList.map((item, j) => (
-                            <div key={j} className="flex items-center justify-between text-xs
-                              bg-green-50 border border-green-100 rounded-lg px-2 py-1.5">
-                              <span className="text-gray-700 truncate mr-1 flex-1 min-w-0">{item.nombre}</span>
-                              <span className="font-bold text-green-700 flex-shrink-0">{item.cantidad}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+      {/* ═══════════════════════════════════════════════════════════
+          SECCIÓN: PUNTOS QUINCENA
+      ═══════════════════════════════════════════════════════════ */}
+      {seccion === "puntos" && (
+        <div className="space-y-4">
+          {/* Filtro */}
+          <div className="bg-white rounded-xl shadow-sm p-4 space-y-2">
+            <div className="flex items-center gap-3">
+              <label className="text-xs font-semibold text-gray-600 flex-shrink-0">Filtrar:</label>
+              <select
+                value={selChofer}
+                onChange={(e) => {
+                  setSelChofer(e.target.value);
+                  if (e.target.value !== "todos")
+                    setTimeout(() => rankingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                }}
+                className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-800
+                  outline-none focus:ring-2 focus:ring-[#F5C800] bg-white"
+              >
+                <option value="todos">Todos los choferes ({choferes.length})</option>
+                {choferes.map((c) => (
+                  <option key={c.uid} value={c.uid}>
+                    {c.nombre}{c.ficha ? ` · Ficha ${c.ficha}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center justify-between text-xs text-gray-400">
+              <span>📅 {quincena.label} actual</span>
+              <span>Meta: <strong className="text-gray-600">{meta} pts</strong></span>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Ranking */}
+          <div ref={rankingRef} className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gradient-to-r from-[#F5C800] to-amber-500 flex items-center justify-between">
+              <h2 className="text-[#1A1A1A] font-bold text-sm">⭐ Puntos — {quincena.label}</h2>
+              {selChofer !== "todos" && (
+                <button onClick={() => setSelChofer("todos")}
+                  className="text-xs text-[#1A1A1A]/60 hover:text-[#1A1A1A] underline">
+                  Ver todos
+                </button>
+              )}
+            </div>
+
+            {rankingVista.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">Sin datos de puntos esta quincena</p>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {rankingVista.map((c, i) => {
+                  const realRank = ranking.findIndex((r) => r.uid === c.uid);
+                  const pct      = meta > 0 ? Math.min((c.puntos / meta) * 100, 100) : 0;
+                  const medal    = realRank === 0 ? "🥇" : realRank === 1 ? "🥈" : realRank === 2 ? "🥉" : null;
+                  const barColor = pct >= 100 ? "bg-[#1E8C3A]" : pct >= 60 ? "bg-[#F5C800]" : pct >= 30 ? "bg-blue-400" : "bg-gray-300";
+
+                  return (
+                    <div key={c.uid}>
+                      <button
+                        onClick={() => setSelChofer(c.uid === selChofer ? "todos" : c.uid)}
+                        className={`w-full px-4 py-3 text-left hover:bg-gray-50 active:scale-[0.99] transition-all ${
+                          selChofer === c.uid ? "bg-amber-50" : ""
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl flex-shrink-0 w-8 text-center">
+                            {medal ?? <span className="text-sm text-gray-400">{realRank + 1}</span>}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <p className="text-sm font-semibold text-gray-800 truncate mr-2">{c.nombre}</p>
+                              <span className={`text-base font-bold flex-shrink-0 ${
+                                c.puntos >= meta ? "text-[#1E8C3A]" : "text-gray-700"
+                              }`}>
+                                {c.puntos} <span className="text-xs font-normal text-gray-400">pts</span>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-gray-400 flex-shrink-0 w-8 text-right">
+                                {Math.round(pct)}%
+                              </span>
+                            </div>
+                            {pct >= 100 && (
+                              <p className="text-xs text-[#1E8C3A] font-medium mt-0.5">✅ Meta alcanzada</p>
+                            )}
+                          </div>
+                          {c.ficha && (
+                            <span className="text-xs text-gray-400 flex-shrink-0">#{c.ficha}</span>
+                          )}
+                        </div>
+                      </button>
+
+                      {selChofer === c.uid && c.detalle.length > 0 && (
+                        <div className="px-4 pb-3 pt-1 bg-amber-50 border-t border-amber-100">
+                          <p className="text-xs font-semibold text-amber-700 mb-1.5">Desglose por producto</p>
+                          <div className="space-y-1">
+                            {c.detalle
+                              .sort((a, b) => b.total - a.total)
+                              .map((d, j) => (
+                                <div key={j} className="flex items-center justify-between text-xs bg-white rounded-lg px-3 py-1.5 border border-amber-100">
+                                  <span className="text-gray-700 flex-1 truncate mr-2">{d.nombre}</span>
+                                  <span className="text-gray-400 flex-shrink-0 mr-2">{d.cantidad} × {d.ptsUnitario}</span>
+                                  <span className="font-bold text-amber-600 flex-shrink-0">{d.total} pts</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                      {selChofer === c.uid && c.detalle.length === 0 && (
+                        <p className="text-xs text-gray-400 italic px-4 pb-2 pt-1 bg-amber-50 border-t border-amber-100">
+                          Sin entregas con puntos esta quincena
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════
+          SECCIÓN: INVENTARIO DESPACHADO HOY
+      ═══════════════════════════════════════════════════════════ */}
+      {seccion === "inventario" && (
+        <div className="space-y-4">
+          {/* Filtro */}
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <label className="text-xs font-semibold text-gray-600 flex-shrink-0">Filtrar:</label>
+              <select
+                value={selChofer}
+                onChange={(e) => setSelChofer(e.target.value)}
+                className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-800
+                  outline-none focus:ring-2 focus:ring-[#F5C800] bg-white"
+              >
+                <option value="todos">Todos los choferes ({choferes.length})</option>
+                {choferes.map((c) => (
+                  <option key={c.uid} value={c.uid}>
+                    {c.nombre}{c.ficha ? ` · Ficha ${c.ficha}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-800 flex items-center justify-between">
+              <h2 className="text-white font-bold text-sm">🚛 Inventario despachado hoy</h2>
+              {selChofer !== "todos" && (
+                <button onClick={() => setSelChofer("todos")}
+                  className="text-xs text-blue-200 hover:text-white underline">
+                  Ver todos
+                </button>
+              )}
+            </div>
+
+            {choferesVista.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">Sin choferes activos</p>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {choferesVista.map((c) => {
+                  const base: InventarioBaseItem[] = c.inventario_base ?? [];
+                  const hoyMap = invHoy.get(c.uid);
+                  const hoyList = hoyMap ? Array.from(hoyMap.values()) : [];
+                  const totalBase = base.reduce((s, i) => s + i.cantidad, 0);
+                  const totalHoy  = hoyList.reduce((s, i) => s + i.cantidad, 0);
+
+                  return (
+                    <div key={c.uid}>
+                      <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50">
+                        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center
+                          text-white text-xs font-bold flex-shrink-0">
+                          {c.nombre.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 truncate">{c.nombre}</p>
+                          {c.ficha && <p className="text-xs text-gray-400">Ficha #{c.ficha}</p>}
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0 text-xs">
+                          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                            Base: {totalBase}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full font-medium ${
+                            totalHoy > 0
+                              ? "bg-green-100 text-[#1E8C3A]"
+                              : "bg-gray-100 text-gray-400"
+                          }`}>
+                            Hoy: {totalHoy}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 px-4 py-3">
+                        <div>
+                          <p className="text-xs font-semibold text-blue-600 mb-1.5">📦 Base asignada</p>
+                          {base.length === 0 ? (
+                            <p className="text-xs text-gray-400 italic">Sin asignar</p>
+                          ) : (
+                            <div className="space-y-1">
+                              {base.map((item, j) => (
+                                <div key={j} className="flex items-center justify-between text-xs
+                                  bg-blue-50 border border-blue-100 rounded-lg px-2 py-1.5">
+                                  <span className="text-gray-700 truncate mr-1 flex-1 min-w-0">{item.nombre}</span>
+                                  <span className="font-bold text-blue-700 flex-shrink-0">{item.cantidad}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold text-[#1E8C3A] mb-1.5">🚛 Hoy despachado</p>
+                          {hoyList.length === 0 ? (
+                            <p className="text-xs text-gray-400 italic">Sin despacho hoy</p>
+                          ) : (
+                            <div className="space-y-1">
+                              {hoyList.map((item, j) => (
+                                <div key={j} className="flex items-center justify-between text-xs
+                                  bg-green-50 border border-green-100 rounded-lg px-2 py-1.5">
+                                  <span className="text-gray-700 truncate mr-1 flex-1 min-w-0">{item.nombre}</span>
+                                  <span className="font-bold text-[#1E8C3A] flex-shrink-0">{item.cantidad}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de registro / detalle ── */}
+      {modalChofer && (
+        <RegistrarInventario
+          uid={modalChofer.uid}
+          nombre={modalChofer.nombre}
+          ficha={modalChofer.ficha}
+          onClose={() => setModalChofer(null)}
+        />
+      )}
     </div>
   );
 }

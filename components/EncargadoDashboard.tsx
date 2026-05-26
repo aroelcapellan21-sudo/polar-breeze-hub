@@ -54,12 +54,14 @@ export default function EncargadoDashboard() {
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* ── Header ── */}
-      <header className="bg-gradient-to-r from-emerald-700 to-emerald-900 text-white shadow-lg sticky top-0 z-30">
+      {/* ── Header Polar Breeze ── */}
+      <header className="bg-[#1A1A1A] text-white shadow-lg sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
 
-          <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center font-black text-sm flex-shrink-0">
-            PB
+          {/* Logo tricolor 🧊 */}
+          <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 relative flex items-center justify-center"
+               style={{ background: "linear-gradient(135deg, rgba(245,200,0,0.85) 33%, rgba(212,43,43,0.85) 33% 66%, rgba(30,140,58,0.85) 66%)" }}>
+            <span className="text-lg relative z-10">🧊</span>
           </div>
 
           <nav className="flex gap-1 flex-1">
@@ -70,8 +72,8 @@ export default function EncargadoDashboard() {
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
                   whitespace-nowrap transition-all duration-100 active:scale-95 flex-shrink-0 ${
                   tab === t.key
-                    ? "bg-white text-emerald-800 shadow-sm"
-                    : "text-emerald-200 hover:bg-white/10 hover:text-white"
+                    ? "bg-[#F5C800] text-[#1A1A1A] shadow-sm font-bold"
+                    : "text-gray-300 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <span>{t.icon}</span>
@@ -91,7 +93,7 @@ export default function EncargadoDashboard() {
             </button>
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium leading-tight">{profile?.nombre}</p>
-              <span className="text-xs text-emerald-300">Encargado</span>
+              <span className="text-xs text-[#F5C800]">Encargado</span>
             </div>
             <button
               onClick={logout}
@@ -103,11 +105,14 @@ export default function EncargadoDashboard() {
           </div>
         </div>
 
-        <div className="border-t border-white/10 bg-black/10">
-          <div className="max-w-2xl mx-auto px-4 py-1.5 text-xs text-emerald-200">
-            {tab === "lote"     && <span className="text-white font-medium">📦 Registrar lote — entrada de mercancía al loker</span>}
-            {tab === "stock"    && <span className="text-white font-medium">📊 Stock actual — saldo del loker en tiempo real</span>}
-            {tab === "choferes" && <span className="text-white font-medium">👥 Choferes — puntos quincena e inventario</span>}
+        {/* Banda tricolor */}
+        <div className="pb-tricolor" />
+
+        <div className="border-t border-white/10 bg-black/20">
+          <div className="max-w-2xl mx-auto px-4 py-1.5 text-xs text-gray-300">
+            {tab === "lote"     && <span className="text-[#F5C800] font-medium">📦 Registrar lote — entrada de mercancía al loker</span>}
+            {tab === "stock"    && <span className="text-[#F5C800] font-medium">📊 Stock actual — saldo del loker en tiempo real</span>}
+            {tab === "choferes" && <span className="text-[#F5C800] font-medium">👥 Choferes — puntos quincena e inventario del día</span>}
           </div>
         </div>
       </header>
