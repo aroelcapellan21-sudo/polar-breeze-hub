@@ -73,7 +73,12 @@ function esHoy(d: Date): boolean {
 // ── Sección activa del tab ───────────────────────────────────────────────────
 type Seccion = "puntos" | "inventario" | "cierre";
 
-export default function ConsultaChoferes() {
+interface Props {
+  /** Reporta cuántos choferes están pendientes al padre (para el badge del tab) */
+  onPendientesChange?: (n: number) => void;
+}
+
+export default function ConsultaChoferes({ onPendientesChange }: Props) {
   const [choferes,    setChoferes]    = useState<UserProfile[]>([]);
   const [talonarios,  setTalonarios]  = useState<TalonarioDoc[]>([]);
   const [extras,      setExtras]      = useState<MovimientoLoker[]>([]);
@@ -210,6 +215,11 @@ export default function ConsultaChoferes() {
   const cerrados   = Object.keys(invGuardados).length;
   const pendientes = choferes.length - cerrados;
 
+  // Reportar badge al padre (EncargadoDashboard)
+  useEffect(() => {
+    onPendientesChange?.(pendientes);
+  }, [pendientes, onPendientesChange]);
+
   if (cargando) {
     return (
       <div className="text-center py-16 text-gray-400">
@@ -274,6 +284,49 @@ export default function ConsultaChoferes() {
             <div className="flex-1 bg-[#1E8C3A]" />
           </div>
 
+          {/* ── Barra de progreso de la jornada — §24 ── */}
+          {choferes.length > 0 && (
+            <div className="px-4 pt-3 pb-2 bg-gray-50 border-b border-gray-100">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-gray-500">Progreso de la jornada</span>
+                <span className="text-xs font-black text-[#1A1A1A]">
+                  {cerrados}/{choferes.length}
+                </span>
+              </div>
+              {/* Barra tricolor animada */}
+              <div className="h-2.5 rounded-full bg-gray-200 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{
+                    width: `${Math.max(2, (cerrados / choferes.length) * 100)}%`,
+                    background: cerrados === 0
+                      ? "#F5C800"
+                      : cerrados === choferes.length
+                      ? "#1E8C3A"
+                      : "linear-gradient(90deg, #F5C800 0%, #D42B2B 50%, #1E8C3A 100%)",
+                  }}
+                />
+              </div>
+              {/* Chips de estado rápido */}
+              <div className="flex items-center gap-2 mt-2 text-[10px] font-semibold">
+                <span className="flex items-center gap-1 text-[#1E8C3A]">
+                  <span className="w-2 h-2 rounded-full bg-[#1E8C3A]" />
+                  {cerrados} Cerrados
+                </span>
+                <span className="flex items-center gap-1 text-amber-600">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  {pendientes} Pendientes
+                </span>
+                {esTarde && esDiaHoy && pendientes > 0 && (
+                  <span className="flex items-center gap-1 text-[#D42B2B] animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-[#D42B2B]" />
+                    {pendientes} Tarde
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Selector de fecha — §24 */}
           <div className="px-4 py-2.5 border-b border-gray-100 flex items-center gap-3 bg-gray-50">
             <span className="text-xs text-gray-500 font-medium flex-shrink-0">📅 Fecha:</span>
@@ -303,80 +356,120 @@ export default function ConsultaChoferes() {
             )}
           </div>
 
-          {/* Lista de choferes con 3 estados */}
+          {/* ── Lista con panel lateral en tablet — §24 ── */}
           {choferes.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">Sin choferes activos</p>
           ) : (
-            <div className="divide-y divide-gray-50">
-              {choferes.map((c) => {
-                const inv       = c.ficha ? invGuardados[c.ficha] : undefined;
-                const guardado  = !!inv;
-                // 🚨 tarde: es hoy, pasó de 22h y no tiene cierre
-                const tarde     = esTarde && esDiaHoy && !guardado && !!c.ficha;
-                const tot       = inv?.totales;
+            <div className="lg:flex">
 
-                return (
-                  <button
-                    key={c.uid}
-                    onClick={() => {
-                      if (!c.ficha) return;
-                      setModalChofer({ uid: c.uid, nombre: c.nombre, ficha: c.ficha });
-                    }}
-                    disabled={!c.ficha}
-                    className={`w-full px-4 py-3 flex items-center gap-3 text-left
-                      hover:bg-gray-50 active:scale-[0.99] transition-all ${
-                        guardado ? "bg-green-50/40" : tarde ? "bg-red-50/30" : ""
-                      }`}
-                  >
-                    {/* Chip de estado — §24 */}
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center
-                      text-white text-xs font-bold flex-shrink-0 ${
-                        guardado ? "bg-[#1E8C3A]"
-                          : tarde  ? "bg-[#D42B2B] animate-pulse"
-                          : "bg-gray-400"
-                      }`}>
-                      {guardado ? "✅" : tarde ? "🚨" : c.nombre.charAt(0).toUpperCase()}
-                    </div>
+              {/* Panel lateral fijo — solo tablet/desktop (§24) */}
+              <aside className="hidden lg:block w-56 flex-shrink-0 border-r border-gray-100
+                border-l-4 border-l-[#F5C800] bg-gray-50/60">
+                <p className="px-3 py-2 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                  Choferes ({choferes.length})
+                </p>
+                <div className="overflow-y-auto max-h-[420px]">
+                  {choferes.map((c) => {
+                    const guardado = !!(c.ficha && invGuardados[c.ficha]);
+                    const tarde    = esTarde && esDiaHoy && !guardado && !!c.ficha;
+                    return (
+                      <button
+                        key={c.uid}
+                        onClick={() => c.ficha && setModalChofer({ uid: c.uid, nombre: c.nombre, ficha: c.ficha })}
+                        disabled={!c.ficha}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left
+                          hover:bg-white active:scale-[0.98] transition-all border-b border-gray-100"
+                      >
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          guardado ? "bg-[#1E8C3A]"
+                            : tarde ? "bg-[#D42B2B] animate-pulse"
+                            : "bg-amber-400"
+                        }`} />
+                        <span className="text-xs font-medium text-gray-700 truncate flex-1">
+                          {c.nombre.split(" ")[0]}
+                        </span>
+                        {c.ficha && (
+                          <span className="text-[9px] text-gray-400 flex-shrink-0">#{c.ficha}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </aside>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{c.nombre}</p>
-                      <p className="text-xs text-gray-400">
-                        {c.ficha ? `Ficha #${c.ficha}` : "Sin ficha"}
-                      </p>
-                      {guardado && tot && (
-                        <p className="text-xs text-[#1E8C3A] font-medium mt-0.5">
-                          {tot.vendido} vendidos · RD${tot.total_rd.toLocaleString("es-DO", { maximumFractionDigits: 0 })}
+              {/* Lista principal */}
+              <div className="flex-1 divide-y divide-gray-50">
+                {choferes.map((c) => {
+                  const inv      = c.ficha ? invGuardados[c.ficha] : undefined;
+                  const guardado = !!inv;
+                  const tarde    = esTarde && esDiaHoy && !guardado && !!c.ficha;
+                  const tot      = inv?.totales;
+
+                  return (
+                    <button
+                      key={c.uid}
+                      onClick={() => {
+                        if (!c.ficha) return;
+                        setModalChofer({ uid: c.uid, nombre: c.nombre, ficha: c.ficha });
+                      }}
+                      disabled={!c.ficha}
+                      className={`w-full px-4 py-3 flex items-center gap-3 text-left
+                        hover:bg-gray-50 active:scale-[0.99] transition-all ${
+                          guardado ? "bg-green-50/40" : tarde ? "bg-red-50/30" : ""
+                        }`}
+                    >
+                      {/* Chip de estado — §24: ⏳ amarillo · ✅ verde · 🚨 rojo parpadeante */}
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center
+                        text-white text-xs font-bold flex-shrink-0 shadow-sm ${
+                          guardado ? "bg-[#1E8C3A]"
+                            : tarde  ? "bg-[#D42B2B] animate-pulse"
+                            : "bg-[#F5C800]"
+                        }`}>
+                        <span className={guardado ? "" : tarde ? "" : "text-[#1A1A1A]"}>
+                          {guardado ? "✅" : tarde ? "🚨" : "⏳"}
+                        </span>
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{c.nombre}</p>
+                        <p className="text-xs text-gray-400">
+                          {c.ficha ? `Ficha #${c.ficha}` : "Sin ficha"}
                         </p>
-                      )}
-                      {tarde && (
-                        <p className="text-xs text-[#D42B2B] font-medium mt-0.5">
-                          Sin reportar — más de 10 pm
-                        </p>
-                      )}
-                    </div>
+                        {guardado && tot && (
+                          <p className="text-xs text-[#1E8C3A] font-medium mt-0.5">
+                            {tot.vendido} vendidos · RD${tot.total_rd.toLocaleString("es-DO", { maximumFractionDigits: 0 })}
+                          </p>
+                        )}
+                        {tarde && (
+                          <p className="text-xs text-[#D42B2B] font-bold mt-0.5 animate-pulse">
+                            ⚠ Sin reportar — más de 10 pm
+                          </p>
+                        )}
+                      </div>
 
-                    {/* Badge de estado */}
-                    <div className="flex-shrink-0">
-                      {guardado ? (
-                        <span className="text-xs bg-green-100 text-[#1E8C3A] font-bold px-2 py-0.5 rounded-full border border-green-200">
-                          Ver detalle
-                        </span>
-                      ) : tarde ? (
-                        <span className="text-xs bg-red-100 text-[#D42B2B] font-bold px-2 py-0.5 rounded-full border border-red-200">
-                          🚨 Tarde
-                        </span>
-                      ) : c.ficha ? (
-                        <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full border border-amber-200">
-                          ⏳ Registrar
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-300">Sin ficha</span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+                      {/* Badge */}
+                      <div className="flex-shrink-0">
+                        {guardado ? (
+                          <span className="text-xs bg-green-100 text-[#1E8C3A] font-bold px-2 py-0.5 rounded-full border border-green-200">
+                            Ver ›
+                          </span>
+                        ) : tarde ? (
+                          <span className="text-xs bg-red-100 text-[#D42B2B] font-bold px-2 py-0.5 rounded-full border border-red-200 animate-pulse">
+                            🚨 Tarde
+                          </span>
+                        ) : c.ficha ? (
+                          <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                            ⏳ Registrar
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-300">Sin ficha</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
