@@ -146,8 +146,9 @@ export default function EncargadoDashboard() {
             <button
               onClick={() => scrollNav("left")}
               aria-hidden={!canScrollLeft}
-              className={`flex-shrink-0 w-6 h-7 rounded-md flex items-center justify-center
+              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
                 text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+                text-lg font-bold leading-none
                 ${canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"}`}
             >
               ‹
@@ -186,8 +187,9 @@ export default function EncargadoDashboard() {
             <button
               onClick={() => scrollNav("right")}
               aria-hidden={!canScrollRight}
-              className={`flex-shrink-0 w-6 h-7 rounded-md flex items-center justify-center
+              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
                 text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+                text-lg font-bold leading-none
                 ${canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"}`}
             >
               ›

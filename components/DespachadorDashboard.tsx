@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   collection, getDocs, doc, setDoc, updateDoc, Timestamp, getDoc,
 } from "firebase/firestore";
@@ -116,6 +116,42 @@ export default function DespachadorDashboard() {
     }
   };
 
+  // ── Flechas de navegación de tabs ────────────────────────────────────────
+  const navRef  = useRef<HTMLElement>(null);
+  const [canScrollLeft,  setCanScrollLeft]  = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = navRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener("scroll", checkScroll, { passive: true });
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", checkScroll); ro.disconnect(); };
+  }, [checkScroll]);
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const active = el.querySelector<HTMLButtonElement>("[data-active='true']");
+    if (active) active.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    setTimeout(checkScroll, 300);
+  }, [tab, checkScroll]);
+
+  const scrollNav = (dir: "left" | "right") => {
+    const el = navRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir === "right" ? 140 : -140, behavior: "smooth" });
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
 
@@ -140,25 +176,56 @@ export default function DespachadorDashboard() {
             </div>
           </div>
 
-          {/* Tabs */}
-          <nav className="flex gap-1 flex-1 overflow-x-auto scrollbar-none">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm
-                  font-medium whitespace-nowrap transition-all duration-100 active:scale-95
-                  flex-shrink-0 ${
-                  tab === t.key
-                    ? "bg-[#F5C800] text-[#1A1A1A] shadow-sm font-bold"
-                    : "text-gray-300 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <span>{t.icon}</span>
-                <span className="hidden sm:inline">{t.label}</span>
-              </button>
-            ))}
-          </nav>
+          {/* Tabs con scroll + flechas */}
+          <div className="flex-1 flex items-center gap-0.5 min-w-0">
+
+            {/* Flecha izquierda */}
+            <button
+              onClick={() => scrollNav("left")}
+              aria-hidden={!canScrollLeft}
+              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
+                text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+                text-lg font-bold leading-none
+                ${canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+            >
+              ‹
+            </button>
+
+            <nav
+              ref={navRef}
+              className="flex gap-1 overflow-x-auto scrollbar-none flex-1 scroll-smooth"
+            >
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  data-active={tab === t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm
+                    font-medium whitespace-nowrap transition-all duration-100 active:scale-95
+                    flex-shrink-0 ${
+                    tab === t.key
+                      ? "bg-[#F5C800] text-[#1A1A1A] shadow-sm font-bold"
+                      : "text-gray-300 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <span>{t.icon}</span>
+                  <span className="hidden sm:inline">{t.label}</span>
+                </button>
+              ))}
+            </nav>
+
+            {/* Flecha derecha */}
+            <button
+              onClick={() => scrollNav("right")}
+              aria-hidden={!canScrollRight}
+              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
+                text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+                text-lg font-bold leading-none
+                ${canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+            >
+              ›
+            </button>
+          </div>
 
           {/* Acciones */}
           <div className="flex items-center gap-1.5 flex-shrink-0">

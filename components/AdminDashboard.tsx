@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
@@ -117,6 +117,42 @@ export default function AdminDashboard() {
 
   const volverALista = () => setChofer(null);
 
+  // ── Flechas de navegación de tabs ────────────────────────────────────────
+  const navRef  = useRef<HTMLElement>(null);
+  const [canScrollLeft,  setCanScrollLeft]  = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = navRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener("scroll", checkScroll, { passive: true });
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", checkScroll); ro.disconnect(); };
+  }, [checkScroll]);
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const active = el.querySelector<HTMLButtonElement>("[data-active='true']");
+    if (active) active.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    setTimeout(checkScroll, 300);
+  }, [tab, checkScroll]);
+
+  const scrollNav = (dir: "left" | "right") => {
+    const el = navRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir === "right" ? 140 : -140, behavior: "smooth" });
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
 
@@ -141,91 +177,132 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Tabs */}
-          <nav className="flex gap-1 flex-1 overflow-x-auto scrollbar-none">
-            <NavTab
-              active={tab === "overview"}
-              onClick={() => { setTab("overview"); setChofer(null); }}
+          {/* Tabs con scroll + flechas */}
+          <div className="flex-1 flex items-center gap-0.5 min-w-0">
+
+            {/* Flecha izquierda */}
+            <button
+              onClick={() => scrollNav("left")}
+              aria-hidden={!canScrollLeft}
+              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
+                text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+                text-lg font-bold leading-none
+                ${canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"}`}
             >
-              <span>🏠</span>
-              <span className="hidden sm:inline">Overview</span>
-            </NavTab>
-            <NavTab
-              active={tab === "choferes"}
-              onClick={() => setTab("choferes")}
+              ‹
+            </button>
+
+            <nav
+              ref={navRef}
+              className="flex gap-1 overflow-x-auto scrollbar-none flex-1 scroll-smooth"
             >
-              <span>👥</span>
-              <span className="hidden sm:inline">Choferes</span>
-              {chofer && (
-                <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded-full hidden sm:inline">
-                  {chofer.nombre.split(" ")[0]}
-                </span>
-              )}
-            </NavTab>
-            <NavTab
-              active={tab === "inventario"}
-              onClick={() => { setTab("inventario"); setChofer(null); }}
+              <NavTab
+                data-active={tab === "overview"}
+                active={tab === "overview"}
+                onClick={() => { setTab("overview"); setChofer(null); }}
+              >
+                <span>🏠</span>
+                <span className="hidden sm:inline">Overview</span>
+              </NavTab>
+              <NavTab
+                data-active={tab === "choferes"}
+                active={tab === "choferes"}
+                onClick={() => setTab("choferes")}
+              >
+                <span>👥</span>
+                <span className="hidden sm:inline">Choferes</span>
+                {chofer && (
+                  <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded-full hidden sm:inline">
+                    {chofer.nombre.split(" ")[0]}
+                  </span>
+                )}
+              </NavTab>
+              <NavTab
+                data-active={tab === "inventario"}
+                active={tab === "inventario"}
+                onClick={() => { setTab("inventario"); setChofer(null); }}
+              >
+                <span>📦</span>
+                <span className="hidden sm:inline">Inventario</span>
+              </NavTab>
+              <NavTab
+                data-active={tab === "estado"}
+                active={tab === "estado"}
+                onClick={() => { setTab("estado"); setChofer(null); }}
+              >
+                <span>🖥️</span>
+                <span className="hidden sm:inline">Estado</span>
+              </NavTab>
+              <NavTab
+                data-active={tab === "informes"}
+                active={tab === "informes"}
+                onClick={() => { setTab("informes"); setChofer(null); }}
+              >
+                <span>📋</span>
+                <span className="hidden sm:inline">Informes</span>
+              </NavTab>
+              <NavTab
+                data-active={tab === "anomalias"}
+                active={tab === "anomalias"}
+                onClick={() => { setTab("anomalias"); setChofer(null); }}
+              >
+                <span>⚠️</span>
+                <span className="hidden sm:inline">Anomalías</span>
+              </NavTab>
+              <NavTab
+                data-active={tab === "encargados"}
+                active={tab === "encargados"}
+                onClick={() => { setTab("encargados"); setChofer(null); }}
+              >
+                <span>🏭</span>
+                <span className="hidden sm:inline">Encargados</span>
+              </NavTab>
+              <NavTab
+                data-active={tab === "anom_desp"}
+                active={tab === "anom_desp"}
+                onClick={() => { setTab("anom_desp"); setChofer(null); }}
+              >
+                <span>📋</span>
+                <span className="hidden sm:inline">Anomalías Desp.</span>
+              </NavTab>
+              <NavTab
+                data-active={tab === "reportes"}
+                active={tab === "reportes"}
+                onClick={() => { setTab("reportes"); setChofer(null); }}
+              >
+                <span>📊</span>
+                <span className="hidden sm:inline">Reportes</span>
+              </NavTab>
+              <NavTab
+                data-active={tab === "codigos"}
+                active={tab === "codigos"}
+                onClick={() => { setTab("codigos"); setChofer(null); }}
+              >
+                <span>🔲</span>
+                <span className="hidden sm:inline">Códigos</span>
+              </NavTab>
+              <NavTab
+                data-active={tab === "pwa"}
+                active={tab === "pwa"}
+                onClick={() => { setTab("pwa"); setChofer(null); }}
+              >
+                <span>📱</span>
+                <span className="hidden sm:inline">PWA</span>
+              </NavTab>
+            </nav>
+
+            {/* Flecha derecha */}
+            <button
+              onClick={() => scrollNav("right")}
+              aria-hidden={!canScrollRight}
+              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
+                text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+                text-lg font-bold leading-none
+                ${canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"}`}
             >
-              <span>📦</span>
-              <span className="hidden sm:inline">Inventario</span>
-            </NavTab>
-            <NavTab
-              active={tab === "estado"}
-              onClick={() => { setTab("estado"); setChofer(null); }}
-            >
-              <span>🖥️</span>
-              <span className="hidden sm:inline">Estado</span>
-            </NavTab>
-            <NavTab
-              active={tab === "informes"}
-              onClick={() => { setTab("informes"); setChofer(null); }}
-            >
-              <span>📋</span>
-              <span className="hidden sm:inline">Informes</span>
-            </NavTab>
-            <NavTab
-              active={tab === "anomalias"}
-              onClick={() => { setTab("anomalias"); setChofer(null); }}
-            >
-              <span>⚠️</span>
-              <span className="hidden sm:inline">Anomalías</span>
-            </NavTab>
-            <NavTab
-              active={tab === "encargados"}
-              onClick={() => { setTab("encargados"); setChofer(null); }}
-            >
-              <span>🏭</span>
-              <span className="hidden sm:inline">Encargados</span>
-            </NavTab>
-            <NavTab
-              active={tab === "anom_desp"}
-              onClick={() => { setTab("anom_desp"); setChofer(null); }}
-            >
-              <span>📋</span>
-              <span className="hidden sm:inline">Anomalías Desp.</span>
-            </NavTab>
-            <NavTab
-              active={tab === "reportes"}
-              onClick={() => { setTab("reportes"); setChofer(null); }}
-            >
-              <span>📊</span>
-              <span className="hidden sm:inline">Reportes</span>
-            </NavTab>
-            <NavTab
-              active={tab === "codigos"}
-              onClick={() => { setTab("codigos"); setChofer(null); }}
-            >
-              <span>🔲</span>
-              <span className="hidden sm:inline">Códigos</span>
-            </NavTab>
-            <NavTab
-              active={tab === "pwa"}
-              onClick={() => { setTab("pwa"); setChofer(null); }}
-            >
-              <span>📱</span>
-              <span className="hidden sm:inline">PWA</span>
-            </NavTab>
-          </nav>
+              ›
+            </button>
+          </div>
 
           {/* Acciones */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -429,12 +506,14 @@ export default function AdminDashboard() {
   );
 }
 
-function NavTab({ active, onClick, children }: {
+function NavTab({ active, onClick, children, "data-active": dataActive }: {
   active: boolean; onClick: () => void; children: React.ReactNode;
+  "data-active"?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
+      data-active={dataActive ?? active}
       className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium
         transition-all duration-100 active:scale-95 whitespace-nowrap flex-shrink-0 ${
         active
