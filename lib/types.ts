@@ -282,3 +282,37 @@ export function fmtDate(ts: Date | { seconds: number } | undefined): string {
   if (!d.getTime()) return "—";
   return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
+
+// ─── Polar Breeze Weight — escáner + báscula BT ───────────────────────────────
+
+export interface CodigoCaja {
+  codigo:          string;
+  producto:        string;
+  unidadesPorCaja: number;
+  pesoCajaKg?:     number;
+  creadoEn?:       Date | { seconds: number };
+  creadoPor?:      string;
+}
+
+export interface WeightItem {
+  codigo:    string;
+  producto:  string;
+  nCajas:    number;
+  unidades:  number;
+  peso_kg:   number | null;
+  timestamp: Date | { seconds: number };
+}
+
+export interface LoteWeight {
+  id?:               string;
+  numero:            string;
+  proveedor?:        string;
+  items:             WeightItem[];
+  totalUnidades:     number;
+  totalPesoKg:       number | null;
+  encargadoId:       string;
+  encargadoNombre:   string;
+  timestamp:         Date | { seconds: number };
+  estado:            "activo" | "cerrado";
+  notas?:            string;
+}
