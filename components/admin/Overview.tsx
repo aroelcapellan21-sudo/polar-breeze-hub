@@ -15,6 +15,7 @@ import {
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
+import SalesChart from "@/components/admin/SalesChart";
 
 interface Props {
   onVerChofer: (c: UserProfile) => void;
@@ -28,6 +29,17 @@ const SEM: Record<Semaforo, { icon: string; ring: string; bg: string; label: str
 
 type KpiModal = "choferes" | "despachos" | "facturado" | "alertas" | null;
 
+// ── Colección alertas (Encargado + sistema) ───────────────────────────────────
+interface AlertaDoc {
+  id?: string;
+  tipo:         string;          // "stock_bajo" | "alerta_peso" | "sistema" | …
+  severidad:    "info" | "warning" | "critical";
+  mensaje:      string;
+  chofer_ficha?: string;
+  leida:        boolean;
+  creada_en:    Date | { seconds: number };
+}
+
 type HistItem = {
   key: string; ts: Date; label: string;
   top: string; sub: string; source: "facturascan" | "hub-sp" | "hub-fac" | "hub-imb";
@@ -36,15 +48,17 @@ type HistItem = {
 type ItemModal = { type: "alerta"; data: WeightAlert } | { type: "hist"; data: HistItem } | { type: "feed"; top: string; sub: string } | null;
 
 export default function Overview({ onVerChofer }: Props) {
-  const [kpiModal, setKpiModal] = useState<KpiModal>(null);
-  const [itemModal, setItemModal] = useState<ItemModal>(null);
+  const [kpiModal,       setKpiModal]       = useState<KpiModal>(null);
+  const [itemModal,      setItemModal]      = useState<ItemModal>(null);
+  const [rankingExpand,  setRankingExpand]  = useState(false);
 
   // ── Listeners existentes del Hub (sin cambios) ────────────────────────────
-  const [choferes, setChoferes] = useState<UserProfile[]>([]);
-  const [spikin,   setSpikin]   = useState<SpikinScanRecord[]>([]);
-  const [factura,  setFactura]  = useState<FacturaScanRecord[]>([]);
-  const [imb,      setImb]      = useState<ImbentarioRecord[]>([]);
-  const [alerts,   setAlerts]   = useState<WeightAlert[]>([]);
+  const [choferes,    setChoferes]    = useState<UserProfile[]>([]);
+  const [spikin,      setSpikin]      = useState<SpikinScanRecord[]>([]);
+  const [factura,     setFactura]     = useState<FacturaScanRecord[]>([]);
+  const [imb,         setImb]         = useState<ImbentarioRecord[]>([]);
+  const [alerts,      setAlerts]      = useState<WeightAlert[]>([]);
+  const [alertasVivo, setAlertasVivo] = useState<AlertaDoc[]>([]);
 
   // ── Listeners adicionales de FacturaScan ─────────────────────────────────
   const [fsSession, setFsSession] = useState<FsSession | null>(null);
@@ -97,9 +111,16 @@ export default function Overview({ onVerChofer }: Props) {
       setFsConfig(snap.exists() ? (snap.data() as FsConfig) : null);
     });
 
+    // ── Alertas del Encargado (colección alertas) ─────────────────────────
+    const uAlertasVivo = onSnapshot(
+      query(collection(db, "alertas"), orderBy("creada_en", "desc"), limit(30)),
+      (s) => setAlertasVivo(s.docs.map((d) => ({ id: d.id, ...d.data() } as AlertaDoc)))
+    );
+
     return () => {
       uChof(); uSp(); uFac(); uImb(); uAl();
       uSess(); uDrv(); uHist(); uCfg();
+      uAlertasVivo();
     };
   }, []);
 
@@ -241,6 +262,63 @@ export default function Overview({ onVerChofer }: Props) {
       .slice(0, 40);
   }, [fsHistory, spikin, factura, imb]);
 
+  // ── Distribución de inventario (imbentario — últimos 15d) ────────────────
+  const distribInv = useMemo(() => {
+    const map: Record<string, number> = {};
+    imb.filter(r => toDate(r.timestamp) >= hace15).forEach((r) => {
+      const cat =
+        /paleta/i.test(r.producto)  ? "Paletas"  :
+        /helado|sundae/i.test(r.producto) ? "Helados"  :
+        /agua|refresc/i.test(r.producto) ? "Aguas"    :
+        "Otros";
+      map[cat] = (map[cat] ?? 0) + (r.cantidadEntregada ?? 0);
+    });
+    const total = Object.values(map).reduce((s, v) => s + v, 0);
+    const COLORS = ["#F5C800", "#D42B2B", "#1E8C3A", "#6366f1"];
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, val], i) => ({
+        label, val,
+        pct: total > 0 ? (val / total) * 100 : 0,
+        color: COLORS[i % COLORS.length],
+      }));
+  }, [imb, hace15]);
+
+  // ── Alertas unificadas: colección alertas + weight_alerts ────────────────
+  const todasAlertas = useMemo(() => {
+    const base = alertasVivo.map((a) => ({
+      id:  a.id ?? "",
+      sev: a.severidad === "critical" ? "critical" : a.severidad === "warning" ? "warning" : "info",
+      msg: a.mensaje,
+      sub: a.tipo ?? "",
+      ts:  a.creada_en,
+      leida: a.leida,
+      source: "alertas" as const,
+    }));
+    const weight = alerts.map((a) => ({
+      id:  a.id ?? "",
+      sev: a.severity as "warning" | "critical",
+      msg: `${a.producto} — diferencia ${a.diferencia.toFixed(1)}kg (${a.porcentaje.toFixed(0)}%)`,
+      sub: a.choferNombre,
+      ts:  a.timestamp,
+      leida: false,
+      source: "weight" as const,
+    }));
+    return [...base, ...weight]
+      .sort((a, b) => toDate(b.ts).getTime() - toDate(a.ts).getTime())
+      .slice(0, 25);
+  }, [alertasVivo, alerts]);
+
+  const alertasSinLeer = todasAlertas.filter((a) => !a.leida).length;
+
+  // ── Métricas clave ─────────────────────────────────────────────────────────
+  const tasaCumplimiento = useMemo(() => {
+    const recs15 = imb.filter(r => toDate(r.timestamp) >= hace15);
+    const carg   = recs15.reduce((s, r) => s + (r.cantidadCargada ?? 0), 0);
+    const entr   = recs15.reduce((s, r) => s + (r.cantidadEntregada ?? 0), 0);
+    return carg > 0 ? (entr / carg) * 100 : null;
+  }, [imb, hace15]);
+
   const SOURCE_CFG = {
     "facturascan": { dot: "bg-orange-400",  badge: "bg-orange-50 text-orange-700 border-orange-200",  label: "FacturaScan" },
     "hub-sp":      { dot: "bg-blue-500",    badge: "bg-blue-50   text-blue-700   border-blue-200",    label: "SPIKINSCAN"  },
@@ -337,6 +415,85 @@ export default function Overview({ onVerChofer }: Props) {
           />
         )}
       </div>
+
+      {/* ── Gráfico de ventas — últimos 7 días ── */}
+      <SalesChart />
+
+      {/* ── Métricas clave ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Tasa de cumplimiento */}
+        <div className={`rounded-xl p-4 border text-center ${
+          tasaCumplimiento === null ? "bg-gray-50 border-gray-200"
+          : tasaCumplimiento >= 85  ? "bg-green-50 border-green-200"
+          : tasaCumplimiento >= 70  ? "bg-yellow-50 border-yellow-200"
+          : "bg-red-50 border-red-200"
+        }`}>
+          <p className="text-2xl font-black leading-tight">
+            {tasaCumplimiento !== null ? `${tasaCumplimiento.toFixed(0)}%` : "—"}
+          </p>
+          <p className="text-xs font-medium text-gray-600 mt-1">Cumplimiento</p>
+          <p className="text-xs text-gray-400">15 días</p>
+        </div>
+
+        {/* Alertas sin leer */}
+        <div className={`rounded-xl p-4 border text-center ${
+          alertasSinLeer === 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+        }`}>
+          <p className="text-2xl font-black leading-tight">
+            {alertasSinLeer > 0 ? alertasSinLeer : "✅"}
+          </p>
+          <p className="text-xs font-medium text-gray-600 mt-1">Alertas s/leer</p>
+          <p className="text-xs text-gray-400">total sistema</p>
+        </div>
+
+        {/* Choferes sin actividad hoy */}
+        <div className="rounded-xl p-4 border bg-blue-50 border-blue-200 text-center">
+          <p className="text-2xl font-black leading-tight text-blue-700">
+            {choferes.filter(c => c.activo !== false && !imbHoyPorChofer[c.uid]).length}
+          </p>
+          <p className="text-xs font-medium text-gray-600 mt-1">Sin actividad</p>
+          <p className="text-xs text-gray-400">hoy</p>
+        </div>
+
+        {/* Despachos por chofer promedio */}
+        <div className="rounded-xl p-4 border bg-purple-50 border-purple-200 text-center">
+          <p className="text-2xl font-black leading-tight text-purple-700">
+            {chofActivos > 0
+              ? (kpiDespachos / chofActivos).toFixed(1)
+              : "—"}
+          </p>
+          <p className="text-xs font-medium text-gray-600 mt-1">Despachos/chofer</p>
+          <p className="text-xs text-gray-400">hoy prom.</p>
+        </div>
+      </div>
+
+      {/* ── Distribución de inventario (dona) ── */}
+      {distribInv.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100">
+            <h3 className="font-bold text-gray-800 text-sm">🍦 Distribución de inventario</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Unidades entregadas por categoría — últimos 15 días</p>
+          </div>
+          <div className="p-4 flex items-center gap-6 flex-wrap">
+            {/* Dona SVG */}
+            <DonaChart segmentos={distribInv} />
+
+            {/* Leyenda */}
+            <div className="flex flex-col gap-2 flex-1 min-w-[120px]">
+              {distribInv.map((seg) => (
+                <div key={seg.label} className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: seg.color }} />
+                  <span className="text-xs text-gray-700 font-medium flex-1">{seg.label}</span>
+                  <span className="text-xs text-gray-500">{seg.val.toLocaleString()} uds</span>
+                  <span className="text-xs font-bold" style={{ color: seg.color }}>
+                    {seg.pct.toFixed(0)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── KPI Detail Modal ── */}
       {kpiModal && (
@@ -452,17 +609,27 @@ export default function Overview({ onVerChofer }: Props) {
         </div>
       )}
 
-      {/* ── Ranking de choferes ── */}
+      {/* ── Ranking de choferes — TOP 5 ── */}
       {rankingChoferes.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-amber-100">
-            <h2 className="font-bold text-amber-900">🏆 Ranking de Choferes</h2>
-            <p className="text-xs text-amber-600 mt-0.5">
-              Últimos 15 días · ordenado por {rankingChoferes[0]?.totalMonto > 0 ? "monto vendido" : "unidades entregadas"}
-            </p>
+          <div className="px-5 py-4 bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-amber-100 flex items-center justify-between">
+            <div>
+              <h2 className="font-bold text-amber-900">🏆 TOP 5 — Ranking de Choferes</h2>
+              <p className="text-xs text-amber-600 mt-0.5">
+                Últimos 15 días · {rankingChoferes[0]?.totalMonto > 0 ? "monto vendido" : "unidades entregadas"}
+              </p>
+            </div>
+            {rankingChoferes.length > 5 && (
+              <button
+                onClick={() => setRankingExpand(v => !v)}
+                className="text-xs text-amber-600 hover:text-amber-800 font-medium transition-colors"
+              >
+                {rankingExpand ? "ver TOP 5 ↑" : `ver todos (${rankingChoferes.length}) ↓`}
+              </button>
+            )}
           </div>
           <div className="divide-y divide-gray-50">
-            {rankingChoferes.map(({ chofer, totalEntregado, totalMonto, sem }, i) => {
+            {(rankingExpand ? rankingChoferes : rankingChoferes.slice(0, 5)).map(({ chofer, totalEntregado, totalMonto, sem }, i) => {
               const isPrimero = i === 0;
               return (
                 <button
@@ -522,9 +689,16 @@ export default function Overview({ onVerChofer }: Props) {
               );
             })}
           </div>
-          <div className="px-5 py-2 border-t flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            <span className="text-xs text-gray-400">Toca un chofer para ver su detalle</span>
+          <div className="px-5 py-2 border-t flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-xs text-gray-400">Toca un chofer para ver su detalle</span>
+            </div>
+            {rankingChoferes.length > 5 && !rankingExpand && (
+              <span className="text-xs text-amber-500">
+                +{rankingChoferes.length - 5} más
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -658,36 +832,61 @@ export default function Overview({ onVerChofer }: Props) {
         )}
       </div>
 
-      {/* ── Alertas de peso ── */}
-      {alerts.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <h3 className="font-bold text-red-600 mb-3">⚖️ Polar Breeze Weight — Alertas</h3>
-          <div className="space-y-2 max-h-44 overflow-y-auto">
-            {alerts.map((a) => (
-              <button
-                key={a.id}
-                onClick={() => setItemModal({ type: "alerta", data: a })}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left active:scale-[0.99] transition-all duration-100 hover:shadow-sm ${
-                  a.severity === "critical"
-                    ? "bg-red-50 border-red-200"
-                    : "bg-yellow-50 border-yellow-200"
-                }`}
+      {/* ── Alertas en tiempo real (sistema + peso) ── */}
+      {todasAlertas.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-red-600 text-sm">🔔 Alertas en tiempo real</h3>
+              {alertasSinLeer > 0 && (
+                <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">
+                  {alertasSinLeer} sin leer
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-xs text-gray-400">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-[#D42B2B]" /> sistema
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-orange-400" /> peso
+              </span>
+            </div>
+          </div>
+          <div className="divide-y divide-gray-50 max-h-56 overflow-y-auto">
+            {todasAlertas.map((a) => (
+              <div
+                key={`${a.source}-${a.id}`}
+                className={`flex items-start gap-3 px-4 py-2.5 ${
+                  a.leida ? "opacity-60" : ""
+                } ${a.sev === "critical" ? "bg-red-50/40" : a.sev === "warning" ? "bg-yellow-50/40" : ""}`}
               >
-                <span className="text-lg flex-shrink-0">
-                  {a.severity === "critical" ? "🚨" : "⚠️"}
+                <span className="text-base flex-shrink-0 mt-0.5">
+                  {a.sev === "critical" ? "🚨" : a.sev === "warning" ? "⚠️" : "ℹ️"}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800">{a.producto}</p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {a.choferNombre} · {a.pesoCargado}kg → {a.pesoEntregado}kg ·
-                    <strong className="text-red-600 ml-1">
-                      Diff {a.diferencia.toFixed(1)}kg ({a.porcentaje.toFixed(0)}%)
-                    </strong>
+                  <p className="text-sm font-medium text-gray-800 truncate">{a.msg}</p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {a.sub}
+                    {a.source === "weight" && (
+                      <span className="ml-1 text-orange-500">· Weight</span>
+                    )}
                   </p>
                 </div>
-                <span className="text-xs text-gray-400 flex-shrink-0">{fmtDate(a.timestamp)}</span>
-              </button>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <span className="text-xs text-gray-400 whitespace-nowrap">{fmtDate(a.ts)}</span>
+                  {!a.leida && (
+                    <span className="w-2 h-2 rounded-full bg-red-400" />
+                  )}
+                </div>
+              </div>
             ))}
+          </div>
+          <div className="px-4 py-2 border-t flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+            <span className="text-xs text-gray-400">
+              {todasAlertas.length} alertas · {alertasSinLeer} sin leer
+            </span>
           </div>
         </div>
       )}
@@ -830,6 +1029,55 @@ export default function Overview({ onVerChofer }: Props) {
       )}
 
     </div>
+  );
+}
+
+// ─── DonaChart ────────────────────────────────────────────────────────────────
+
+interface SegDona { label: string; val: number; pct: number; color: string; }
+
+function DonaChart({ segmentos }: { segmentos: SegDona[] }) {
+  const R = 52, r = 28, cx = 64, cy = 64, total = segmentos.reduce((s, g) => s + g.val, 0);
+  if (total === 0) return null;
+
+  let acum = -Math.PI / 2;
+  const slices = segmentos.map((seg) => {
+    const angle = (seg.pct / 100) * 2 * Math.PI;
+    const x1o = cx + R * Math.cos(acum);
+    const y1o = cy + R * Math.sin(acum);
+    const x1i = cx + r * Math.cos(acum);
+    const y1i = cy + r * Math.sin(acum);
+    acum += angle;
+    const x2o = cx + R * Math.cos(acum);
+    const y2o = cy + R * Math.sin(acum);
+    const x2i = cx + r * Math.cos(acum);
+    const y2i = cy + r * Math.sin(acum);
+    const large = angle > Math.PI ? 1 : 0;
+    return {
+      d: [
+        `M ${x1o.toFixed(2)} ${y1o.toFixed(2)}`,
+        `A ${R} ${R} 0 ${large} 1 ${x2o.toFixed(2)} ${y2o.toFixed(2)}`,
+        `L ${x2i.toFixed(2)} ${y2i.toFixed(2)}`,
+        `A ${r} ${r} 0 ${large} 0 ${x1i.toFixed(2)} ${y1i.toFixed(2)}`,
+        "Z",
+      ].join(" "),
+      color: seg.color,
+    };
+  });
+
+  return (
+    <svg width={128} height={128} viewBox="0 0 128 128" className="flex-shrink-0">
+      {slices.map((sl, i) => (
+        <path key={i} d={sl.d} fill={sl.color} opacity={0.88} />
+      ))}
+      <circle cx={cx} cy={cy} r={r - 2} fill="white" />
+      <text x={cx} y={cy + 5} textAnchor="middle" fontSize={14} fontWeight="800" fill="#1A1A1A">
+        {total.toLocaleString()}
+      </text>
+      <text x={cx} y={cy + 18} textAnchor="middle" fontSize={8} fill="#9ca3af">
+        uds total
+      </text>
+    </svg>
   );
 }
 
