@@ -1,0 +1,20 @@
+import type { MetadataRoute } from "next";
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "Polar Breeze Hub",
+    short_name: "PB Hub",
+    description: "Hub Central — Polar Breeze, S.R.L.",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#1A1A1A",
+    theme_color: "#F5C800",
+    orientation: "portrait-primary",
+    icons: [
+      { src: "/icon-hub.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+      { src: "/icon-hub.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" },
+    ],
+    categories: ["business", "productivity"],
+    lang: "es-DO",
+  };
+}

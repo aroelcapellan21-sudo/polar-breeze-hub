@@ -17,10 +17,12 @@ import AnomaliasDespachador  from "@/components/admin/AnomaliasDespachador";
 import GestionEncargados     from "@/components/admin/GestionEncargados";
 import Reportes              from "@/components/admin/Reportes";
 import GestionCodigos        from "@/components/admin/GestionCodigos";
+import PWAControl            from "@/components/admin/PWAControl";
 import FloatingFAB           from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
+import RolePill              from "@/components/shared/RolePill";
 
-type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp" | "reportes" | "codigos";
+type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp" | "reportes" | "codigos" | "pwa";
 
 type SearchItem =
   | { kind: "chofer";   data: UserProfile }
@@ -125,12 +127,18 @@ export default function AdminDashboard() {
       >
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
 
-          {/* Logo 🧊 tricolor */}
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md"
-            style={{ background: "linear-gradient(135deg, rgba(245,200,0,0.92) 33%, rgba(212,43,43,0.92) 33% 66%, rgba(30,140,58,0.92) 66%)" }}
-          >
-            <span className="text-base">🧊</span>
+          {/* ── Logo 🧊 tricolor ── */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/20"
+              style={{ background: "linear-gradient(135deg, #F5C800 33%, #D42B2B 33% 66%, #1E8C3A 66%)" }}
+            >
+              <span className="text-lg">🧊</span>
+            </div>
+            <div className="hidden lg:block">
+              <p className="text-white font-black text-xs leading-none">Polar Breeze</p>
+              <p className="text-white/50 text-[9px] leading-none mt-0.5">Hub Central</p>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -210,6 +218,13 @@ export default function AdminDashboard() {
               <span>🔲</span>
               <span className="hidden sm:inline">Códigos</span>
             </NavTab>
+            <NavTab
+              active={tab === "pwa"}
+              onClick={() => { setTab("pwa"); setChofer(null); }}
+            >
+              <span>📱</span>
+              <span className="hidden sm:inline">PWA</span>
+            </NavTab>
           </nav>
 
           {/* Acciones */}
@@ -240,10 +255,8 @@ export default function AdminDashboard() {
             >
               ⚙️
             </button>
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium leading-tight">{profile?.nombre}</p>
-              <span className="text-xs text-purple-300">Administrador</span>
-            </div>
+            {/* ── Pastilla de rol — Admin ── */}
+            <RolePill rol="admin" nombre={profile?.nombre ?? ""} />
             <button
               onClick={logout}
               className="bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5
@@ -254,7 +267,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Banda tricolor */}
+        {/* ── Banda tricolor 5 px ── */}
         <div className="flex h-[5px]">
           <div className="flex-1 bg-[#F5C800]" />
           <div className="flex-1 bg-[#D42B2B]" />
@@ -263,7 +276,7 @@ export default function AdminDashboard() {
 
         {/* Breadcrumb */}
         <div className="border-t border-white/10 bg-black/10">
-          <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center gap-2 text-xs text-purple-200 overflow-x-auto">
+          <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center gap-2 text-xs text-[#F5C800]/80 overflow-x-auto">
             {tab === "overview" && (
               <span className="text-white font-medium">🏠 Overview — resumen general del sistema</span>
             )}
@@ -290,6 +303,9 @@ export default function AdminDashboard() {
             )}
             {tab === "codigos" && (
               <span className="text-white font-medium">🔲 Códigos — base de códigos de cajas SPIKINSCAN + Weight</span>
+            )}
+            {tab === "pwa" && (
+              <span className="text-white font-medium">📱 PWA — control de apps instaladas · notificaciones · subdominios</span>
             )}
             {tab === "choferes" && !chofer && (
               <span className="text-white font-medium">👥 Choferes — gestión, inventario y sistema de puntos</span>
@@ -326,6 +342,7 @@ export default function AdminDashboard() {
         {tab === "anom_desp"  && <AnomaliasDespachador mode="admin" />}
         {tab === "reportes"   && <Reportes />}
         {tab === "codigos"    && <GestionCodigos />}
+        {tab === "pwa"        && <PWAControl />}
       </main>
 
       {/* ── Modal Configuración ── */}
