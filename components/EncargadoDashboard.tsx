@@ -13,6 +13,7 @@ import ConsultarTablaModal from "@/components/shared/ConsultarTablaModal";
 import RolePill            from "@/components/shared/RolePill";
 import PWAInstallBanner    from "@/components/shared/PWAInstallBanner";
 import PolarBreezeHTML     from "@/components/encargado/PolarBreezeHTML";
+import AsistenteAI         from "@/components/shared/AsistenteAI";
 
 type Tab = "lote" | "weight" | "stock" | "choferes" | "vista";
 
@@ -312,6 +313,17 @@ export default function EncargadoDashboard() {
 
       {/* FAB Polar Breeze */}
       <FloatingFAB />
+
+      {/* ── Asistente IA Gemini ── */}
+      <AsistenteAI
+        rol="encargado"
+        nombre={profile?.nombre}
+        contexto={[
+          `Choferes pendientes por reportar hoy: ${pendientesBadge}`,
+          `Tab activo: ${tab}`,
+          stockCargado ? `Productos en stock: ${saldo.length} tipos, ${saldo.filter(p => p.saldo < 0).length} en negativo` : "Stock: cargando",
+        ].join(". ")}
+      />
 
       {/* ── Banner de instalación PWA ── */}
       <PWAInstallBanner appName="App Encargado" appIcon="🏭" />

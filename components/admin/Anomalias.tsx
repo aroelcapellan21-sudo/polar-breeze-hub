@@ -36,9 +36,12 @@ export default function Anomalias() {
   const [imb,       setImb]       = useState<ImbentarioRecord[]>([]);
   const [meta,      setMeta]      = useState(0);
   const [puntoProd, setPuntoProd] = useState<PuntoProducto[]>([]);
-  const [tgLoading, setTgLoading] = useState(false);
-  const [tgMsg,     setTgMsg]     = useState<string | null>(null);
-  const [filtro,    setFiltro]    = useState<AnomaliaType | "todas">("todas");
+  const [tgLoading,    setTgLoading]    = useState(false);
+  const [tgMsg,        setTgMsg]        = useState<string | null>(null);
+  const [filtro,       setFiltro]       = useState<AnomaliaType | "todas">("todas");
+  const [iaLoading,    setIaLoading]    = useState(false);
+  const [iaAnalisis,   setIaAnalisis]   = useState<string | null>(null);
+  const [iaModalOpen,  setIaModalOpen]  = useState(false);
   const sentRef = useRef(false);
 
   useEffect(() => {
@@ -239,6 +242,66 @@ export default function Anomalias() {
     }
   };
 
+  // ── Análisis profundo con Claude API ──────────────────────────────────────
+  const analizarConClaude = async () => {
+    setIaLoading(true);
+    setIaAnalisis(null);
+    setIaModalOpen(true);
+
+    // Construir resumen del estado actual para enviar a la IA
+    const resumenAnomAlias = anomalias.map((a) =>
+      `- [${TIPO_CFG[a.tipo].label}] ${a.choferNombre}: ${a.descripcion}`
+    ).join("\n");
+
+    const resumenImb15 = imb15.reduce((map, r) => {
+      const k = r.choferNombre;
+      if (!map[k]) map[k] = { entr: 0, carg: 0 };
+      map[k].entr += r.cantidadEntregada ?? 0;
+      map[k].carg += r.cantidadCargada   ?? 0;
+      return map;
+    }, {} as Record<string, { entr: number; carg: number }>);
+
+    const resumenChoferes = Object.entries(resumenImb15)
+      .map(([nom, d]) => `${nom}: ${d.entr}/${d.carg} uds (${d.carg > 0 ? ((d.entr/d.carg)*100).toFixed(0) : "—"}%)`)
+      .join(", ");
+
+    const prompt = `Eres un experto en detección de fraude y análisis de anomalías para distribuidoras de helados.
+
+CONTEXTO: Polar Breeze, S.R.L. — distribuidora en Santiago, Rep. Dom.
+FECHA: ${new Date().toLocaleDateString("es-DO")}
+
+ANOMALÍAS DETECTADAS HOY (${anomalias.length}):
+${resumenAnomAlias || "Ninguna detectada por el motor de reglas."}
+
+RENDIMIENTO CHOFERES (últimos 15 días):
+${resumenChoferes || "Sin datos suficientes."}
+
+META DE PUNTOS: ${meta}
+
+INSTRUCCIONES:
+1. Analiza los patrones de las anomalías detectadas.
+2. Identifica cuáles choferes merecen mayor atención y por qué.
+3. Detecta si hay patrones recurrentes que podrían indicar manipulación.
+4. Da recomendaciones concretas al administrador.
+5. Clasifica el riesgo general: BAJO / MEDIO / ALTO / CRÍTICO.
+
+Responde en español dominicano, formato claro con secciones.`;
+
+    try {
+      const res = await fetch("/api/analyze", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ tipo: "anomalias", texto: prompt }),
+      });
+      const data = await res.json() as { resultado?: string; error?: string };
+      setIaAnalisis(data.resultado ?? data.error ?? "Sin respuesta del motor IA.");
+    } catch (e) {
+      setIaAnalisis(`Error al conectar con Claude API: ${String(e)}`);
+    } finally {
+      setIaLoading(false);
+    }
+  };
+
   const filtradas = filtro === "todas" ? anomalias : anomalias.filter((a) => a.tipo === filtro);
   const chofActivos = choferes.filter((c) => c.activo !== false);
 
@@ -259,6 +322,18 @@ export default function Anomalias() {
           {tgMsg && (
             <span className="text-xs text-gray-600 bg-gray-100 px-3 py-1.5 rounded-full">{tgMsg}</span>
           )}
+          {/* Botón Analizar con IA */}
+          <button
+            onClick={analizarConClaude}
+            disabled={iaLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] hover:bg-gray-800 active:scale-95
+              text-white rounded-lg text-sm font-medium transition-all duration-100 disabled:opacity-50"
+          >
+            {iaLoading ? (
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : "🤖"}
+            Analizar con IA
+          </button>
           <button
             onClick={() => enviarTelegram(anomalias)}
             disabled={tgLoading || anomalias.length === 0}
@@ -410,6 +485,75 @@ export default function Anomalias() {
           </div>
         ))}
       </div>
+
+      {/* ── Modal análisis IA ── */}
+      {iaModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.55)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setIaModalOpen(false); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden"
+            style={{ maxHeight: "min(80vh, 640px)" }}>
+
+            {/* Header */}
+            <div className="px-5 py-4 flex items-center gap-3 flex-shrink-0"
+              style={{ background: "linear-gradient(90deg, #1A1A1A 0%, #2d2d2d 100%)" }}>
+              <span className="text-2xl">🤖</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-bold text-sm">Análisis profundo con IA</p>
+                <p className="text-white/50 text-[10px]">
+                  {new Date().toLocaleDateString("es-DO", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                </p>
+              </div>
+              <button
+                onClick={() => setIaModalOpen(false)}
+                className="text-white/60 hover:text-white text-xl leading-none transition-colors"
+              >✕</button>
+            </div>
+
+            {/* Banda tricolor */}
+            <div className="flex h-[3px] flex-shrink-0">
+              <div className="flex-1 bg-[#F5C800]" />
+              <div className="flex-1 bg-[#D42B2B]" />
+              <div className="flex-1 bg-[#1E8C3A]" />
+            </div>
+
+            {/* Contenido */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {iaLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-4">
+                  <div className="w-10 h-10 border-4 border-[#F5C800]/30 border-t-[#F5C800] rounded-full animate-spin" />
+                  <p className="text-sm text-gray-500">Analizando anomalías con IA…</p>
+                  <p className="text-xs text-gray-300">Esto puede tardar unos segundos</p>
+                </div>
+              ) : iaAnalisis ? (
+                <div className="prose prose-sm max-w-none">
+                  <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700 leading-relaxed">
+                    {iaAnalisis}
+                  </pre>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 text-center py-8">Sin análisis disponible.</p>
+              )}
+            </div>
+
+            {/* Footer */}
+            {!iaLoading && iaAnalisis && (
+              <div className="px-5 py-3 border-t border-gray-100 flex justify-between items-center flex-shrink-0 bg-gray-50/50">
+                <p className="text-xs text-gray-400">Motor: Claude API · Polar Breeze Hub</p>
+                <button
+                  onClick={() => setIaModalOpen(false)}
+                  className="px-4 py-2 bg-[#1A1A1A] hover:bg-gray-800 text-white text-xs font-medium
+                    rounded-lg transition-all active:scale-95"
+                >
+                  Cerrar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -17,6 +17,7 @@ import FloatingFAB          from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal  from "@/components/shared/ConsultarTablaModal";
 import RolePill             from "@/components/shared/RolePill";
 import PWAInstallBanner     from "@/components/shared/PWAInstallBanner";
+import AsistenteAI          from "@/components/shared/AsistenteAI";
 
 type Tab = "cuartofrio" | "choferes" | "comparar" | "historial" | "cierre" | "anomalias";
 
@@ -442,6 +443,13 @@ export default function DespachadorDashboard() {
 
       {/* ── Botón flotante ── */}
       <FloatingFAB />
+
+      {/* ── Asistente IA Gemini ── */}
+      <AsistenteAI
+        rol="despachador"
+        nombre={profile?.nombre}
+        contexto={`Tab activo: ${tab}. Usuario: ${profile?.nombre ?? "Despachador"}.`}
+      />
 
       {/* ── Banner de instalación PWA ── */}
       <PWAInstallBanner appName="App Despachador" appIcon="🚛" />
