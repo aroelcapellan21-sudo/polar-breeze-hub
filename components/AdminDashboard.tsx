@@ -15,10 +15,12 @@ import InformesHistorial  from "@/components/admin/InformesHistorial";
 import Anomalias             from "@/components/admin/Anomalias";
 import AnomaliasDespachador  from "@/components/admin/AnomaliasDespachador";
 import GestionEncargados     from "@/components/admin/GestionEncargados";
+import Reportes              from "@/components/admin/Reportes";
+import GestionCodigos        from "@/components/admin/GestionCodigos";
 import FloatingFAB           from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 
-type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp";
+type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp" | "reportes" | "codigos";
 
 type SearchItem =
   | { kind: "chofer";   data: UserProfile }
@@ -116,14 +118,16 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* ── Header ── */}
-      <header className="bg-gradient-to-r from-purple-800 to-purple-950 text-white shadow-lg sticky top-0 z-30">
+      {/* ── Header — Polar Breeze palette ── */}
+      <header className="bg-[#1A1A1A] text-white shadow-lg sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
 
-          {/* Logo */}
-          <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center
-            font-black text-sm flex-shrink-0 tracking-tight">
-            PB
+          {/* Logo 🧊 tricolor */}
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md"
+            style={{ background: "linear-gradient(135deg, rgba(245,200,0,0.92) 33%, rgba(212,43,43,0.92) 33% 66%, rgba(30,140,58,0.92) 66%)" }}
+          >
+            <span className="text-base">🧊</span>
           </div>
 
           {/* Tabs */}
@@ -189,6 +193,20 @@ export default function AdminDashboard() {
               <span>📋</span>
               <span className="hidden sm:inline">Anomalías Desp.</span>
             </NavTab>
+            <NavTab
+              active={tab === "reportes"}
+              onClick={() => { setTab("reportes"); setChofer(null); }}
+            >
+              <span>📊</span>
+              <span className="hidden sm:inline">Reportes</span>
+            </NavTab>
+            <NavTab
+              active={tab === "codigos"}
+              onClick={() => { setTab("codigos"); setChofer(null); }}
+            >
+              <span>🔲</span>
+              <span className="hidden sm:inline">Códigos</span>
+            </NavTab>
           </nav>
 
           {/* Acciones */}
@@ -233,6 +251,13 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Banda tricolor */}
+        <div className="flex h-[5px]">
+          <div className="flex-1 bg-[#F5C800]" />
+          <div className="flex-1 bg-[#D42B2B]" />
+          <div className="flex-1 bg-[#1E8C3A]" />
+        </div>
+
         {/* Breadcrumb */}
         <div className="border-t border-white/10 bg-black/10">
           <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center gap-2 text-xs text-purple-200 overflow-x-auto">
@@ -256,6 +281,12 @@ export default function AdminDashboard() {
             )}
             {tab === "anom_desp" && (
               <span className="text-white font-medium">📋 Anomalías Despacho — faltantes registrados por despachadores</span>
+            )}
+            {tab === "reportes" && (
+              <span className="text-white font-medium">📊 Reportes — lotes · movimientos · sync Google Sheets</span>
+            )}
+            {tab === "codigos" && (
+              <span className="text-white font-medium">🔲 Códigos — base de códigos de cajas SPIKINSCAN + Weight</span>
             )}
             {tab === "choferes" && !chofer && (
               <span className="text-white font-medium">👥 Choferes — gestión, inventario y sistema de puntos</span>
@@ -290,6 +321,8 @@ export default function AdminDashboard() {
         {tab === "anomalias"  && <Anomalias />}
         {tab === "encargados" && <GestionEncargados />}
         {tab === "anom_desp"  && <AnomaliasDespachador mode="admin" />}
+        {tab === "reportes"   && <Reportes />}
+        {tab === "codigos"    && <GestionCodigos />}
       </main>
 
       {/* ── Modal Configuración ── */}

@@ -252,6 +252,17 @@ export interface NotaCredito {
   estado: "pendiente" | "aprobada" | "rechazada";
 }
 
+// ─── Códigos de cajas (colección codigos_cajas) ───────────────────────────────
+
+export interface CodigoCaja {
+  codigo:          string;            // código de barras — es el id del documento
+  producto:        string;            // nombre legible del producto
+  unidadesPorCaja: number;            // cuántas unidades entran en una caja
+  pesoCajaKg?:     number | null;     // peso por caja en kg (opcional)
+  creadoPor?:      string;
+  creadoEn?:       Date | { seconds: number };
+}
+
 export function toProductoId(nombre: string): string {
   return nombre.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_áéíóúñü]/g, "");
 }
