@@ -294,16 +294,7 @@ export function fmtDate(ts: Date | { seconds: number } | undefined): string {
   return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-// ─── Polar Breeze Weight + SPIKINSCAN — códigos de caja y lotes ───────────────
-
-export interface CodigoCaja {
-  codigo:          string;
-  producto:        string;
-  unidadesPorCaja: number;
-  pesoCajaKg?:     number;
-  creadoEn?:       Date | { seconds: number };
-  creadoPor?:      string;
-}
+// ─── Polar Breeze Weight + SPIKINSCAN — lotes ─────────────────────────────────
 
 export interface WeightItem {
   codigo:    string;
