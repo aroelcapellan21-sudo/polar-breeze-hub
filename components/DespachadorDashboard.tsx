@@ -15,6 +15,8 @@ import InformeCierre         from "@/components/despachador/InformeCierre";
 import AnomaliasDespachador  from "@/components/admin/AnomaliasDespachador";
 import FloatingFAB          from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal  from "@/components/shared/ConsultarTablaModal";
+import RolePill             from "@/components/shared/RolePill";
+import PWAInstallBanner     from "@/components/shared/PWAInstallBanner";
 
 type Tab = "cuartofrio" | "choferes" | "comparar" | "historial" | "cierre" | "anomalias";
 
@@ -124,10 +126,18 @@ export default function DespachadorDashboard() {
       >
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
 
-          {/* Logo tricolor 🧊 */}
-          <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 relative flex items-center justify-center"
-               style={{ background: "linear-gradient(135deg, rgba(245,200,0,0.85) 33%, rgba(212,43,43,0.85) 33% 66%, rgba(30,140,58,0.85) 66%)" }}>
-            <span className="text-lg relative z-10">🧊</span>
+          {/* ── Logo 🧊 tricolor ── */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/20"
+              style={{ background: "linear-gradient(135deg, #F5C800 33%, #D42B2B 33% 66%, #1E8C3A 66%)" }}
+            >
+              <span className="text-lg">🧊</span>
+            </div>
+            <div className="hidden lg:block">
+              <p className="text-white font-black text-xs leading-none">Polar Breeze</p>
+              <p className="text-white/50 text-[9px] leading-none mt-0.5">Despacho</p>
+            </div>
           </div>
 
           {/* Tabs */}
@@ -168,10 +178,8 @@ export default function DespachadorDashboard() {
             >
               🔄 Restablecer
             </button>
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium leading-tight">{profile?.nombre}</p>
-              <span className="text-xs text-[#F5C800]">Despachador</span>
-            </div>
+            {/* ── Pastilla de rol — Despachador ── */}
+            <RolePill rol="despachador" nombre={profile?.nombre ?? ""} />
             <button
               onClick={logout}
               className="bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5
@@ -367,6 +375,9 @@ export default function DespachadorDashboard() {
 
       {/* ── Botón flotante ── */}
       <FloatingFAB />
+
+      {/* ── Banner de instalación PWA ── */}
+      <PWAInstallBanner appName="App Despachador" appIcon="🚛" />
     </div>
   );
 }

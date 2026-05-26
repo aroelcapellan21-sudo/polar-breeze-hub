@@ -1,0 +1,32 @@
+import type { MetadataRoute } from "next";
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "App Despachador — Polar Breeze",
+    short_name: "Despachador",
+    description: "Cuarto Frío · Despacho · Choferes · Anomalías",
+    start_url: "/app-despachador",
+    display: "standalone",
+    background_color: "#1A1A1A",
+    theme_color: "#D42B2B",
+    orientation: "portrait-primary",
+    icons: [
+      { src: "/icon-despachador.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+      { src: "/icon-despachador.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" },
+    ],
+    categories: ["business", "productivity"],
+    lang: "es-DO",
+    shortcuts: [
+      {
+        name: "Cuarto Frío",
+        url: "/app-despachador?tab=cuartofrio",
+        description: "Ir al inventario del Cuarto Frío",
+      },
+      {
+        name: "Choferes",
+        url: "/app-despachador?tab=choferes",
+        description: "Ver y registrar choferes",
+      },
+    ],
+  };
+}
