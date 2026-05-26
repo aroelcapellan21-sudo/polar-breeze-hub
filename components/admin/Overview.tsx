@@ -311,6 +311,30 @@ export default function Overview({ onVerChofer }: Props) {
 
   const alertasSinLeer = todasAlertas.filter((a) => !a.leida).length;
 
+  // ── Mapa de rutas activas hoy ─────────────────────────────────────────────
+  const rutasHoy = useMemo(() => {
+    const map: Record<string, {
+      ruta: string;
+      choferes: { nombre: string; entr: number; carg: number; }[];
+      totalEntr: number; totalCarg: number;
+    }> = {};
+    imbHoy.forEach((r) => {
+      const key = r.ruta || "Sin ruta";
+      if (!map[key]) map[key] = { ruta: key, choferes: [], totalEntr: 0, totalCarg: 0 };
+      const zona = map[key];
+      const ch   = zona.choferes.find(c => c.nombre === r.choferNombre);
+      if (ch) {
+        ch.entr += r.cantidadEntregada ?? 0;
+        ch.carg += r.cantidadCargada ?? 0;
+      } else {
+        zona.choferes.push({ nombre: r.choferNombre, entr: r.cantidadEntregada ?? 0, carg: r.cantidadCargada ?? 0 });
+      }
+      zona.totalEntr += r.cantidadEntregada ?? 0;
+      zona.totalCarg += r.cantidadCargada ?? 0;
+    });
+    return Object.values(map).sort((a, b) => b.totalEntr - a.totalEntr);
+  }, [imbHoy]);
+
   // ── Métricas clave ─────────────────────────────────────────────────────────
   const tasaCumplimiento = useMemo(() => {
     const recs15 = imb.filter(r => toDate(r.timestamp) >= hace15);
@@ -418,6 +442,85 @@ export default function Overview({ onVerChofer }: Props) {
 
       {/* ── Gráfico de ventas — últimos 7 días ── */}
       <SalesChart />
+
+      {/* ── Mapa de rutas activas hoy ── */}
+      {rutasHoy.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-gray-800 text-sm">🗺️ Rutas activas hoy</h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {rutasHoy.length} zona{rutasHoy.length !== 1 ? "s" : ""} · {imbHoy.length} registros
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#1E8C3A] animate-pulse" />
+              <span className="text-xs text-gray-400">En tiempo real</span>
+            </div>
+          </div>
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {rutasHoy.map((zona) => {
+              const pct    = zona.totalCarg > 0 ? (zona.totalEntr / zona.totalCarg) * 100 : 0;
+              const color  = pct >= 85 ? "#1E8C3A" : pct >= 60 ? "#F5C800" : "#D42B2B";
+              const bgCls  = pct >= 85 ? "border-green-200 bg-green-50/30"
+                           : pct >= 60 ? "border-yellow-200 bg-yellow-50/30"
+                           : "border-red-200 bg-red-50/30";
+              return (
+                <div key={zona.ruta} className={`rounded-xl border p-3 ${bgCls}`}>
+                  {/* Header zona */}
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-bold text-gray-800 truncate">{zona.ruta}</p>
+                    <span className="text-xs font-bold flex-shrink-0 ml-2" style={{ color }}>
+                      {pct.toFixed(0)}%
+                    </span>
+                  </div>
+
+                  {/* Barra de progreso */}
+                  <div className="h-1.5 bg-white/70 rounded-full overflow-hidden mb-2">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(pct, 100)}%`, background: color }}
+                    />
+                  </div>
+
+                  {/* Stats */}
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                    <span>{zona.totalEntr}/{zona.totalCarg} uds</span>
+                    <span>{zona.choferes.length} chofer{zona.choferes.length !== 1 ? "es" : ""}</span>
+                  </div>
+
+                  {/* Lista de choferes */}
+                  <div className="space-y-1">
+                    {zona.choferes.slice(0, 3).map((ch) => {
+                      const chPct = ch.carg > 0 ? (ch.entr / ch.carg) * 100 : 0;
+                      return (
+                        <div key={ch.nombre} className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">
+                            {ch.nombre.charAt(0).toUpperCase()}
+                          </div>
+                          <p className="text-xs text-gray-700 truncate flex-1">{ch.nombre}</p>
+                          <span className="text-[10px] text-gray-400 flex-shrink-0">
+                            {ch.entr}/{ch.carg}
+                          </span>
+                          <span
+                            className="text-[10px] font-bold flex-shrink-0"
+                            style={{ color: chPct >= 85 ? "#1E8C3A" : chPct >= 60 ? "#b45309" : "#D42B2B" }}
+                          >
+                            {chPct.toFixed(0)}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {zona.choferes.length > 3 && (
+                      <p className="text-xs text-gray-400 pl-7">+{zona.choferes.length - 3} más…</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Métricas clave ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
