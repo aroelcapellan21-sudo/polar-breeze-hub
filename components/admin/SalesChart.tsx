@@ -77,10 +77,12 @@ export default function SalesChart() {
     v: _.total,
   }));
 
-  const lineD = pts
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-    .join(" ");
-  const areaD = `${lineD} L${pts[pts.length - 1].x.toFixed(1)},${(PAD.top + IH).toFixed(1)} L${PAD.left.toFixed(1)},${(PAD.top + IH).toFixed(1)} Z`;
+  const lineD = pts.length > 0
+    ? pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")
+    : "";
+  const areaD = pts.length > 1
+    ? `${lineD} L${pts[pts.length - 1].x.toFixed(1)},${(PAD.top + IH).toFixed(1)} L${PAD.left.toFixed(1)},${(PAD.top + IH).toFixed(1)} Z`
+    : "";
 
   const gridVals = [0, 0.25, 0.5, 0.75, 1];
 

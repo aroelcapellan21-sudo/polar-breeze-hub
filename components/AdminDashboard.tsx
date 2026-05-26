@@ -18,11 +18,14 @@ import GestionEncargados     from "@/components/admin/GestionEncargados";
 import Reportes              from "@/components/admin/Reportes";
 import GestionCodigos        from "@/components/admin/GestionCodigos";
 import PWAControl            from "@/components/admin/PWAControl";
+import TiempoReal            from "@/components/admin/TiempoReal";
+import ProyeccionesChoferes  from "@/components/admin/ProyeccionesChoferes";
 import FloatingFAB           from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 import RolePill              from "@/components/shared/RolePill";
+import AsistenteAI           from "@/components/shared/AsistenteAI";
 
-type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp" | "reportes" | "codigos" | "pwa";
+type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp" | "reportes" | "codigos" | "pwa" | "tiemporeal" | "proyecciones";
 
 type SearchItem =
   | { kind: "chofer";   data: UserProfile }
@@ -289,6 +292,22 @@ export default function AdminDashboard() {
                 <span>📱</span>
                 <span className="hidden sm:inline">PWA</span>
               </NavTab>
+              <NavTab
+                data-active={tab === "tiemporeal"}
+                active={tab === "tiemporeal"}
+                onClick={() => { setTab("tiemporeal"); setChofer(null); }}
+              >
+                <span>⚡</span>
+                <span className="hidden sm:inline">Tiempo Real</span>
+              </NavTab>
+              <NavTab
+                data-active={tab === "proyecciones"}
+                active={tab === "proyecciones"}
+                onClick={() => { setTab("proyecciones"); setChofer(null); }}
+              >
+                <span>📈</span>
+                <span className="hidden sm:inline">Proyecciones</span>
+              </NavTab>
             </nav>
 
             {/* Flecha derecha */}
@@ -384,6 +403,12 @@ export default function AdminDashboard() {
             {tab === "pwa" && (
               <span className="text-white font-medium">📱 PWA — control de apps instaladas · notificaciones · subdominios</span>
             )}
+            {tab === "tiemporeal" && (
+              <span className="text-white font-medium">⚡ Tiempo Real — feeds en vivo · SPIKINSCAN · FACTURASCAN · IMBENTARIO</span>
+            )}
+            {tab === "proyecciones" && (
+              <span className="text-white font-medium">📈 Proyecciones — rendimiento estimado por chofer · quincena</span>
+            )}
             {tab === "choferes" && !chofer && (
               <span className="text-white font-medium">👥 Choferes — gestión, inventario y sistema de puntos</span>
             )}
@@ -418,9 +443,18 @@ export default function AdminDashboard() {
         {tab === "encargados" && <GestionEncargados />}
         {tab === "anom_desp"  && <AnomaliasDespachador mode="admin" />}
         {tab === "reportes"   && <Reportes />}
-        {tab === "codigos"    && <GestionCodigos />}
-        {tab === "pwa"        && <PWAControl />}
+        {tab === "codigos"      && <GestionCodigos />}
+        {tab === "pwa"          && <PWAControl />}
+        {tab === "tiemporeal"   && <TiempoReal />}
+        {tab === "proyecciones" && <ProyeccionesChoferes />}
       </main>
+
+      {/* ── Asistente IA Admin ── */}
+      <AsistenteAI
+        rol="admin"
+        nombre={profile?.nombre}
+        contexto={`Tab activo: ${tab}. Admin: ${profile?.nombre ?? "Oliver"}. Sistema Polar Breeze Hub.`}
+      />
 
       {/* ── Modal Configuración ── */}
       {showConfig && <ConfigModal onClose={() => setShowConfig(false)} />}

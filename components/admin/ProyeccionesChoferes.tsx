@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  collection, query, orderBy, onSnapshot, limit, getDoc, doc,
+  collection, query, orderBy, onSnapshot, limit, getDoc, doc, where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ImbentarioRecord, UserProfile, PuntosConfig, toDate } from "@/lib/types";
 
 interface Props {
-  choferes: UserProfile[];
+  choferes?: UserProfile[];   // opcional — si no se pasa, se carga internamente
 }
 
 interface ProyeccionChofer {
@@ -25,10 +25,23 @@ interface ProyeccionChofer {
   ventasProyectadas:  number;
 }
 
-export default function ProyeccionesChoferes({ choferes }: Props) {
-  const [imb,          setImb]          = useState<ImbentarioRecord[]>([]);
-  const [puntosConfig, setPuntosConfig] = useState<PuntosConfig | null>(null);
-  const [periodo,      setPeriodo]      = useState<15 | 30>(15);
+export default function ProyeccionesChoferes({ choferes: choferesProp }: Props) {
+  const [imb,           setImb]          = useState<ImbentarioRecord[]>([]);
+  const [puntosConfig,  setPuntosConfig] = useState<PuntosConfig | null>(null);
+  const [periodo,       setPeriodo]      = useState<15 | 30>(15);
+  const [choferesLocal, setChoferesLocal] = useState<UserProfile[]>([]);
+
+  // Carga choferes internamente si no vienen por prop
+  useEffect(() => {
+    if (choferesProp) return;
+    const q = query(collection(db, "usuarios"), where("role", "==", "chofer"));
+    const unsub = onSnapshot(q, (snap) =>
+      setChoferesLocal(snap.docs.map((d) => d.data() as UserProfile)),
+    );
+    return unsub;
+  }, [choferesProp]);
+
+  const choferes = choferesProp ?? choferesLocal;
 
   useEffect(() => {
     const q = query(collection(db, "imbentario"), orderBy("timestamp", "desc"), limit(500));
