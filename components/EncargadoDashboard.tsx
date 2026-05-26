@@ -60,8 +60,12 @@ export default function EncargadoDashboard() {
       <header className="bg-gradient-to-r from-emerald-700 to-emerald-900 text-white shadow-lg sticky top-0 z-30">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
 
-          <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center font-black text-sm flex-shrink-0">
-            PB
+          {/* Logo 🧊 tricolor */}
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md"
+            style={{ background: "linear-gradient(135deg, rgba(245,200,0,0.92) 33%, rgba(212,43,43,0.92) 33% 66%, rgba(30,140,58,0.92) 66%)" }}
+          >
+            <span className="text-base">🧊</span>
           </div>
 
           <nav className="flex gap-1 flex-1">
@@ -103,6 +107,13 @@ export default function EncargadoDashboard() {
               Salir
             </button>
           </div>
+        </div>
+
+        {/* Banda tricolor */}
+        <div className="flex h-[5px]">
+          <div className="flex-1 bg-[#F5C800]" />
+          <div className="flex-1 bg-[#D42B2B]" />
+          <div className="flex-1 bg-[#1E8C3A]" />
         </div>
 
         <div className="border-t border-white/10 bg-black/10">
