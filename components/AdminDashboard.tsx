@@ -118,8 +118,11 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* ── Header — Polar Breeze palette ── */}
-      <header className="bg-[#1A1A1A] text-white shadow-lg sticky top-0 z-30">
+      {/* ── Header — gradiente tricolor Polar Breeze ── */}
+      <header
+        className="text-white shadow-lg sticky top-0 z-30"
+        style={{ background: "linear-gradient(90deg, rgba(245,200,0,0.55) 0% 33.33%, rgba(212,43,43,0.55) 33.33% 66.66%, rgba(30,140,58,0.55) 66.66% 100%), #1A1A1A" }}
+      >
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
 
           {/* Logo 🧊 tricolor */}
