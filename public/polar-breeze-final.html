@@ -284,6 +284,43 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 
 @media(min-width:600px){.panel-lateral{display:block}.btn-choferes{display:none}.modal-choferes{display:none!important}}
 @media(max-width:599px){.panel-lateral{display:none!important}}
+
+/* ── DARK MODE OVERRIDES ─────────────────────────────────────────────────
+   Corrige elementos con colores hardcodeados que quedan invisibles
+   o ilegibles cuando body tiene la clase .dark                          */
+
+/* .money: fondo negro fijo → distinguible en dark mode */
+.dark .money{
+  background:linear-gradient(135deg,#252525,#353535);
+  border:1px solid rgba(255,255,255,0.1);
+}
+
+/* .col-head: cabeceras de columna negras → visibles en dark */
+.dark .col-head{
+  background:linear-gradient(90deg,#252525,#333333);
+  border-bottom:2px solid rgba(245,200,0,0.3);
+}
+
+/* .stat: bordes más visibles en dark */
+.dark .stat{border-color:rgba(255,255,255,0.14)}
+
+/* .col-list: borde visible en dark */
+.dark .col-list{border-color:rgba(255,255,255,0.1)}
+
+/* Texto ámbar #92660a → ilegible en fondos oscuros → ámbar brillante */
+.dark .prog-chip.pend,
+.dark .prog-chip.activo{color:#e0aa10}
+.dark .turno-text{color:#e0aa10}
+
+/* .prog-track: riel de progreso más visible en dark */
+.dark .prog-track{background:rgba(255,255,255,0.12)}
+
+/* .btn-limpiar: texto sub (#6b7280) en dark sobre input-bg (#111) → ok,
+   pero el borde casi invisible — reforzar */
+.dark .btn-limpiar{border-color:rgba(255,255,255,0.18)}
+
+/* .row: divisores entre filas de lista → más visibles */
+.dark .row{border-bottom-color:rgba(255,255,255,0.07)}
 </style>
 </head>
 <body>
