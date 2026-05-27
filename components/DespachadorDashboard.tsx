@@ -125,8 +125,8 @@ export default function DespachadorDashboard() {
   const checkScroll = useCallback(() => {
     const el = navRef.current;
     if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 4);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(Math.ceil(el.scrollLeft + el.clientWidth) < el.scrollWidth - 2);
   }, []);
 
   useEffect(() => {
@@ -151,6 +151,7 @@ export default function DespachadorDashboard() {
     const el = navRef.current;
     if (!el) return;
     el.scrollBy({ left: dir === "right" ? 140 : -140, behavior: "smooth" });
+    setTimeout(checkScroll, 350);
   };
 
   return (
@@ -161,74 +162,21 @@ export default function DespachadorDashboard() {
         className="text-white shadow-lg sticky top-0 z-30"
         style={{ background: "linear-gradient(90deg, rgba(245,200,0,0.55) 0% 33.33%, rgba(212,43,43,0.55) 33.33% 66.66%, rgba(30,140,58,0.55) 66.66% 100%), #1A1A1A" }}
       >
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
-
-          {/* ── Logo 🧊 tricolor ── */}
+        {/* ── Fila 1: Logo + Nombre + Acciones ── */}
+        <div className="max-w-6xl mx-auto px-4 pt-3 pb-2 flex items-center gap-3">
           <div className="flex items-center gap-2 flex-shrink-0">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/20"
+              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/20"
               style={{ background: "linear-gradient(135deg, #F5C800 33%, #D42B2B 33% 66%, #1E8C3A 66%)" }}
             >
-              <span className="text-lg">🧊</span>
+              <span className="text-base">🧊</span>
             </div>
-            <div className="hidden lg:block">
-              <p className="text-white font-black text-xs leading-none">Polar Breeze</p>
-              <p className="text-white/50 text-[9px] leading-none mt-0.5">Despacho</p>
+            <div>
+              <p className="text-white/60 text-[9px] leading-none uppercase tracking-widest">Polar Breeze</p>
+              <p className="text-white font-black text-sm leading-tight">Despacho</p>
             </div>
           </div>
-
-          {/* Tabs con scroll + flechas */}
-          <div className="flex-1 flex items-center gap-0.5 min-w-0">
-
-            {/* Flecha izquierda */}
-            <button
-              onClick={() => scrollNav("left")}
-              aria-hidden={!canScrollLeft}
-              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
-                text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
-                text-lg font-bold leading-none
-                ${canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-            >
-              ‹
-            </button>
-
-            <nav
-              ref={navRef}
-              className="flex gap-1 overflow-x-auto scrollbar-none flex-1 scroll-smooth"
-            >
-              {TABS.map((t) => (
-                <button
-                  key={t.key}
-                  data-active={tab === t.key}
-                  onClick={() => setTab(t.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm
-                    font-medium whitespace-nowrap transition-all duration-100 active:scale-95
-                    flex-shrink-0 ${
-                    tab === t.key
-                      ? "bg-[#F5C800] text-[#1A1A1A] shadow-sm font-bold"
-                      : "text-gray-300 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  <span>{t.icon}</span>
-                  <span className="hidden sm:inline">{t.label}</span>
-                </button>
-              ))}
-            </nav>
-
-            {/* Flecha derecha */}
-            <button
-              onClick={() => scrollNav("right")}
-              aria-hidden={!canScrollRight}
-              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
-                text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
-                text-lg font-bold leading-none
-                ${canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-            >
-              ›
-            </button>
-          </div>
-
-          {/* Acciones */}
+          <div className="flex-1" />
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
               onClick={() => setShowTablas(true)}
@@ -242,20 +190,63 @@ export default function DespachadorDashboard() {
               onClick={() => { setShowReset(true); setResetPwd(""); setResetMsg(null); }}
               title="Restablecer día"
               className="bg-white/10 hover:bg-white/20 active:scale-95 px-2 py-1.5
-                rounded-lg text-xs transition-all duration-100 font-medium whitespace-nowrap"
+                rounded-lg text-xs transition-all duration-100 font-medium whitespace-nowrap hidden sm:block"
             >
-              🔄 Restablecer
+              🔄 Reset
             </button>
-            {/* ── Pastilla de rol — Despachador ── */}
             <RolePill rol="despachador" nombre={profile?.nombre ?? ""} />
             <button
               onClick={logout}
-              className="bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5
-                rounded-lg text-xs transition-all duration-100 font-medium"
+              className="bg-white/10 hover:bg-white/20 active:scale-95 px-2 py-1.5
+                rounded-lg text-xs transition-all duration-100 font-medium hidden sm:block"
             >
               Salir
             </button>
           </div>
+        </div>
+
+        {/* ── Fila 2: Tabs con flechas ── */}
+        <div className="max-w-6xl mx-auto px-2 pb-2 flex items-center gap-0.5">
+          <button
+            onClick={() => scrollNav("left")}
+            className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
+              text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+              text-lg font-bold leading-none
+              ${canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+          >
+            ‹
+          </button>
+          <nav
+            ref={navRef}
+            className="flex gap-1 overflow-x-auto scrollbar-none flex-1 scroll-smooth"
+          >
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                data-active={tab === t.key}
+                onClick={() => setTab(t.key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm
+                  font-medium whitespace-nowrap transition-all duration-100 active:scale-95
+                  flex-shrink-0 ${
+                  tab === t.key
+                    ? "bg-[#F5C800] text-[#1A1A1A] shadow-sm font-bold"
+                    : "text-gray-300 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <span>{t.icon}</span>
+                <span className="hidden sm:inline">{t.label}</span>
+              </button>
+            ))}
+          </nav>
+          <button
+            onClick={() => scrollNav("right")}
+            className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
+              text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+              text-lg font-bold leading-none
+              ${canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+          >
+            ›
+          </button>
         </div>
 
         {/* Banda tricolor */}

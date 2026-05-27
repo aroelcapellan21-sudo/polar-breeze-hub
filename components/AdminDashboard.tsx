@@ -128,8 +128,8 @@ export default function AdminDashboard() {
   const checkScroll = useCallback(() => {
     const el = navRef.current;
     if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 4);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(Math.ceil(el.scrollLeft + el.clientWidth) < el.scrollWidth - 2);
   }, []);
 
   useEffect(() => {
@@ -154,6 +154,8 @@ export default function AdminDashboard() {
     const el = navRef.current;
     if (!el) return;
     el.scrollBy({ left: dir === "right" ? 140 : -140, behavior: "smooth" });
+    // Forzar recheck después de que termine la animación smooth
+    setTimeout(checkScroll, 350);
   };
 
   return (
@@ -164,182 +166,42 @@ export default function AdminDashboard() {
         className="text-white shadow-lg sticky top-0 z-30"
         style={{ background: "linear-gradient(90deg, rgba(245,200,0,0.55) 0% 33.33%, rgba(212,43,43,0.55) 33.33% 66.66%, rgba(30,140,58,0.55) 66.66% 100%), #1A1A1A" }}
       >
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+        {/* ── Fila 1: Logo + Nombre + Acciones ── */}
+        <div className="max-w-7xl mx-auto px-4 pt-3 pb-2 flex items-center gap-3">
 
-          {/* ── Logo 🧊 tricolor ── */}
+          {/* Logo + nombre de departamento */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/20"
+              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/20"
               style={{ background: "linear-gradient(135deg, #F5C800 33%, #D42B2B 33% 66%, #1E8C3A 66%)" }}
             >
-              <span className="text-lg">🧊</span>
+              <span className="text-base">🧊</span>
             </div>
-            <div className="hidden lg:block">
-              <p className="text-white font-black text-xs leading-none">Polar Breeze</p>
-              <p className="text-white/50 text-[9px] leading-none mt-0.5">Hub Central</p>
+            <div>
+              <p className="text-white/60 text-[9px] leading-none uppercase tracking-widest">Polar Breeze</p>
+              <p className="text-white font-black text-sm leading-tight">Admin</p>
             </div>
           </div>
 
-          {/* Tabs con scroll + flechas */}
-          <div className="flex-1 flex items-center gap-0.5 min-w-0">
+          {/* Spacer */}
+          <div className="flex-1" />
 
-            {/* Flecha izquierda */}
-            <button
-              onClick={() => scrollNav("left")}
-              aria-hidden={!canScrollLeft}
-              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
-                text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
-                text-lg font-bold leading-none
-                ${canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-            >
-              ‹
-            </button>
-
-            <nav
-              ref={navRef}
-              className="flex gap-1 overflow-x-auto scrollbar-none flex-1 scroll-smooth"
-            >
-              <NavTab
-                data-active={tab === "overview"}
-                active={tab === "overview"}
-                onClick={() => { setTab("overview"); setChofer(null); }}
-              >
-                <span>🏠</span>
-                <span className="hidden sm:inline">Overview</span>
-              </NavTab>
-              <NavTab
-                data-active={tab === "choferes"}
-                active={tab === "choferes"}
-                onClick={() => setTab("choferes")}
-              >
-                <span>👥</span>
-                <span className="hidden sm:inline">Choferes</span>
-                {chofer && (
-                  <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded-full hidden sm:inline">
-                    {chofer.nombre.split(" ")[0]}
-                  </span>
-                )}
-              </NavTab>
-              <NavTab
-                data-active={tab === "inventario"}
-                active={tab === "inventario"}
-                onClick={() => { setTab("inventario"); setChofer(null); }}
-              >
-                <span>📦</span>
-                <span className="hidden sm:inline">Inventario</span>
-              </NavTab>
-              <NavTab
-                data-active={tab === "estado"}
-                active={tab === "estado"}
-                onClick={() => { setTab("estado"); setChofer(null); }}
-              >
-                <span>🖥️</span>
-                <span className="hidden sm:inline">Estado</span>
-              </NavTab>
-              <NavTab
-                data-active={tab === "informes"}
-                active={tab === "informes"}
-                onClick={() => { setTab("informes"); setChofer(null); }}
-              >
-                <span>📋</span>
-                <span className="hidden sm:inline">Informes</span>
-              </NavTab>
-              <NavTab
-                data-active={tab === "anomalias"}
-                active={tab === "anomalias"}
-                onClick={() => { setTab("anomalias"); setChofer(null); }}
-              >
-                <span>⚠️</span>
-                <span className="hidden sm:inline">Anomalías</span>
-              </NavTab>
-              <NavTab
-                data-active={tab === "encargados"}
-                active={tab === "encargados"}
-                onClick={() => { setTab("encargados"); setChofer(null); }}
-              >
-                <span>🏭</span>
-                <span className="hidden sm:inline">Encargados</span>
-              </NavTab>
-              <NavTab
-                data-active={tab === "anom_desp"}
-                active={tab === "anom_desp"}
-                onClick={() => { setTab("anom_desp"); setChofer(null); }}
-              >
-                <span>📋</span>
-                <span className="hidden sm:inline">Anomalías Desp.</span>
-              </NavTab>
-              <NavTab
-                data-active={tab === "reportes"}
-                active={tab === "reportes"}
-                onClick={() => { setTab("reportes"); setChofer(null); }}
-              >
-                <span>📊</span>
-                <span className="hidden sm:inline">Reportes</span>
-              </NavTab>
-              <NavTab
-                data-active={tab === "codigos"}
-                active={tab === "codigos"}
-                onClick={() => { setTab("codigos"); setChofer(null); }}
-              >
-                <span>🔲</span>
-                <span className="hidden sm:inline">Códigos</span>
-              </NavTab>
-              <NavTab
-                data-active={tab === "pwa"}
-                active={tab === "pwa"}
-                onClick={() => { setTab("pwa"); setChofer(null); }}
-              >
-                <span>📱</span>
-                <span className="hidden sm:inline">PWA</span>
-              </NavTab>
-              <NavTab
-                data-active={tab === "tiemporeal"}
-                active={tab === "tiemporeal"}
-                onClick={() => { setTab("tiemporeal"); setChofer(null); }}
-              >
-                <span>⚡</span>
-                <span className="hidden sm:inline">Tiempo Real</span>
-              </NavTab>
-              <NavTab
-                data-active={tab === "proyecciones"}
-                active={tab === "proyecciones"}
-                onClick={() => { setTab("proyecciones"); setChofer(null); }}
-              >
-                <span>📈</span>
-                <span className="hidden sm:inline">Proyecciones</span>
-              </NavTab>
-            </nav>
-
-            {/* Flecha derecha */}
-            <button
-              onClick={() => scrollNav("right")}
-              aria-hidden={!canScrollRight}
-              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
-                text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
-                text-lg font-bold leading-none
-                ${canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-            >
-              ›
-            </button>
-          </div>
-
-          {/* Acciones */}
+          {/* Acciones — siempre visibles */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* 🔍 Buscador */}
+            {/* 🔍 Buscador — siempre visible */}
             <button
               onClick={openSearch}
               title="Buscar chofer, producto, ficha…"
-              className="bg-white/10 hover:bg-white/20 active:scale-95 w-8 h-8 rounded-lg
+              className="bg-white/15 hover:bg-white/25 active:scale-95 w-8 h-8 rounded-lg
                 flex items-center justify-center text-base transition-all duration-100"
             >
               🔍
             </button>
-            {/* 📋 Tablas */}
             <button
               onClick={() => setShowTablas(true)}
               title="Consultar tablas"
               className="bg-white/10 hover:bg-white/20 active:scale-95 w-8 h-8 rounded-lg
-                flex items-center justify-center text-base transition-all duration-100"
+                flex items-center justify-center text-base transition-all duration-100 hidden sm:flex"
             >
               📋
             </button>
@@ -347,20 +209,90 @@ export default function AdminDashboard() {
               onClick={() => setShowConfig(true)}
               title="Configuración"
               className="bg-white/10 hover:bg-white/20 active:scale-95 w-8 h-8 rounded-lg
-                flex items-center justify-center text-base transition-all duration-100"
+                flex items-center justify-center text-base transition-all duration-100 hidden sm:flex"
             >
               ⚙️
             </button>
-            {/* ── Pastilla de rol — Admin ── */}
             <RolePill rol="admin" nombre={profile?.nombre ?? ""} />
             <button
               onClick={logout}
-              className="bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5
-                rounded-lg text-xs transition-all duration-100 font-medium"
+              className="bg-white/10 hover:bg-white/20 active:scale-95 px-2 py-1.5
+                rounded-lg text-xs transition-all duration-100 font-medium hidden sm:block"
             >
               Salir
             </button>
           </div>
+        </div>
+
+        {/* ── Fila 2: Tabs con flechas (ancho completo) ── */}
+        <div className="max-w-7xl mx-auto px-2 pb-2 flex items-center gap-0.5">
+          {/* Flecha izquierda */}
+          <button
+            onClick={() => scrollNav("left")}
+            className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
+              text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+              text-lg font-bold leading-none
+              ${canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+          >
+            ‹
+          </button>
+
+          <nav
+            ref={navRef}
+            className="flex gap-1 overflow-x-auto scrollbar-none flex-1 scroll-smooth"
+          >
+            <NavTab data-active={tab === "overview"} active={tab === "overview"} onClick={() => { setTab("overview"); setChofer(null); }}>
+              <span>🏠</span><span className="hidden sm:inline">Overview</span>
+            </NavTab>
+            <NavTab data-active={tab === "choferes"} active={tab === "choferes"} onClick={() => setTab("choferes")}>
+              <span>👥</span><span className="hidden sm:inline">Choferes</span>
+              {chofer && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded-full hidden sm:inline">{chofer.nombre.split(" ")[0]}</span>}
+            </NavTab>
+            <NavTab data-active={tab === "inventario"} active={tab === "inventario"} onClick={() => { setTab("inventario"); setChofer(null); }}>
+              <span>📦</span><span className="hidden sm:inline">Inventario</span>
+            </NavTab>
+            <NavTab data-active={tab === "estado"} active={tab === "estado"} onClick={() => { setTab("estado"); setChofer(null); }}>
+              <span>🖥️</span><span className="hidden sm:inline">Estado</span>
+            </NavTab>
+            <NavTab data-active={tab === "informes"} active={tab === "informes"} onClick={() => { setTab("informes"); setChofer(null); }}>
+              <span>📋</span><span className="hidden sm:inline">Informes</span>
+            </NavTab>
+            <NavTab data-active={tab === "anomalias"} active={tab === "anomalias"} onClick={() => { setTab("anomalias"); setChofer(null); }}>
+              <span>⚠️</span><span className="hidden sm:inline">Anomalías</span>
+            </NavTab>
+            <NavTab data-active={tab === "encargados"} active={tab === "encargados"} onClick={() => { setTab("encargados"); setChofer(null); }}>
+              <span>🏭</span><span className="hidden sm:inline">Encargados</span>
+            </NavTab>
+            <NavTab data-active={tab === "anom_desp"} active={tab === "anom_desp"} onClick={() => { setTab("anom_desp"); setChofer(null); }}>
+              <span>📋</span><span className="hidden sm:inline">Anom. Desp.</span>
+            </NavTab>
+            <NavTab data-active={tab === "reportes"} active={tab === "reportes"} onClick={() => { setTab("reportes"); setChofer(null); }}>
+              <span>📊</span><span className="hidden sm:inline">Reportes</span>
+            </NavTab>
+            <NavTab data-active={tab === "codigos"} active={tab === "codigos"} onClick={() => { setTab("codigos"); setChofer(null); }}>
+              <span>🔲</span><span className="hidden sm:inline">Códigos</span>
+            </NavTab>
+            <NavTab data-active={tab === "pwa"} active={tab === "pwa"} onClick={() => { setTab("pwa"); setChofer(null); }}>
+              <span>📱</span><span className="hidden sm:inline">PWA</span>
+            </NavTab>
+            <NavTab data-active={tab === "tiemporeal"} active={tab === "tiemporeal"} onClick={() => { setTab("tiemporeal"); setChofer(null); }}>
+              <span>⚡</span><span className="hidden sm:inline">Tiempo Real</span>
+            </NavTab>
+            <NavTab data-active={tab === "proyecciones"} active={tab === "proyecciones"} onClick={() => { setTab("proyecciones"); setChofer(null); }}>
+              <span>📈</span><span className="hidden sm:inline">Proyecciones</span>
+            </NavTab>
+          </nav>
+
+          {/* Flecha derecha */}
+          <button
+            onClick={() => scrollNav("right")}
+            className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
+              text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+              text-lg font-bold leading-none
+              ${canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+          >
+            ›
+          </button>
         </div>
 
         {/* ── Banda tricolor 5 px ── */}

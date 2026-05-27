@@ -85,8 +85,8 @@ export default function EncargadoDashboard() {
   const checkScroll = useCallback(() => {
     const el = navRef.current;
     if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 4);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(Math.ceil(el.scrollLeft + el.clientWidth) < el.scrollWidth - 2);
   }, []);
 
   useEffect(() => {
@@ -112,6 +112,7 @@ export default function EncargadoDashboard() {
     const el = navRef.current;
     if (!el) return;
     el.scrollBy({ left: dir === "right" ? 120 : -120, behavior: "smooth" });
+    setTimeout(checkScroll, 350);
   };
 
   return (
@@ -124,80 +125,21 @@ export default function EncargadoDashboard() {
         className="text-white shadow-lg sticky top-0 z-30"
         style={{ background: HEADER_BG }}
       >
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-
-          {/* ── Logo 🧊 tricolor ── */}
+        {/* ── Fila 1: Logo + Nombre + Acciones ── */}
+        <div className="max-w-2xl mx-auto px-4 pt-3 pb-2 flex items-center gap-3">
           <div className="flex items-center gap-2 flex-shrink-0">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/20"
+              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/20"
               style={{ background: "linear-gradient(135deg, #F5C800 33%, #D42B2B 33% 66%, #1E8C3A 66%)" }}
             >
-              <span className="text-lg">🧊</span>
+              <span className="text-base">🧊</span>
             </div>
-            <div className="hidden lg:block">
-              <p className="text-white font-black text-xs leading-none">Polar Breeze</p>
-              <p className="text-white/50 text-[9px] leading-none mt-0.5">Loker</p>
+            <div>
+              <p className="text-white/60 text-[9px] leading-none uppercase tracking-widest">Polar Breeze</p>
+              <p className="text-white font-black text-sm leading-tight">Supervisor</p>
             </div>
           </div>
-
-          {/* ── Tabs con scroll + flechas ── */}
-          <div className="flex-1 flex items-center gap-0.5 min-w-0">
-
-            {/* Flecha izquierda */}
-            <button
-              onClick={() => scrollNav("left")}
-              aria-hidden={!canScrollLeft}
-              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
-                text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
-                text-lg font-bold leading-none
-                ${canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-            >
-              ‹
-            </button>
-
-            <nav
-              ref={navRef}
-              className="flex gap-1 overflow-x-auto scrollbar-none flex-1 scroll-smooth"
-            >
-              {TABS.map(t => (
-                <button
-                  key={t.key}
-                  data-active={tab === t.key}
-                  onClick={() => setTab(t.key)}
-                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
-                    whitespace-nowrap transition-all duration-100 active:scale-95 flex-shrink-0 ${
-                    tab === t.key
-                      ? "bg-white text-[#1A1A1A] shadow-sm font-bold"
-                      : "text-white/80 hover:bg-white/15 hover:text-white"
-                  }`}
-                >
-                  <span>{t.icon}</span>
-                  <span className="hidden sm:inline">{t.label}</span>
-                  {/* Badge pendientes en tab Choferes */}
-                  {t.key === "choferes" && pendientesBadge > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#D42B2B] rounded-full
-                      flex items-center justify-center text-[9px] font-black text-white border border-white/30">
-                      {pendientesBadge > 9 ? "9+" : pendientesBadge}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </nav>
-
-            {/* Flecha derecha */}
-            <button
-              onClick={() => scrollNav("right")}
-              aria-hidden={!canScrollRight}
-              className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
-                text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
-                text-lg font-bold leading-none
-                ${canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-            >
-              ›
-            </button>
-          </div>
-
-          {/* Acciones */}
+          <div className="flex-1" />
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
               onClick={() => setShowTablas(true)}
@@ -207,16 +149,64 @@ export default function EncargadoDashboard() {
             >
               📋
             </button>
-            {/* ── Pastilla de rol — Encargado ── */}
             <RolePill rol="encargado" nombre={profile?.nombre ?? "Encargado"} />
             <button
               onClick={logout}
-              className="bg-white/15 hover:bg-white/25 active:scale-95 px-3 py-1.5
-                rounded-lg text-xs transition-all font-medium"
+              className="bg-white/15 hover:bg-white/25 active:scale-95 px-2 py-1.5
+                rounded-lg text-xs transition-all font-medium hidden sm:block"
             >
               Salir
             </button>
           </div>
+        </div>
+
+        {/* ── Fila 2: Tabs con flechas ── */}
+        <div className="max-w-2xl mx-auto px-2 pb-2 flex items-center gap-0.5">
+          <button
+            onClick={() => scrollNav("left")}
+            className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
+              text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+              text-lg font-bold leading-none
+              ${canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+          >
+            ‹
+          </button>
+          <nav
+            ref={navRef}
+            className="flex gap-1 overflow-x-auto scrollbar-none flex-1 scroll-smooth"
+          >
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                data-active={tab === t.key}
+                onClick={() => setTab(t.key)}
+                className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
+                  whitespace-nowrap transition-all duration-100 active:scale-95 flex-shrink-0 ${
+                  tab === t.key
+                    ? "bg-white text-[#1A1A1A] shadow-sm font-bold"
+                    : "text-white/80 hover:bg-white/15 hover:text-white"
+                }`}
+              >
+                <span>{t.icon}</span>
+                <span className="hidden sm:inline">{t.label}</span>
+                {t.key === "choferes" && pendientesBadge > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#D42B2B] rounded-full
+                    flex items-center justify-center text-[9px] font-black text-white border border-white/30">
+                    {pendientesBadge > 9 ? "9+" : pendientesBadge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+          <button
+            onClick={() => scrollNav("right")}
+            className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
+              text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
+              text-lg font-bold leading-none
+              ${canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+          >
+            ›
+          </button>
         </div>
 
         {/* Banda tricolor 5 px */}
