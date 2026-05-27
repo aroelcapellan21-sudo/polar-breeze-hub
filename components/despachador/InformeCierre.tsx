@@ -689,12 +689,12 @@ export default function InformeCierre() {
 
       {/* ── CHOFERES: factura individual ──────────────────────────────────────── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 bg-gradient-to-r from-cyan-700 to-cyan-900 flex items-center justify-between">
+        <div className="px-4 py-3 bg-[#1A1A1A] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-lg">🚛</span>
             <span className="text-white font-semibold text-sm">Facturas por Chofer</span>
             {choferData.length > 0 && (
-              <span className="text-xs bg-cyan-600 text-white px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">
                 {choferData.length}
               </span>
             )}

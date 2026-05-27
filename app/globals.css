@@ -2,6 +2,8 @@
 
 /* ── Polar Breeze — variables globales ─────────────────────────────────── */
 :root {
+  color-scheme: light;
+
   --pb-yellow: #F5C800;
   --pb-red:    #D42B2B;
   --pb-green:  #1E8C3A;
@@ -16,8 +18,8 @@
   --foreground:  #1A1A1A;
 }
 
-/* La app es 100% light-mode. NO seguimos la preferencia del sistema
-   para evitar que el body oscuro choque con los componentes Tailwind. */
+/* Forzar light mode: evita que iOS/Android en dark mode oscurezca inputs y fondos */
+html { color-scheme: light; }
 
 body {
   background: var(--background);

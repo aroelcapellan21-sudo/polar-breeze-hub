@@ -325,13 +325,16 @@ export default function ChoferDashboard() {
   if (!hayDespacho) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
-        <header className="bg-gradient-to-r from-cyan-600 to-teal-700 text-white shadow-lg">
+        <header className="text-white shadow-lg" style={{ background: "linear-gradient(90deg, rgba(245,200,0,0.55) 0% 33.33%, rgba(212,43,43,0.55) 33.33% 66.66%, rgba(30,140,58,0.55) 66.66% 100%), #1A1A1A" }}>
           <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center font-bold text-sm">PB</div>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow ring-1 ring-white/20 flex-shrink-0"
+                   style={{ background: "linear-gradient(135deg, #F5C800 33%, #D42B2B 33% 66%, #1E8C3A 66%)" }}>
+                <span className="text-sm">🧊</span>
+              </div>
               <div>
                 <p className="font-semibold text-sm leading-tight">{profile?.nombre}</p>
-                <p className="text-cyan-200 text-xs">Polar Breeze · Chofer</p>
+                <p className="text-white/60 text-xs">Polar Breeze · Chofer</p>
               </div>
             </div>
             <button onClick={logout} className="bg-white/15 hover:bg-white/25 active:scale-95 px-3 py-1.5 rounded-lg text-xs transition-all duration-100 font-medium">
@@ -383,13 +386,16 @@ export default function ChoferDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      <header className="bg-gradient-to-r from-cyan-600 to-teal-700 text-white shadow-lg sticky top-0 z-10">
+      <header className="text-white shadow-lg sticky top-0 z-10" style={{ background: "linear-gradient(90deg, rgba(245,200,0,0.55) 0% 33.33%, rgba(212,43,43,0.55) 33.33% 66.66%, rgba(30,140,58,0.55) 66.66% 100%), #1A1A1A" }}>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">PB</div>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow ring-1 ring-white/20 flex-shrink-0"
+                 style={{ background: "linear-gradient(135deg, #F5C800 33%, #D42B2B 33% 66%, #1E8C3A 66%)" }}>
+              <span className="text-sm">🧊</span>
+            </div>
             <div>
               <p className="font-semibold text-sm leading-tight">{profile?.nombre}</p>
-              <p className="text-cyan-200 text-xs">
+              <p className="text-white/60 text-xs">
                 Polar Breeze · Chofer{yaReporto ? " · 🔒 Solo lectura" : ""}
               </p>
             </div>

@@ -123,16 +123,40 @@ async function getAccessToken(email: string, pem: string): Promise<string> {
 
 // ─── Google Sheets API v4 ──────────────────────────────────────────────────────
 
+async function ensureTabs(token: string, sheetsId: string, tabNames: string[]): Promise<void> {
+  const res  = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetsId}?fields=sheets.properties.title`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal:  AbortSignal.timeout(10000),
+  });
+  if (!res.ok) return;
+  const data     = await res.json() as { sheets?: { properties: { title: string } }[] };
+  const existing = new Set((data.sheets ?? []).map((s) => s.properties.title));
+  const missing  = tabNames.filter((n) => !existing.has(n));
+  if (missing.length === 0) return;
+
+  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetsId}:batchUpdate`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body:    JSON.stringify({
+      requests: missing.map((title) => ({ addSheet: { properties: { title } } })),
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
+}
+
 async function sheetsWrite(
   token: string,
   sheetsId: string,
   updates: { range: string; values: (string | number)[][] }[],
 ): Promise<void> {
+  const tabNames = updates.map((u) => u.range.split("!")[0]);
+  await ensureTabs(token, sheetsId, tabNames);
+
   // Limpiar tabs primero
   await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetsId}/values:batchClear`, {
     method:  "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body:    JSON.stringify({ ranges: updates.map((u) => u.range.split("!")[0] + "!A:Z") }),
+    body:    JSON.stringify({ ranges: tabNames.map((t) => t + "!A:Z") }),
     signal:  AbortSignal.timeout(10000),
   });
   // Escribir datos

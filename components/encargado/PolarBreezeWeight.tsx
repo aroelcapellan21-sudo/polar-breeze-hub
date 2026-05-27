@@ -540,13 +540,13 @@ export default function PolarBreezeWeight() {
 
           {/* ── Báscula Bluetooth ── */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-800 flex items-center justify-between">
+            <div className="px-4 py-3 bg-[#1A1A1A] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-base">⚖️</span>
                 <div>
                   <p className="text-white font-bold text-sm">Báscula Bluetooth</p>
                   {btEstado === "conectado" && btNombreDisp && (
-                    <p className="text-blue-200 text-xs">{btNombreDisp}</p>
+                    <p className="text-white/50 text-xs">{btNombreDisp}</p>
                   )}
                 </div>
               </div>

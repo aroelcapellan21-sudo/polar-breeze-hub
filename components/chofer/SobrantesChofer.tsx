@@ -187,7 +187,7 @@ export default function SobrantesChofer() {
   if (yaReporto) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 bg-gradient-to-r from-teal-600 to-teal-800">
+        <div className="px-4 py-3 bg-[#1E8C3A]">
           <h2 className="text-white font-semibold text-sm">✅ Sobrantes del día — reportados</h2>
         </div>
         <div className="p-4 space-y-3">
@@ -223,9 +223,9 @@ export default function SobrantesChofer() {
   // Formulario de captura de sobrantes
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="px-4 py-3 bg-gradient-to-r from-teal-600 to-teal-800">
+      <div className="px-4 py-3 bg-[#1A1A1A]">
         <h2 className="text-white font-semibold text-sm">🔄 Sobrantes del día</h2>
-        <p className="text-teal-200 text-xs mt-0.5">Registra lo que devuelves al loker</p>
+        <p className="text-white/50 text-xs mt-0.5">Registra lo que devuelves al loker</p>
       </div>
 
       <div className="p-4 space-y-4">
@@ -318,8 +318,7 @@ export default function SobrantesChofer() {
         <button
           onClick={handleGuardar}
           disabled={guardando}
-          className="w-full bg-gradient-to-r from-teal-600 to-teal-800 hover:from-teal-500
-            hover:to-teal-700 text-white font-semibold py-2.5 rounded-lg text-sm
+          className="w-full bg-[#1E8C3A] hover:bg-[#176830] text-white font-semibold py-2.5 rounded-lg text-sm
             transition-all duration-100 active:scale-95 disabled:opacity-60"
         >
           {guardando ? "Registrando…" : "Registrar sobrantes"}
