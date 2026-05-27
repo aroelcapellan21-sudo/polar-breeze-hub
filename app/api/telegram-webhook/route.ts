@@ -2,11 +2,9 @@
  * POST /api/telegram-webhook
  *
  * Receptor de actualizaciones del Bot de Telegram.
- * Maneja comandos: /estado, /choferes, /alertas, /resumen_hoy
+ * Comandos: /estado, /choferes, /alertas, /resumen_hoy, /puntos, /ayuda
  *
- * Para registrar el webhook en Telegram:
- *   https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://polar-breeze-hub.vercel.app/api/telegram-webhook
- *   (o usar GET /api/telegram-webhook?setup=1)
+ * Registrar webhook: GET /api/telegram-webhook?setup=1
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -60,7 +58,7 @@ async function send(chatId: number, text: string, parseMode = "Markdown") {
   });
 }
 
-// ─── Helper: extraer valor de campo Firestore ────────────────────────────────
+// ─── Helpers Firestore ───────────────────────────────────────────────────────
 
 function fv(field: Record<string, unknown> | unknown): string {
   if (!field || typeof field !== "object") return "—";
@@ -74,6 +72,28 @@ function fv(field: Record<string, unknown> | unknown): string {
     return d.toLocaleString("es-DO", { timeZone: "America/Santo_Domingo" });
   }
   return "—";
+}
+
+function fvNum(field: unknown): number {
+  if (!field || typeof field !== "object") return 0;
+  const f = field as Record<string, unknown>;
+  const s = "doubleValue" in f ? String(f.doubleValue)
+          : "integerValue" in f ? String(f.integerValue) : "0";
+  return isNaN(Number(s)) ? 0 : Number(s);
+}
+
+async function fsRunQuery(body: Record<string, unknown>): Promise<Record<string, unknown>[]> {
+  try {
+    const res = await fetch(`${FS_BASE}:runQuery?key=${API_KEY}`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return [];
+    const rows = await res.json() as { document?: Record<string, unknown> }[];
+    return rows.filter((r) => r.document).map((r) => r.document!);
+  } catch { return []; }
 }
 
 // ─── Comandos ────────────────────────────────────────────────────────────────
@@ -194,39 +214,175 @@ async function cmdAlertas(chatId: number) {
   }
 }
 
-/** /resumen_hoy — resumen operativo del día */
+/** /resumen_hoy — resumen operativo del día con datos reales */
 async function cmdResumenHoy(chatId: number) {
   await send(chatId, "⏳ Preparando resumen del día…");
   try {
-    const ahora = new Date();
-    const hora  = ahora.toLocaleTimeString("es-DO", {
-      timeZone: "America/Santo_Domingo", hour: "2-digit", minute: "2-digit"
+    const ahora   = new Date();
+    const fechaRD = ahora.toLocaleDateString("en-CA", { timeZone: "America/Santo_Domingo" });
+    const hora    = ahora.toLocaleTimeString("es-DO", {
+      timeZone: "America/Santo_Domingo", hour: "2-digit", minute: "2-digit",
     });
-    const fecha = ahora.toLocaleDateString("es-DO", {
-      timeZone: "America/Santo_Domingo", weekday: "long", day: "2-digit", month: "long"
+    const fechaLabel = ahora.toLocaleDateString("es-DO", {
+      timeZone: "America/Santo_Domingo", weekday: "long", day: "2-digit", month: "long",
     });
 
     // Lotes del día
-    const lotes = await fsQuery("lotes_loker", { pageSize: 50 });
-    const movs  = await fsQuery("movimientos_loker", { pageSize: 50 });
+    const lotes = await fsQuery("lotes_loker", { pageSize: 100 });
+
+    // Imbentario del día — structured query
+    const inicioDia = new Date(`${fechaRD}T00:00:00-04:00`).toISOString();
+    const imbDocs   = await fsRunQuery({
+      structuredQuery: {
+        from:  [{ collectionId: "imbentario" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "timestamp" },
+            op:    "GREATER_THAN_OR_EQUAL",
+            value: { timestampValue: inicioDia },
+          },
+        },
+        limit: 300,
+      },
+    });
+
+    let totalUds   = 0;
+    let totalMonto = 0;
+    const porChofer: Record<string, { nombre: string; uds: number }> = {};
+    for (const doc of imbDocs) {
+      const f       = doc.fields as Record<string, unknown> | undefined;
+      const cId     = fv(f?.choferId);
+      const cNombre = fv(f?.choferNombre);
+      const uds     = fvNum(f?.cantidadEntregada);
+      const monto   = fvNum(f?.monto);
+      totalUds   += uds;
+      totalMonto += monto;
+      if (!porChofer[cId]) porChofer[cId] = { nombre: cNombre, uds: 0 };
+      porChofer[cId].uds += uds;
+    }
+
+    const ranking = Object.values(porChofer)
+      .sort((a, b) => b.uds - a.uds)
+      .slice(0, 5);
 
     const lines = [
       `📊 *Resumen del día — Polar Breeze*`,
-      `📅 ${fecha} · 🕐 ${hora}`,
+      `📅 ${fechaLabel} · 🕐 ${hora}`,
       "",
       `📦 *Lotes recibidos hoy:* ${lotes.length}`,
-      `🔄 *Movimientos del loker:* ${movs.length}`,
-      "",
-    ];
+      `🚚 *Registros de despacho:* ${imbDocs.length}`,
+      `🔢 *Unidades entregadas:* ${totalUds.toLocaleString("es-DO")}`,
+      totalMonto > 0
+        ? `💰 *Facturado:* RD$${totalMonto.toLocaleString("es-DO", { maximumFractionDigits: 0 })}`
+        : "",
+    ].filter(Boolean);
 
-    if (lotes.length === 0) {
-      lines.push("_No hay lotes registrados hoy._");
+    if (ranking.length > 0) {
+      lines.push("", "🏆 *Top choferes hoy:*");
+      ranking.forEach((c, i) => {
+        lines.push(`  ${i + 1}. ${c.nombre} — ${c.uds} uds`);
+      });
+    }
+
+    if (imbDocs.length === 0) {
+      lines.push("", "_Sin registros de despacho hoy todavía._");
     }
 
     lines.push("", "_Para detalles completos, abre el Hub Admin._");
     await send(chatId, lines.join("\n"));
   } catch (e) {
     await send(chatId, `❌ Error: \`${String(e)}\``);
+  }
+}
+
+/** /puntos — puntos acumulados de la quincena actual por chofer */
+async function cmdPuntos(chatId: number) {
+  await send(chatId, "⏳ Calculando puntos de la quincena…");
+  try {
+    const ahora = new Date();
+    const dia   = Number(ahora.toLocaleDateString("en-CA", { timeZone: "America/Santo_Domingo" }).split("-")[2]);
+    const esSegunda = dia >= 16;
+
+    const mesAnio    = ahora.toLocaleDateString("es-DO", {
+      timeZone: "America/Santo_Domingo", month: "long", year: "numeric",
+    });
+    const qLabel = `${esSegunda ? "2ª" : "1ª"} quincena ${mesAnio}`;
+
+    // Rango de la quincena
+    const anio = ahora.getFullYear();
+    const mes  = ahora.getMonth();
+    const inicioQ = esSegunda
+      ? new Date(anio, mes, 16, 0, 0, 0)
+      : new Date(anio, mes, 1,  0, 0, 0);
+
+    const imbDocs = await fsRunQuery({
+      structuredQuery: {
+        from:  [{ collectionId: "imbentario" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "timestamp" },
+            op:    "GREATER_THAN_OR_EQUAL",
+            value: { timestampValue: inicioQ.toISOString() },
+          },
+        },
+        limit: 1000,
+      },
+    });
+
+    // Config puntos
+    const cfgDoc    = await fsGet("config/puntos");
+    const metaVal   = fvNum((cfgDoc?.fields as Record<string, unknown> | undefined)?.metaPuntos);
+    const puntosMap: Record<string, number> = {};
+    const prodArr   = ((cfgDoc?.fields as Record<string, unknown> | undefined)?.productos as Record<string, unknown> | undefined)
+      ?.arrayValue as Record<string, unknown> | undefined;
+    if (prodArr?.values && Array.isArray(prodArr.values)) {
+      (prodArr.values as Record<string, unknown>[]).forEach((item) => {
+        const mv  = (item as Record<string, unknown>).mapValue as Record<string, unknown> | undefined;
+        const ff  = mv?.fields as Record<string, Record<string, unknown>> | undefined;
+        if (ff?.nombre && ff?.puntos) {
+          puntosMap[fv(ff.nombre).toLowerCase().trim()] = fvNum(ff.puntos);
+        }
+      });
+    }
+
+    // Agregar por chofer
+    const porChofer: Record<string, { nombre: string; pts: number; uds: number }> = {};
+    for (const doc of imbDocs) {
+      const f       = doc.fields as Record<string, unknown> | undefined;
+      const cId     = fv(f?.choferId);
+      const cNombre = fv(f?.choferNombre);
+      const prod    = fv(f?.producto).toLowerCase().trim();
+      const uds     = fvNum(f?.cantidadEntregada);
+      const pts     = (puntosMap[prod] ?? 0) * uds;
+      if (!porChofer[cId]) porChofer[cId] = { nombre: cNombre, pts: 0, uds: 0 };
+      porChofer[cId].pts += pts;
+      porChofer[cId].uds += uds;
+    }
+
+    const ranking = Object.values(porChofer).sort((a, b) => b.pts - a.pts);
+
+    if (ranking.length === 0) {
+      await send(chatId, `📊 Sin datos de puntos para la ${qLabel}.`);
+      return;
+    }
+
+    const lines = [
+      `⭐ *Puntos — ${qLabel}*`,
+      metaVal > 0 ? `Meta: ${metaVal} pts` : "",
+      "",
+    ].filter(Boolean);
+
+    ranking.forEach((c, i) => {
+      const icon = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+      const cumple = metaVal > 0 ? (c.pts >= metaVal ? " ✅" : " ⚠️") : "";
+      lines.push(`${icon} ${c.nombre}${cumple}`);
+      lines.push(`   ${c.pts} pts · ${c.uds} uds`);
+    });
+
+    lines.push("", "_Datos en tiempo real desde Firebase._");
+    await send(chatId, lines.join("\n"));
+  } catch (e) {
+    await send(chatId, `❌ Error calculando puntos: \`${String(e)}\``);
   }
 }
 
@@ -240,9 +396,10 @@ async function cmdAyuda(chatId: number) {
     "  /choferes — Lista choferes activos",
     "  /alertas — Alertas pendientes sin leer",
     "  /resumen\\_hoy — Resumen operativo del día",
+    "  /puntos — Puntos de la quincena actual",
     "  /ayuda — Esta ayuda",
     "",
-    "_Administrador: Oliver · Sistema: aroelcapellan21_",
+    "_Administrador: Oliver · Hub: polar\\-breeze\\-hub.vercel.app_",
   ].join("\n");
   await send(chatId, texto);
 }
@@ -281,6 +438,7 @@ export async function POST(req: NextRequest) {
       case "/choferes":      await cmdChoferes(chatId);    break;
       case "/alertas":       await cmdAlertas(chatId);     break;
       case "/resumen_hoy":   await cmdResumenHoy(chatId);  break;
+      case "/puntos":        await cmdPuntos(chatId);      break;
       case "/ayuda":
       case "/start":
       case "/help":          await cmdAyuda(chatId);       break;

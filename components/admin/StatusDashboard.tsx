@@ -43,6 +43,12 @@ export default function StatusDashboard() {
   const [lastCheck, setLastCheck] = useState<Date | null>(null);
   const [fbClient,  setFbClient]  = useState<ServiceStatus>("verificando");
 
+  // ── Herramientas de configuración ─────────────────────────────────────────────
+  const [webhookLoading, setWebhookLoading] = useState(false);
+  const [webhookResult,  setWebhookResult]  = useState<string | null>(null);
+  const [cronLoading,    setCronLoading]    = useState(false);
+  const [cronResult,     setCronResult]     = useState<string | null>(null);
+
   // ── Owner password ────────────────────────────────────────────────────────────
   const [ownerLocked,   setOwnerLocked]   = useState(true);
   const [ownerPwd,      setOwnerPwd]      = useState("");
@@ -147,6 +153,53 @@ export default function StatusDashboard() {
     const interval = setInterval(fetchStatus, 60_000);
     return () => clearInterval(interval);
   }, [fetchStatus]);
+
+  const registrarWebhook = async () => {
+    setWebhookLoading(true);
+    setWebhookResult(null);
+    try {
+      const res  = await fetch("/api/telegram-webhook?setup=1");
+      const data = await res.json() as { hookUrl?: string; telegram?: { ok: boolean; description?: string }; error?: string };
+      if (data.error) {
+        setWebhookResult(`❌ ${data.error}`);
+      } else if (data.telegram?.ok) {
+        setWebhookResult(`✅ Webhook registrado en:\n${data.hookUrl}`);
+      } else {
+        setWebhookResult(`⚠️ Respuesta de Telegram: ${data.telegram?.description ?? "sin detalle"}`);
+      }
+    } catch (e) {
+      setWebhookResult(`❌ Error: ${String(e)}`);
+    } finally {
+      setWebhookLoading(false);
+    }
+  };
+
+  const probarCron = async () => {
+    setCronLoading(true);
+    setCronResult(null);
+    try {
+      const res  = await fetch("/api/cron-nocturno");
+      if (res.status === 401) {
+        setCronResult("🔒 No autorizado (CRON_SECRET activo — ejecuta manualmente desde Vercel)");
+      } else {
+        const data = await res.json() as { ok?: boolean; fecha?: string; ms?: number; tareas?: { nombre: string; status: string; detalle?: string }[] };
+        if (data.ok && data.tareas) {
+          const lineas = [`✅ Cron ejecutado para ${data.fecha} en ${data.ms}ms`, ""];
+          data.tareas.forEach((t) => {
+            const icn = t.status === "ok" ? "✅" : t.status === "skip" ? "⏭️" : "❌";
+            lineas.push(`${icn} ${t.nombre}${t.detalle ? ` — ${t.detalle}` : ""}`);
+          });
+          setCronResult(lineas.join("\n"));
+        } else {
+          setCronResult(`⚠️ Respuesta inesperada: ${JSON.stringify(data).slice(0, 200)}`);
+        }
+      }
+    } catch (e) {
+      setCronResult(`❌ Error: ${String(e)}`);
+    } finally {
+      setCronLoading(false);
+    }
+  };
 
   // ── Loading owner config ──────────────────────────────────────────────────────
   if (ownerPwdSet === null) {
@@ -434,6 +487,63 @@ export default function StatusDashboard() {
         <p className="text-xs text-blue-500 mt-2">
           Notificaciones enviadas a todos los chat IDs configurados simultáneamente.
         </p>
+      </div>
+
+      {/* ── Herramientas de administración ── */}
+      <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+        <h3 className="font-bold text-gray-700">🛠️ Herramientas</h3>
+        <div className="grid sm:grid-cols-2 gap-4">
+
+          {/* Registrar Webhook */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+            <div>
+              <p className="font-semibold text-gray-700 text-sm">✈️ Webhook Telegram</p>
+              <p className="text-xs text-gray-400 mt-0.5">Registra o actualiza la URL del webhook en Telegram</p>
+            </div>
+            <button
+              onClick={registrarWebhook}
+              disabled={webhookLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] hover:bg-gray-800 active:scale-95
+                text-white rounded-lg text-sm font-medium transition-all duration-100 disabled:opacity-60"
+            >
+              {webhookLoading
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : "📡"
+              }
+              {webhookLoading ? "Registrando…" : "Registrar Webhook"}
+            </button>
+            {webhookResult && (
+              <pre className="text-xs bg-white border border-gray-200 rounded-lg px-3 py-2 whitespace-pre-wrap text-gray-700 font-mono">
+                {webhookResult}
+              </pre>
+            )}
+          </div>
+
+          {/* Probar Cron */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+            <div>
+              <p className="font-semibold text-gray-700 text-sm">⏰ Cron Nocturno</p>
+              <p className="text-xs text-gray-400 mt-0.5">Ejecuta manualmente la automatización nocturna</p>
+            </div>
+            <button
+              onClick={probarCron}
+              disabled={cronLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1E8C3A] hover:bg-green-700 active:scale-95
+                text-white rounded-lg text-sm font-medium transition-all duration-100 disabled:opacity-60"
+            >
+              {cronLoading
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : "▶️"
+              }
+              {cronLoading ? "Ejecutando…" : "Probar Cron"}
+            </button>
+            {cronResult && (
+              <pre className="text-xs bg-white border border-gray-200 rounded-lg px-3 py-2 whitespace-pre-wrap text-gray-700 font-mono">
+                {cronResult}
+              </pre>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ── Eventos que disparan notificaciones ── */}
