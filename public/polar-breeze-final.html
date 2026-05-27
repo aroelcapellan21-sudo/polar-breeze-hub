@@ -409,7 +409,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 
     <div class="stats-row">
       <div class="stat"><div class="stat-l">Productos</div><div class="stat-v" id="sProds">—</div></div>
-      <div class="stat"><div class="stat-l">Unidades</div><div class="stat-v" id="sUds">—</div></div>
+      <div class="stat"><div class="stat-l">Vendidas</div><div class="stat-v" id="sUds">—</div></div>
       <div class="stat"><div class="stat-l">Pts 15</div><div class="stat-v" id="sPts15" style="font-size:16px">—</div></div>
     </div>
 
@@ -654,13 +654,24 @@ function renderCol(id,lista){
 }
 
 function actualizarTotales(){
-  const prods=Object.keys(valores).filter(k=>valores[k]>0).length;
-  const uds=Object.values(valores).reduce((a,v)=>a+(v||0),0);
-  const rd=Object.entries(valores).reduce((a,[p,v])=>a+(PRECIOS[p]||0)*(v||0),0);
+  // Sobrante = lo que ingresa el encargado (lo que le QUEDÓ al chofer)
+  // Vendidas = inventario base - sobrante (lo que VENDIÓ)
+  const prods=Object.keys(valores).filter(k=>valores[k]>=0).length;
+  let udsVendidas=0,rdVendido=0;
+  for(const [p,sobrante] of Object.entries(valores)){
+    if(sobrante==null||sobrante<0)continue;
+    const esExtra=choferActual&&!(p in choferActual.inv);
+    if(!esExtra){
+      const base=choferActual?.inv?.[p]||0;
+      const vend=Math.max(0,base-sobrante);
+      udsVendidas+=vend;
+      rdVendido+=vend*(PRECIOS[p]||0);
+    }
+  }
   document.getElementById('sProds').textContent=prods||'—';
-  document.getElementById('sUds').textContent=uds||'—';
-  document.getElementById('sPuntos').textContent=uds>0?Math.round(uds*8.5):'—';
-  document.getElementById('sRD').textContent=rd>0?'RD$'+rd.toLocaleString('es-DO'):'—';
+  document.getElementById('sUds').textContent=udsVendidas||'—';
+  document.getElementById('sPuntos').textContent=udsVendidas>0?Math.round(udsVendidas*8.5):'—';
+  document.getElementById('sRD').textContent=rdVendido>0?'RD$'+rdVendido.toLocaleString('es-DO'):'—';
   document.getElementById('sPts15').textContent=choferActual?.pts15?choferActual.pts15.toLocaleString('es-DO'):'—';
 }
 
