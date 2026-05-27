@@ -14,6 +14,7 @@ import RolePill            from "@/components/shared/RolePill";
 import PWAInstallBanner    from "@/components/shared/PWAInstallBanner";
 import PolarBreezeHTML     from "@/components/encargado/PolarBreezeHTML";
 import AsistenteAI         from "@/components/shared/AsistenteAI";
+import SyncSheetsPanel     from "@/components/shared/SyncSheetsPanel";
 
 type Tab = "lote" | "weight" | "stock" | "choferes" | "vista";
 
@@ -236,7 +237,12 @@ export default function EncargadoDashboard() {
       <main className="max-w-2xl mx-auto px-4 py-5">
 
         {tab === "lote"   && <RegistroLote />}
-        {tab === "weight" && <PolarBreezeWeight />}
+        {tab === "weight" && (
+          <div className="space-y-4">
+            <PolarBreezeWeight />
+            <SyncSheetsPanel />
+          </div>
+        )}
 
         {/* Tab Choferes — §24 integración completa */}
         {tab === "choferes" && (

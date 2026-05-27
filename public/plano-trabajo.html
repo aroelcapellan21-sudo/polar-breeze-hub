@@ -20,7 +20,7 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
 .progreso-general{background:#fff;border-radius:18px;padding:16px;margin-bottom:20px;border:1.5px solid #f0ede4;box-shadow:0 2px 10px rgba(0,0,0,0.05)}
 .prog-titulo{font-size:12px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
 .prog-track{height:10px;background:#f1f5f9;border-radius:5px;overflow:hidden;margin-bottom:6px}
-.prog-fill{height:100%;background:linear-gradient(90deg,#F5C800,#D42B2B,#1E8C3A);border-radius:5px;width:35%}
+.prog-fill{height:100%;background:linear-gradient(90deg,#F5C800,#D42B2B,#1E8C3A);border-radius:5px;width:80%}
 .prog-stats{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:#6b7280}
 .prog-stat span{color:#1a1a1a;font-weight:900}
 
@@ -234,7 +234,7 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
     <div class="fase-header">
       <div class="fase-num" style="background:#6366f1">3</div>
       <div class="fase-titulo">IA y automatización</div>
-      <span class="fase-estado estado-pendiente">○ Pendiente</span>
+      <span class="fase-estado estado-hecho">✅ Completado</span>
     </div>
 
     <div class="paso">
@@ -247,29 +247,47 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
     </div>
 
     <div class="paso">
-      <div class="paso-check check-pendiente">○</div>
+      <div class="paso-check check-hecho">✓</div>
       <div class="paso-info">
         <div class="paso-titulo">Asistente Gemini para el personal</div>
-        <div class="paso-desc">El encargado y despachador pueden hacerle preguntas al asistente dentro de su app.</div>
+        <div class="paso-desc">El encargado, despachador y admin tienen un chat flotante arrastrable con Gemini 2.0 Flash.</div>
         <span class="paso-tag tag-ia">Gemini</span>
       </div>
     </div>
 
     <div class="paso">
-      <div class="paso-check check-pendiente">○</div>
+      <div class="paso-check check-hecho">✓</div>
       <div class="paso-info">
         <div class="paso-titulo">Cierre automático nocturno</div>
-        <div class="paso-desc">Al cerrar todos los choferes el sistema envía resúmenes por WhatsApp y actualiza el Hub automáticamente.</div>
+        <div class="paso-desc">Cron 23:00 RD: detecta choferes sin reporte, envía resumen por Telegram, calcula puntos quincena y sincroniza Google Sheets.</div>
         <span class="paso-tag tag-bot">Automático</span>
       </div>
     </div>
 
     <div class="paso">
-      <div class="paso-check check-pendiente">○</div>
+      <div class="paso-check check-hecho">✓</div>
       <div class="paso-info">
-        <div class="paso-titulo">Motor de detección de fraudes</div>
-        <div class="paso-desc">Claude API analiza patrones y detecta irregularidades automáticamente.</div>
+        <div class="paso-titulo">Motor de detección de anomalías</div>
+        <div class="paso-desc">Claude API analiza patrones de choferes y despachadores — anomalías en ventas, rutas e inventario.</div>
         <span class="paso-tag tag-ia">Claude API</span>
+      </div>
+    </div>
+
+    <div class="paso">
+      <div class="paso-check check-hecho">✓</div>
+      <div class="paso-info">
+        <div class="paso-titulo">Bot Telegram operativo</div>
+        <div class="paso-desc">/estado /choferes /alertas /resumen_hoy /puntos — responde con datos reales de Firebase. Webhook registrado.</div>
+        <span class="paso-tag tag-bot">Telegram</span>
+      </div>
+    </div>
+
+    <div class="paso">
+      <div class="paso-check check-hecho">✓</div>
+      <div class="paso-info">
+        <div class="paso-titulo">Sincronización Google Sheets</div>
+        <div class="paso-desc">Exporta códigos de barras, lotes Weight y movimientos al spreadsheet. JWT RS256 sin dependencias externas.</div>
+        <span class="paso-tag tag-firebase">Sheets API v4</span>
       </div>
     </div>
   </div>
@@ -279,29 +297,29 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
     <div class="fase-header">
       <div class="fase-num" style="background:#D42B2B">4</div>
       <div class="fase-titulo">PWA multi-app + lanzamiento</div>
-      <span class="fase-estado estado-pendiente">○ Pendiente</span>
+      <span class="fase-estado estado-progreso">⚡ En curso</span>
     </div>
 
     <div class="paso">
-      <div class="paso-check check-pendiente">○</div>
+      <div class="paso-check check-hecho">✓</div>
       <div class="paso-info">
         <div class="paso-titulo">Apps PWA instalables por rol</div>
-        <div class="paso-desc">App Despachador y App Encargado instalables desde el celular como apps nativas.</div>
+        <div class="paso-desc">App Despachador y App Encargado instalables desde Android e iOS como apps nativas.</div>
         <span class="paso-tag tag-pwa">PWA</span>
       </div>
     </div>
 
     <div class="paso">
-      <div class="paso-check check-pendiente">○</div>
+      <div class="paso-check check-hecho">✓</div>
       <div class="paso-info">
         <div class="paso-titulo">Control de acceso desde el Hub</div>
-        <div class="paso-desc">Oliver puede bloquear o activar el acceso de cualquier empleado con un clic.</div>
+        <div class="paso-desc">Admin puede bloquear o activar cualquier chofer/encargado con un switch. Cambio inmediato en Firebase.</div>
         <span class="paso-tag tag-firebase">Firebase</span>
       </div>
     </div>
 
     <div class="paso">
-      <div class="paso-check check-pendiente">○</div>
+      <div class="paso-check check-hecho">✓</div>
       <div class="paso-info">
         <div class="paso-titulo">Compatible con todos los sistemas</div>
         <div class="paso-desc">Android, iOS, Windows, Linux — cualquier navegador moderno puede instalar y usar el sistema.</div>
@@ -314,7 +332,16 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
       <div class="paso-info">
         <div class="paso-titulo">Reglas de seguridad Firestore</div>
         <div class="paso-desc">Cada rol solo puede leer y escribir sus propios datos. Nadie accede a lo que no le corresponde.</div>
-        <span class="paso-tag tag-firebase">Firebase</span>
+        <span class="paso-tag tag-firebase">Firebase Rules</span>
+      </div>
+    </div>
+
+    <div class="paso">
+      <div class="paso-check check-pendiente">○</div>
+      <div class="paso-info">
+        <div class="paso-titulo">Bot WhatsApp para choferes</div>
+        <div class="paso-desc">El chofer manda nota de voz con sus sobrantes — el bot transcribe y registra en Firestore automáticamente.</div>
+        <span class="paso-tag tag-bot">WhatsApp</span> <span class="paso-tag tag-ia">Voz + IA</span>
       </div>
     </div>
   </div>
@@ -329,8 +356,8 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
     <div class="res-titulo">📊 Resumen del plan</div>
     <div class="res-row"><div class="res-label">Fase 1 — Base operativa</div><div class="res-val v">✅ Listo</div></div>
     <div class="res-row"><div class="res-label">Fase 2 — Hub Admin datos reales</div><div class="res-val v">✅ Listo</div></div>
-    <div class="res-row"><div class="res-label">Fase 3 — IA y automatización</div><div class="res-val" style="color:#6b7280">○ Pendiente</div></div>
-    <div class="res-row"><div class="res-label">Fase 4 — PWA + lanzamiento</div><div class="res-val" style="color:#6b7280">○ Pendiente</div></div>
+    <div class="res-row"><div class="res-label">Fase 3 — IA y automatización</div><div class="res-val v">✅ Listo</div></div>
+    <div class="res-row"><div class="res-label">Fase 4 — PWA + lanzamiento</div><div class="res-val a">⚡ En curso</div></div>
     <div class="res-row"><div class="res-label">Costo operativo mensual</div><div class="res-val a">~RD$500</div></div>
     <div class="res-row"><div class="res-label">Compatible con</div><div class="res-val v">Todos los SO</div></div>
   </div>
