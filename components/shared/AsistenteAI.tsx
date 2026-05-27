@@ -2,12 +2,8 @@
 
 /**
  * AsistenteAI — Chat flotante con Gemini.
- * Disponible en App Encargado y App Despachador.
- *
- * Props:
- *   rol      — "encargado" | "despachador" | "admin"
- *   nombre   — nombre del usuario (para personalizar)
- *   contexto — string de contexto en tiempo real (pendientes, stock, etc.)
+ * El botón es arrastrable: el usuario puede colocarlo donde no tape contenido.
+ * La posición se guarda en localStorage.
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -51,31 +47,115 @@ const SUGERENCIAS: Record<string, string[]> = {
   ],
 };
 
+const POS_KEY  = "pb_asistente_pos";
+const BTN_SIZE = 48;
+
+function clamp(x: number, y: number) {
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  return {
+    x: Math.max(8, Math.min(W - BTN_SIZE - 8, x)),
+    y: Math.max(8, Math.min(H - BTN_SIZE - 8, y)),
+  };
+}
+
+function defaultPos() {
+  // Esquina inferior izquierda, sobre el área de FAB (que está a la derecha)
+  return { x: 16, y: Math.max(8, window.innerHeight - BTN_SIZE - 96) };
+}
+
 export default function AsistenteAI({ rol = "encargado", nombre, contexto }: Props) {
-  const [open,     setOpen]     = useState(false);
-  const [msgs,     setMsgs]     = useState<Msg[]>([]);
-  const [input,    setInput]    = useState("");
-  const [loading,  setLoading]  = useState(false);
-  const [badge,    setBadge]    = useState(false);
+  const [open,      setOpen]      = useState(false);
+  const [msgs,      setMsgs]      = useState<Msg[]>([]);
+  const [input,     setInput]     = useState("");
+  const [loading,   setLoading]   = useState(false);
+  const [badge,     setBadge]     = useState(false);
   const [historial, setHistorial] = useState<HistorialItem[]>([]);
+  const [pos,       setPos]       = useState<{ x: number; y: number } | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLTextAreaElement>(null);
 
-  // Scroll al último mensaje
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [msgs]);
+  // Drag refs — sin re-renders durante el arrastre
+  const dragging  = useRef(false);
+  const dragMoved = useRef(false);
+  const dragStart = useRef({ px: 0, py: 0, bx: 0, by: 0 });
 
-  // Focus en input al abrir
+  // ── Inicializar posición ────────────────────────────────────────────────────
   useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 150);
-      setBadge(false);
+    try {
+      const saved = localStorage.getItem(POS_KEY);
+      setPos(saved ? JSON.parse(saved) as { x: number; y: number } : defaultPos());
+    } catch {
+      setPos(defaultPos());
     }
+  }, []);
+
+  // ── Drag handlers ──────────────────────────────────────────────────────────
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!pos) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragging.current  = true;
+    dragMoved.current = false;
+    dragStart.current = { px: e.clientX, py: e.clientY, bx: pos.x, by: pos.y };
+  };
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragging.current) return;
+    const dx = e.clientX - dragStart.current.px;
+    const dy = e.clientY - dragStart.current.py;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragMoved.current = true;
+    if (dragMoved.current) setPos(clamp(dragStart.current.bx + dx, dragStart.current.by + dy));
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    if (dragMoved.current) {
+      // Guardar posición final
+      setPos((p) => { if (p) localStorage.setItem(POS_KEY, JSON.stringify(p)); return p; });
+    } else {
+      // Fue un toque/clic — abrir/cerrar chat
+      setOpen((v) => !v);
+    }
+  }, []);
+
+  // ── Posición del panel (inteligente, no sale de pantalla) ──────────────────
+  const getPanelStyle = (): React.CSSProperties => {
+    if (!pos || typeof window === "undefined") return {};
+    const W  = window.innerWidth;
+    const H  = window.innerHeight;
+    const PW = Math.min(384, W - 24);
+    const GAP = 10;
+    const style: React.CSSProperties = {
+      width:     PW,
+      maxHeight: `min(560px, calc(100vh - ${BTN_SIZE + GAP * 2}px))`,
+    };
+
+    // Horizontal: abre a la derecha si cabe, si no a la izquierda
+    if (pos.x + BTN_SIZE + GAP + PW <= W) {
+      style.left = pos.x + BTN_SIZE + GAP;
+    } else if (pos.x - GAP - PW >= 0) {
+      style.left = pos.x - GAP - PW;
+    } else {
+      style.left = Math.max(8, (W - PW) / 2);
+    }
+
+    // Vertical: centra sobre el botón, ajusta si sale de pantalla
+    const PANEL_H = Math.min(560, H - BTN_SIZE - GAP * 2);
+    let top = pos.y + BTN_SIZE / 2 - PANEL_H / 2;
+    style.top = Math.max(8, Math.min(H - PANEL_H - 8, top));
+
+    return style;
+  };
+
+  // ── Efectos ────────────────────────────────────────────────────────────────
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
+
+  useEffect(() => {
+    if (open) { setTimeout(() => inputRef.current?.focus(), 150); setBadge(false); }
   }, [open]);
 
-  // Mensaje de bienvenida al abrir por primera vez
   useEffect(() => {
     if (open && msgs.length === 0) {
       const saludo = nombre
@@ -85,44 +165,30 @@ export default function AsistenteAI({ rol = "encargado", nombre, contexto }: Pro
     }
   }, [open, msgs.length, nombre]);
 
+  // ── Enviar mensaje ─────────────────────────────────────────────────────────
   const enviar = useCallback(async (texto?: string) => {
     const msg = (texto ?? input).trim();
     if (!msg || loading) return;
-
     setInput("");
-    const msgId = Date.now().toString();
-    setMsgs(prev => [...prev, { id: msgId, from: "user", text: msg, ts: new Date() }]);
+    setMsgs((prev) => [...prev, { id: Date.now().toString(), from: "user", text: msg, ts: new Date() }]);
     setLoading(true);
-
     try {
-      const res = await fetch("/api/asistente", {
+      const res  = await fetch("/api/asistente", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ mensaje: msg, rol, contexto, historial }),
       });
       const data = await res.json() as { respuesta?: string };
       const respuesta = data.respuesta ?? "No recibí respuesta. Intenta de nuevo.";
-
-      setMsgs(prev => [...prev, {
-        id:   `bot-${Date.now()}`,
-        from: "bot",
-        text: respuesta,
-        ts:   new Date(),
-      }]);
-
-      // Actualizar historial para contexto de conversación
-      setHistorial(prev => [
-        ...prev,
+      setMsgs((prev) => [...prev, { id: `bot-${Date.now()}`, from: "bot", text: respuesta, ts: new Date() }]);
+      setHistorial((prev) => [...prev,
         { role: "user",  text: msg },
         { role: "model", text: respuesta },
       ]);
-
     } catch {
-      setMsgs(prev => [...prev, {
-        id:   `err-${Date.now()}`,
-        from: "bot",
-        text: "Error de conexión. Verifica tu internet e inténtalo de nuevo.",
-        ts:   new Date(),
+      setMsgs((prev) => [...prev, {
+        id: `err-${Date.now()}`, from: "bot",
+        text: "Error de conexión. Verifica tu internet e inténtalo de nuevo.", ts: new Date(),
       }]);
     } finally {
       setLoading(false);
@@ -131,35 +197,36 @@ export default function AsistenteAI({ rol = "encargado", nombre, contexto }: Pro
   }, [input, loading, rol, contexto, historial]);
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      enviar();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); }
   };
 
   const sugerencias = SUGERENCIAS[rol] ?? SUGERENCIAS.encargado;
   const showSugs    = msgs.length <= 1 && !loading;
 
+  if (!pos) return null;
+
   return (
     <>
-      {/* ── Botón flotante ── */}
+      {/* ── Botón flotante arrastrable ── */}
       <button
-        onClick={() => setOpen(v => !v)}
-        title="Asistente Polar Breeze"
-        className={`fixed bottom-24 left-4 z-40 w-12 h-12 rounded-full shadow-lg
-          flex items-center justify-center transition-all duration-200
-          ${open
-            ? "bg-gray-700 hover:bg-gray-800 scale-90"
-            : "bg-[#1A1A1A] hover:bg-gray-800 active:scale-95"
-          }`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        title="Asistente Polar Breeze — arrastra para mover"
+        style={{ left: pos.x, top: pos.y, zIndex: 9040, touchAction: "none" }}
+        className={`fixed w-12 h-12 rounded-full shadow-lg select-none
+          flex items-center justify-center transition-transform duration-150
+          cursor-grab active:cursor-grabbing
+          ${open ? "bg-gray-700 hover:bg-gray-800 scale-90" : "bg-[#1A1A1A] hover:bg-gray-800"}`}
       >
         {open ? (
-          <span className="text-white text-lg leading-none">✕</span>
+          <span className="text-white text-lg leading-none">🤖</span>
         ) : (
           <>
             <span className="text-xl leading-none">🤖</span>
             {badge && (
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#F5C800] rounded-full animate-pulse border border-white" />
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#F5C800] rounded-full
+                animate-pulse border border-white" />
             )}
           </>
         )}
@@ -168,24 +235,35 @@ export default function AsistenteAI({ rol = "encargado", nombre, contexto }: Pro
       {/* ── Panel de chat ── */}
       {open && (
         <div
-          className="fixed bottom-40 left-4 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl
-            border border-gray-200 flex flex-col overflow-hidden"
-          style={{ maxHeight: "min(560px, calc(100vh - 180px))" }}
+          className="fixed bg-white rounded-2xl shadow-2xl border border-gray-200
+            flex flex-col overflow-hidden"
+          style={{ ...getPanelStyle(), zIndex: 9050 }}
         >
           {/* Header */}
-          <div className="px-4 py-3 flex items-center gap-3 flex-shrink-0"
-            style={{ background: "linear-gradient(90deg, #1A1A1A 0%, #2d2d2d 100%)" }}>
-            <div className="w-8 h-8 rounded-full bg-[#F5C800] flex items-center justify-center text-sm flex-shrink-0">
+          <div
+            className="px-4 py-3 flex items-center gap-3 flex-shrink-0"
+            style={{ background: "linear-gradient(90deg, #1A1A1A 0%, #2d2d2d 100%)" }}
+          >
+            <div className="w-8 h-8 rounded-full bg-[#F5C800] flex items-center
+              justify-center text-sm flex-shrink-0">
               🤖
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white font-bold text-sm">Asistente Polar Breeze</p>
               <p className="text-white/50 text-[10px]">Gemini · {rol}</p>
             </div>
-            <span className="flex items-center gap-1">
-              <span className={`w-2 h-2 rounded-full ${loading ? "bg-yellow-400 animate-pulse" : "bg-[#1E8C3A]"}`} />
-              <span className="text-white/40 text-[9px]">{loading ? "pensando…" : "activo"}</span>
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1">
+                <span className={`w-2 h-2 rounded-full ${loading ? "bg-yellow-400 animate-pulse" : "bg-[#1E8C3A]"}`} />
+                <span className="text-white/40 text-[9px]">{loading ? "pensando…" : "activo"}</span>
+              </span>
+              <button
+                onClick={() => setOpen(false)}
+                className="text-white/50 hover:text-white text-xl leading-none ml-1 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           {/* Banda tricolor */}
@@ -198,10 +276,7 @@ export default function AsistenteAI({ rol = "encargado", nombre, contexto }: Pro
           {/* Mensajes */}
           <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50/50">
             {msgs.map((m) => (
-              <div
-                key={m.id}
-                className={`flex ${m.from === "user" ? "justify-end" : "justify-start"}`}
-              >
+              <div key={m.id} className={`flex ${m.from === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[82%] px-3 py-2 rounded-xl text-sm leading-snug ${
                   m.from === "user"
                     ? "bg-[#1A1A1A] text-white rounded-br-none"
@@ -220,18 +295,15 @@ export default function AsistenteAI({ rol = "encargado", nombre, contexto }: Pro
               <div className="flex justify-start">
                 <div className="bg-white shadow-sm border border-gray-100 rounded-xl rounded-bl-none px-4 py-3">
                   <div className="flex gap-1">
-                    {[0, 1, 2].map(i => (
-                      <span
-                        key={i}
+                    {[0, 1, 2].map((i) => (
+                      <span key={i}
                         className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: `${i * 0.15}s` }}
-                      />
+                        style={{ animationDelay: `${i * 0.15}s` }} />
                     ))}
                   </div>
                 </div>
               </div>
             )}
-
             <div ref={bottomRef} />
           </div>
 
@@ -241,12 +313,9 @@ export default function AsistenteAI({ rol = "encargado", nombre, contexto }: Pro
               <p className="text-[10px] text-gray-400 mb-1.5">Preguntas frecuentes:</p>
               <div className="flex flex-wrap gap-1.5">
                 {sugerencias.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => enviar(s)}
+                  <button key={s} onClick={() => enviar(s)}
                     className="text-[10px] bg-[#F5C800]/15 text-[#b38a00] hover:bg-[#F5C800]/25
-                      border border-[#F5C800]/30 rounded-full px-2.5 py-1 transition-colors"
-                  >
+                      border border-[#F5C800]/30 rounded-full px-2.5 py-1 transition-colors">
                     {s}
                   </button>
                 ))}
@@ -277,7 +346,8 @@ export default function AsistenteAI({ rol = "encargado", nombre, contexto }: Pro
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M22 2L11 13" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           </div>
