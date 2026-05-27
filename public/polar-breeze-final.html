@@ -147,21 +147,6 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .inv-sin-ico{font-size:44px;margin-bottom:10px}
 .inv-sin-txt{font-size:13px;font-weight:700}
 
-/* FAB FLOTANTE */
-.fab-wrap{position:fixed;bottom:22px;right:18px;display:flex;flex-direction:column;align-items:flex-end;gap:10px;z-index:400}
-.fab-ops{display:flex;flex-direction:column;gap:8px;align-items:flex-end;transition:all 0.25s;opacity:0;pointer-events:none;transform:translateY(10px)}
-.fab-ops.visible{opacity:1;pointer-events:all;transform:translateY(0)}
-.fab-op{display:flex;align-items:center;gap:8px;cursor:pointer}
-.fab-op-label{background:#1a1a1a;color:#fff;font-size:11px;font-weight:700;padding:5px 11px;border-radius:16px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25)}
-.fab-op-btn{width:44px;height:44px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,0.2);transition:transform 0.15s}
-.fab-op-btn:active{transform:scale(0.92)}
-.fab-imprimir{background:linear-gradient(135deg,#F5C800,#e6b800)}
-.fab-whatsapp{background:linear-gradient(135deg,#1E8C3A,#167a30)}
-.fab-main{width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#D42B2B,#b82424);border:none;font-size:21px;cursor:pointer;box-shadow:0 4px 16px rgba(212,43,43,0.4);display:flex;align-items:center;justify-content:center;transition:all 0.2s;position:relative}
-.fab-main::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid rgba(212,43,43,0.3);animation:ring 2s ease-out infinite}
-@keyframes ring{0%{transform:scale(1);opacity:0.6}100%{transform:scale(1.5);opacity:0}}
-.fab-main.abierto{transform:rotate(45deg);background:linear-gradient(135deg,#1a1a1a,#333)}
-.fab-main.abierto::after{display:none}
 
 /* CONTENIDO */
 .content{flex:1;padding:12px 14px;min-width:0}
@@ -440,35 +425,6 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
   </div>
 </div>
 
-<!-- FAB FLOTANTE -->
-<div class="fab-wrap">
-  <div class="fab-ops" id="fabOps">
-    <div class="fab-op" onclick="fabAccion('imprimir')">
-      <span class="fab-op-label">Imprimir</span>
-      <button class="fab-op-btn fab-imprimir">🖨️</button>
-    </div>
-    <div class="fab-op" onclick="fabAccion('whatsapp')">
-      <span class="fab-op-label">WhatsApp</span>
-      <button class="fab-op-btn fab-whatsapp">📲</button>
-    </div>
-  </div>
-  <button class="fab-main" id="fabMain" onclick="toggleFab()">📤</button>
-</div>
-
-<!-- FAB PARA INVENTARIO REGISTRADO -->
-<div class="fab-wrap hidden" id="fabInvWrap" style="bottom:22px;right:18px">
-  <div class="fab-ops" id="fabInvOps">
-    <div class="fab-op" onclick="fabAccion('imprimir')">
-      <span class="fab-op-label">Imprimir inventario</span>
-      <button class="fab-op-btn fab-imprimir">🖨️</button>
-    </div>
-    <div class="fab-op" onclick="fabAccion('whatsapp')">
-      <span class="fab-op-label">Enviar por WhatsApp</span>
-      <button class="fab-op-btn fab-whatsapp">📲</button>
-    </div>
-  </div>
-  <button class="fab-main" id="fabInvMain" onclick="toggleFabInv()">📤</button>
-</div>
 
 <div class="footer">
   <button class="btn-limpiar" onclick="pedirLimpiar()">🗑</button>
@@ -558,7 +514,6 @@ const PRECIOS={"PALETA CHOCO MANI 32/1":90,"PALETA CHOCO CREMA 32/1":90,"PALETA 
 let valores={},choferActual=null,fichaActual='',guardado=false,bloqueado=false;
 let completados=new Set();
 let inventariosGuardados={};
-let fabAbierto=false,fabInvAbierto=false;
 const DIAS=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"],MESES=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
 function iniciar(){setHoy();renderListas();renderChoferes();}
@@ -571,11 +526,6 @@ function actualizarFechaHeader(){
 }
 document.getElementById('fechaInput').addEventListener('change',actualizarFechaHeader);
 
-// FAB
-function toggleFab(){fabAbierto=!fabAbierto;document.getElementById('fabOps').classList.toggle('visible',fabAbierto);const m=document.getElementById('fabMain');m.classList.toggle('abierto',fabAbierto);m.textContent=fabAbierto?'✕':'📤';}
-function toggleFabInv(){fabInvAbierto=!fabInvAbierto;document.getElementById('fabInvOps').classList.toggle('visible',fabInvAbierto);const m=document.getElementById('fabInvMain');m.classList.toggle('abierto',fabInvAbierto);m.textContent=fabInvAbierto?'✕':'📤';}
-function fabAccion(t){alert(t==='imprimir'?'🖨️ Preparando impresión...':'📲 Preparando mensaje de WhatsApp...');if(fabAbierto)toggleFab();if(fabInvAbierto)toggleFabInv();}
-document.addEventListener('click',e=>{if(fabAbierto&&!e.target.closest('.fab-wrap'))toggleFab();});
 
 // INVENTARIO REGISTRADO
 function abrirInvReg(f){
@@ -601,13 +551,10 @@ function abrirInvReg(f){
       `<div class="inv-totales"><div class="inv-tot"><div class="inv-tot-l">Sobrante</div><div class="inv-tot-v">${tTiene} uds</div></div><div class="inv-tot"><div class="inv-tot-l">Vendido</div><div class="inv-tot-v" style="color:#1E8C3A">${tVend} uds</div></div><div class="inv-tot"><div class="inv-tot-l">Total RD$</div><div class="inv-tot-v" style="color:#D42B2B">RD$${tRD.toLocaleString('es-DO')}</div></div></div>`;
   }
   document.getElementById('invReg').classList.remove('hidden');
-  document.getElementById('fabInvWrap').classList.remove('hidden');
   cerrarModalChoferes();
 }
 function cerrarInvReg(){
   document.getElementById('invReg').classList.add('hidden');
-  document.getElementById('fabInvWrap').classList.add('hidden');
-  if(fabInvAbierto)toggleFabInv();
 }
 
 // CHOFERES
