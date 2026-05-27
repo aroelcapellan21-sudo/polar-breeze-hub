@@ -268,29 +268,64 @@ export default function EncargadoDashboard() {
                 <p className="text-sm font-semibold text-gray-600">Sin movimientos registrados</p>
                 <p className="text-xs text-gray-400 mt-1">Registra el primer lote para ver el stock.</p>
               </div>
-            ) : (
-              <div className="divide-y divide-gray-50">
-                {saldo.map(p => (
-                  <div key={p.pid}
-                    className={`px-4 py-3 flex items-center justify-between ${p.saldo < 0 ? "bg-red-50/40" : ""}`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm flex-shrink-0">
-                        {p.saldo < 0 ? "🚨" : p.saldo === 0 ? "⚠️" : "✅"}
-                      </span>
-                      <p className="text-sm font-medium text-gray-800 truncate">{p.nombre}</p>
-                    </div>
-                    <span className={`flex-shrink-0 text-sm font-bold px-2.5 py-0.5 rounded-full border ${
-                      p.saldo < 0  ? "bg-red-100 text-red-700 border-red-300" :
-                      p.saldo === 0 ? "bg-amber-100 text-amber-600 border-amber-200" :
-                                     "bg-green-100 text-green-700 border-green-200"
-                    }`}>
-                      {p.saldo > 0 ? "+" : ""}{p.saldo}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+            ) : (() => {
+              const maxSaldo = Math.max(...saldo.map(p => p.saldo), 1);
+              return (
+                <div className="divide-y divide-gray-100">
+                  {saldo.map(p => {
+                    const pct   = p.saldo <= 0 ? 0 : Math.min((p.saldo / maxSaldo) * 100, 100);
+                    const color = p.saldo <= 0  ? "#D42B2B"
+                                : pct >= 60     ? "#1E8C3A"
+                                : pct >= 25     ? "#F5C800"
+                                :                 "#D42B2B";
+                    const trackBg = p.saldo < 0 ? "bg-red-100" : "bg-gray-100";
+                    const rowBg   = p.saldo < 0 ? "bg-red-50/30" : "";
+                    return (
+                      <div key={p.pid} className={`px-4 py-3 ${rowBg}`}>
+                        {/* Fila superior: icono + nombre + badge */}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm flex-shrink-0">
+                              {p.saldo < 0 ? "🚨" : p.saldo === 0 ? "⚠️" : "✅"}
+                            </span>
+                            <p className="text-sm font-medium text-gray-800 truncate">{p.nombre}</p>
+                          </div>
+                          <span className={`flex-shrink-0 text-sm font-bold tabular-nums px-2.5 py-0.5 rounded-full border ml-3 ${
+                            p.saldo < 0   ? "bg-red-100 text-red-700 border-red-300" :
+                            p.saldo === 0 ? "bg-amber-100 text-amber-600 border-amber-200" :
+                                            "bg-green-100 text-green-700 border-green-200"
+                          }`}>
+                            {p.saldo > 0 ? "+" : ""}{p.saldo} uds
+                          </span>
+                        </div>
+                        {/* Barra de progreso */}
+                        <div className={`h-2 rounded-full overflow-hidden ${trackBg}`}>
+                          <div
+                            className="h-full rounded-full transition-all duration-700 ease-out"
+                            style={{
+                              width: `${p.saldo < 0 ? 100 : pct}%`,
+                              background: color,
+                              opacity: p.saldo === 0 ? 0 : 1,
+                            }}
+                          />
+                        </div>
+                        {/* Etiqueta de nivel debajo de la barra (solo en casos extremos) */}
+                        {p.saldo < 0 && (
+                          <p className="text-[10px] text-red-500 font-semibold mt-0.5">
+                            Stock negativo — revisar registros
+                          </p>
+                        )}
+                        {p.saldo === 0 && (
+                          <p className="text-[10px] text-amber-500 font-semibold mt-0.5">
+                            Sin unidades disponibles
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
