@@ -607,7 +607,7 @@ function cerrarModalChoferes(){document.getElementById('modalChoferes').classLis
 
 // CONFIRM
 function mostrarConfirm(icon,title,msg,color,cb){
-  document.getElementById('confirmIcon').textContent=icon;document.getElementById('confirmTitle').textContent=title;document.getElementById('confirmMsg').textContent=msg;
+  document.getElementById('confirmIcon').textContent=icon;document.getElementById('confirmTitle').textContent=title;document.getElementById('confirmMsg').innerHTML=msg;
   const btn=document.getElementById('confirmYesBtn');
   btn.style.background=color==='rojo'?'linear-gradient(135deg,#D42B2B,#b82424)':color==='verde'?'linear-gradient(135deg,#1E8C3A,#167a30)':'linear-gradient(135deg,#F5C800,#e6b800)';
   btn.style.color=color==='amarillo'?'#1a1a1a':'#fff';
@@ -733,7 +733,31 @@ function abrirResumen(){
 
 function pedirGuardar(){
   cerrar('ovRes');
-  mostrarConfirm('💾','¿Guardar inventario?',`Se guardará el inventario de ${choferActual.nombre}. No podrá editarse sin autorización.`,'verde',()=>{
+  // Calcular totales para mostrar en el modal
+  let udsVendidas=0,rdVendido=0;
+  for(const [p,sobrante] of Object.entries(valores)){
+    if(sobrante==null||sobrante<0)continue;
+    if(choferActual&&!(p in choferActual.inv))continue;
+    const base=choferActual?.inv?.[p]||0;
+    const vend=Math.max(0,base-sobrante);
+    udsVendidas+=vend;rdVendido+=vend*(PRECIOS[p]||0);
+  }
+  const ptsVenta=Math.round(udsVendidas*8.5);
+  const pts15=choferActual?.pts15||0;
+  const msgHTML=
+    `<span style="display:block;margin-bottom:10px;font-size:11px">Inventario de <strong style="color:var(--text)">${choferActual.nombre.split(' ').slice(0,2).join(' ')}</strong> — `+
+    `${udsVendidas} uds vendidas · <strong style="color:#D42B2B">RD$${rdVendido.toLocaleString('es-DO')}</strong>.<br>No podrá editarse sin autorización.</span>`+
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`+
+      `<div style="background:rgba(30,140,58,0.1);border:1px solid rgba(30,140,58,0.25);border-radius:12px;padding:10px 6px;text-align:center">`+
+        `<div style="font-size:20px;font-weight:900;color:#1E8C3A">⭐ ${ptsVenta.toLocaleString('es-DO')}</div>`+
+        `<div style="font-size:9px;color:#6b7280;font-weight:700;margin-top:3px;text-transform:uppercase;letter-spacing:0.5px">Pts esta venta</div>`+
+      `</div>`+
+      `<div style="background:rgba(245,200,0,0.1);border:1px solid rgba(245,200,0,0.3);border-radius:12px;padding:10px 6px;text-align:center">`+
+        `<div style="font-size:20px;font-weight:900;color:#92660a">🏆 ${pts15.toLocaleString('es-DO')}</div>`+
+        `<div style="font-size:9px;color:#6b7280;font-weight:700;margin-top:3px;text-transform:uppercase;letter-spacing:0.5px">Pts quincena</div>`+
+      `</div>`+
+    `</div>`;
+  mostrarConfirm('💾','¿Guardar inventario?',msgHTML,'verde',()=>{
     guardado=true;bloqueado=true;completados.add(fichaActual);
     inventariosGuardados[fichaActual]={...valores};
     document.getElementById('bloqBanner').classList.remove('hidden');
