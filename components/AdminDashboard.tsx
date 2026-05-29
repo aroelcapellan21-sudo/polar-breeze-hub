@@ -15,6 +15,7 @@ import InformesHistorial  from "@/components/admin/InformesHistorial";
 import Anomalias             from "@/components/admin/Anomalias";
 import AnomaliasDespachador  from "@/components/admin/AnomaliasDespachador";
 import GestionEncargados     from "@/components/admin/GestionEncargados";
+import GestionUsuarios       from "@/components/admin/GestionUsuarios";
 import Reportes              from "@/components/admin/Reportes";
 import GestionCodigos        from "@/components/admin/GestionCodigos";
 import PWAControl            from "@/components/admin/PWAControl";
@@ -25,7 +26,7 @@ import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 import RolePill              from "@/components/shared/RolePill";
 import AsistenteAI           from "@/components/shared/AsistenteAI";
 
-type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp" | "reportes" | "codigos" | "pwa" | "tiemporeal" | "proyecciones";
+type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp" | "reportes" | "codigos" | "pwa" | "tiemporeal" | "proyecciones" | "usuarios";
 
 type SearchItem =
   | { kind: "chofer";   data: UserProfile }
@@ -281,6 +282,9 @@ export default function AdminDashboard() {
             <NavTab data-active={tab === "proyecciones"} active={tab === "proyecciones"} onClick={() => { setTab("proyecciones"); setChofer(null); }}>
               <span>📈</span><span className="hidden sm:inline">Proyecciones</span>
             </NavTab>
+            <NavTab data-active={tab === "usuarios"} active={tab === "usuarios"} onClick={() => { setTab("usuarios"); setChofer(null); }}>
+              <span>👤</span><span className="hidden sm:inline">Usuarios</span>
+            </NavTab>
           </nav>
 
           {/* Flecha derecha */}
@@ -341,6 +345,9 @@ export default function AdminDashboard() {
             {tab === "proyecciones" && (
               <span className="text-white font-medium">📈 Proyecciones — rendimiento estimado por chofer · quincena</span>
             )}
+            {tab === "usuarios" && (
+              <span className="text-white font-medium">👤 Usuarios — crear, editar roles y desactivar accesos</span>
+            )}
             {tab === "choferes" && !chofer && (
               <span className="text-white font-medium">👥 Choferes — gestión, inventario y sistema de puntos</span>
             )}
@@ -379,6 +386,7 @@ export default function AdminDashboard() {
         {tab === "pwa"          && <PWAControl />}
         {tab === "tiemporeal"   && <TiempoReal />}
         {tab === "proyecciones" && <ProyeccionesChoferes />}
+        {tab === "usuarios"     && <GestionUsuarios />}
       </main>
 
       {/* ── Asistente IA Admin ── */}
