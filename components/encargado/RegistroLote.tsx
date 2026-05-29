@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   collection, addDoc, getDocs, Timestamp, getDoc, doc,
 } from "firebase/firestore";
@@ -20,20 +20,40 @@ interface ProductoLote {
 export default function RegistroLote() {
   const { profile } = useAuth();
 
-  const [catalogo,  setCatalogo]  = useState<PuntoProducto[]>([]);
-  const [selProd,   setSelProd]   = useState("");
-  const [cajasStr,  setCajasStr]  = useState("");
-  const [unidsStr,  setUnidsStr]  = useState("");
-  const [costoStr,  setCostoStr]  = useState("");
-  const [items,     setItems]     = useState<ProductoLote[]>([]);
-  const [proveedor, setProveedor] = useState("");
-  const [factNum,   setFactNum]   = useState("");
-  const [factOk,    setFactOk]    = useState(false);
-  const [notas,     setNotas]     = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [msg,       setMsg]       = useState<{ type: "ok" | "err"; text: string } | null>(null);
-  const [guardado,  setGuardado]  = useState<LoteLoker | null>(null);
-  const [waNum,     setWaNum]     = useState("");
+  const [catalogo,    setCatalogo]    = useState<PuntoProducto[]>([]);
+  const [selProd,     setSelProd]     = useState("");
+  const [busqueda,    setBusqueda]    = useState("");
+  const [showDrop,    setShowDrop]    = useState(false);
+  const [cajasStr,    setCajasStr]    = useState("");
+  const [unidsStr,    setUnidsStr]    = useState("");
+  const [costoStr,    setCostoStr]    = useState("");
+  const [items,       setItems]       = useState<ProductoLote[]>([]);
+  const [proveedor,   setProveedor]   = useState("");
+  const [factNum,     setFactNum]     = useState("");
+  const [factOk,      setFactOk]      = useState(false);
+  const [notas,       setNotas]       = useState("");
+  const [guardando,   setGuardando]   = useState(false);
+  const [msg,         setMsg]         = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [guardado,    setGuardado]    = useState<LoteLoker | null>(null);
+  const [waNum,       setWaNum]       = useState("");
+
+  // Escáner de factura
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanFocused, setScanFocused] = useState(false);
+  const scanRef = useRef<HTMLInputElement>(null);
+
+  // Dropdown de búsqueda de productos
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  // Filtra catálogo en tiempo real
+  const catalogoFiltrado = catalogo.filter(p => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q || q === selProd.toLowerCase()) return true;
+    return (
+      p.nombre.toLowerCase().includes(q) ||
+      toProductoId(p.nombre).includes(q.replace(/\s+/g, "_"))
+    );
+  });
 
   useEffect(() => {
     getDoc(doc(db, "config", "puntos")).then((snap) => {
@@ -41,7 +61,10 @@ export default function RegistroLote() {
         const d = snap.data();
         const prods: PuntoProducto[] = d.productos ?? [];
         setCatalogo(prods);
-        if (prods.length > 0) setSelProd(prods[0].nombre);
+        if (prods.length > 0) {
+          setSelProd(prods[0].nombre);
+          setBusqueda(prods[0].nombre);
+        }
       }
     });
     getDoc(doc(db, "config", "main")).then((snap) => {
@@ -52,6 +75,41 @@ export default function RegistroLote() {
       }
     });
   }, []);
+
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    if (!showDrop) return;
+    const handler = (e: MouseEvent) => {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node)) {
+        setShowDrop(false);
+        // Si no hay producto seleccionado, restaurar busqueda al selProd anterior
+        if (!selProd) setBusqueda("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showDrop, selProd]);
+
+  // Auto-enfocar el input del escáner al abrir el panel
+  useEffect(() => {
+    if (showScanner) setTimeout(() => scanRef.current?.focus(), 50);
+  }, [showScanner]);
+
+  function handleScanKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      const val = (e.currentTarget as HTMLInputElement).value.trim();
+      if (val) {
+        setFactNum(val);
+        setShowScanner(false);
+      }
+    }
+  }
+
+  function selectProd(nombre: string) {
+    setSelProd(nombre);
+    setBusqueda(nombre);
+    setShowDrop(false);
+  }
 
   function agregar() {
     if (!selProd) return;
@@ -164,14 +222,66 @@ export default function RegistroLote() {
     <div className="space-y-4 max-w-lg mx-auto">
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 bg-gradient-to-r from-emerald-600 to-emerald-800">
-          <h2 className="text-white font-bold text-sm">📦 Registrar nuevo lote</h2>
-          <p className="text-emerald-200 text-xs mt-0.5">El número se genera automáticamente</p>
+
+        {/* ── Header con botón escáner ── */}
+        <div className="px-4 py-3 bg-gradient-to-r from-emerald-600 to-emerald-800 flex items-center justify-between gap-2">
+          <div>
+            <h2 className="text-white font-bold text-sm">📦 Registrar nuevo lote</h2>
+            <p className="text-emerald-200 text-xs mt-0.5">El número se genera automáticamente</p>
+          </div>
+          <button
+            type="button"
+            title="Escanear número de factura"
+            onClick={() => setShowScanner(v => !v)}
+            className={`w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0 transition-all active:scale-95 ${
+              showScanner
+                ? "bg-white text-emerald-700 shadow-inner"
+                : "bg-white/20 border border-white/30 text-white hover:bg-white/30"
+            }`}
+          >
+            🔲
+          </button>
         </div>
+
+        {/* ── Panel escáner de factura ── */}
+        {showScanner && (
+          <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-emerald-800">📄 Escanear Nº Factura</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  scanFocused ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                }`}>
+                  {scanFocused ? "Listo ●" : "Sin foco"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScanner(false)}
+                className="text-xs text-emerald-600 hover:text-emerald-800 font-semibold px-2 py-1 rounded"
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+            <input
+              ref={scanRef}
+              onFocus={() => setScanFocused(true)}
+              onBlur={() => setScanFocused(false)}
+              onKeyDown={handleScanKey}
+              defaultValue=""
+              placeholder="Apunta el escáner a la factura o escribe el número…"
+              className="w-full border border-emerald-300 rounded-lg px-3 py-2 text-sm
+                focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white font-mono"
+            />
+            <p className="text-xs text-emerald-600">
+              Presiona <kbd className="bg-emerald-100 px-1 rounded text-xs font-mono">Enter</kbd> para copiar el número al campo Nº Factura.
+            </p>
+          </div>
+        )}
 
         <div className="p-4 space-y-4">
 
-          {/* Proveedor y factura */}
+          {/* ── Proveedor y factura ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -197,7 +307,7 @@ export default function RegistroLote() {
             </div>
           </div>
 
-          {/* Factura entregada */}
+          {/* ── Factura entregada ── */}
           <button
             type="button"
             onClick={() => setFactOk(v => !v)}
@@ -221,19 +331,84 @@ export default function RegistroLote() {
             )}
           </button>
 
-          {/* Selector de producto */}
+          {/* ── Agregar producto con buscador inteligente ── */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">Agregar producto</label>
-            <select
-              value={selProd} onChange={(e) => setSelProd(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white mb-2"
-            >
-              {catalogo.length === 0 && <option value="">Sin catálogo configurado</option>}
-              {catalogo.map(p => (
-                <option key={p.nombre} value={p.nombre}>{p.nombre}</option>
-              ))}
-            </select>
+
+            {/* Buscador tipo "configuración del celular" */}
+            <div className="relative mb-2" ref={dropRef}>
+              <input
+                type="text"
+                value={busqueda}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setBusqueda(val);
+                  setShowDrop(true);
+                  // Si el usuario edita algo diferente al producto seleccionado, deselecciona
+                  if (val !== selProd) setSelProd("");
+                }}
+                onFocus={() => setShowDrop(true)}
+                placeholder={
+                  catalogo.length === 0
+                    ? "Sin catálogo configurado"
+                    : "🔍 Buscar producto por nombre o código…"
+                }
+                disabled={catalogo.length === 0}
+                className={`w-full border rounded-lg px-3 py-2 text-sm
+                  focus:outline-none focus:ring-2 focus:ring-emerald-400 pr-8 ${
+                  selProd
+                    ? "border-emerald-400 bg-emerald-50 text-emerald-900 font-medium"
+                    : "border-gray-300 bg-white"
+                }`}
+              />
+              {/* Botón limpiar selección */}
+              {busqueda && (
+                <button
+                  type="button"
+                  onClick={() => { setBusqueda(""); setSelProd(""); setShowDrop(true); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400
+                    hover:text-gray-600 text-lg leading-none w-5 h-5 flex items-center justify-center"
+                >
+                  ×
+                </button>
+              )}
+
+              {/* Dropdown de resultados */}
+              {showDrop && catalogo.length > 0 && (
+                <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-gray-200
+                  rounded-xl shadow-2xl max-h-52 overflow-y-auto">
+                  {catalogoFiltrado.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-gray-400 text-center">
+                      Sin resultados para &ldquo;{busqueda}&rdquo;
+                    </div>
+                  ) : (
+                    catalogoFiltrado.map(p => (
+                      <button
+                        key={p.nombre}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => selectProd(p.nombre)}
+                        className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-100
+                          last:border-0 transition-colors ${
+                          selProd === p.nombre
+                            ? "bg-emerald-50 text-emerald-800 font-semibold"
+                            : "text-gray-800 hover:bg-emerald-50 active:bg-emerald-100"
+                        }`}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="flex-1">{p.nombre}</span>
+                          {selProd === p.nombre && (
+                            <span className="text-emerald-500 text-base flex-shrink-0">✓</span>
+                          )}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Cantidad: cajas + unidades + costo */}
             <div className="flex gap-2">
               <div className="flex-1">
                 <input
@@ -279,7 +454,7 @@ export default function RegistroLote() {
             </div>
           </div>
 
-          {/* Lista de productos del lote */}
+          {/* ── Lista de productos del lote ── */}
           {items.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold text-gray-600">
@@ -316,7 +491,7 @@ export default function RegistroLote() {
             </div>
           )}
 
-          {/* Notas */}
+          {/* ── Notas ── */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
               Notas <span className="text-gray-400 font-normal">(opcional)</span>
@@ -329,7 +504,7 @@ export default function RegistroLote() {
             />
           </div>
 
-          {/* Registrado por */}
+          {/* ── Registrado por ── */}
           <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
             <span className="text-xs text-gray-400">Registrado por:</span>
             <span className="text-sm font-medium text-gray-700">{profile?.nombre ?? "—"}</span>
@@ -366,7 +541,7 @@ export default function RegistroLote() {
         </div>
       </div>
 
-      {/* Tarjeta de éxito + WhatsApp */}
+      {/* ── Tarjeta de éxito + WhatsApp ── */}
       {guardado && (
         <div className="bg-white rounded-xl shadow-sm border border-emerald-200 overflow-hidden">
           <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-3">
