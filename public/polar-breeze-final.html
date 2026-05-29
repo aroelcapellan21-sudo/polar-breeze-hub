@@ -658,11 +658,9 @@ function actualizarTotales(){
   let udsVendidas=0,rdVendido=0;
   for(const [p,vend] of Object.entries(valores)){
     if(vend==null||vend<0)continue;
-    const esExtra=choferActual&&!(p in choferActual.inv);
-    if(!esExtra){
-      udsVendidas+=vend;
-      rdVendido+=vend*(PRECIOS[p]||0);
-    }
+    // El rojo es solo advertencia visual — todos los productos suman al total
+    udsVendidas+=vend;
+    rdVendido+=vend*(PRECIOS[p]||0);
   }
   document.getElementById('sProds').textContent=prods||'—';
   document.getElementById('sUds').textContent=udsVendidas||'—';
@@ -713,7 +711,7 @@ function abrirResumen(){
   let tV=0,tRD=0,tT=0;
   const filas=prods.map(p=>{
     const base=choferActual.inv?.[p]||0,esExtra=!(p in choferActual.inv);
-    const vend=esExtra?0:valores[p]||0;
+    const vend=valores[p]||0;
     const tiene=esExtra?0:Math.max(0,base-vend);
     const rd=vend*(PRECIOS[p]||0);
     tV+=vend;tRD+=rd;tT+=tiene;
