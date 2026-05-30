@@ -637,6 +637,7 @@ function setValCore(p,n){
   if(row)row.className='row'+(active&&!esExtra?' active':active&&esExtra?' extra':'');
   if(inp)inp.className='qty'+(active&&!esExtra?' active':active&&esExtra?' extra-red':'');
   if(btn)btn.className='clr'+(active?'':' off');
+  if(row){const info=row.querySelector('.row-info');let eb=info?.querySelector('.extra-badge');if(active&&esExtra){if(!eb){eb=document.createElement('span');eb.className='extra-badge';eb.textContent='⚠ No es del inventario';info.appendChild(eb);}}else{eb?.remove();}}
 }
 function setVal(p,v){if(bloqueado)return;const n=parseInt(v);if(!v||n<0)setValCore(p,0);else setValCore(p,n);}
 
