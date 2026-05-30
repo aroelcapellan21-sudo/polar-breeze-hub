@@ -542,11 +542,11 @@ function abrirInvReg(f){
     const palItems=allProds.filter(p=>PALETAS.includes(p)&&(p in ch.inv));
     const helItems=allProds.filter(p=>HELADOS.includes(p)&&(p in ch.inv));
     const extraItems=allProds.filter(p=>!(p in ch.inv));
-    let tTiene=0,tVend=0,tRD=0;
+    let tTiene=0,tVend=0,tRD=0,tRDBase=0,tRDExtra=0;
     const rows=(lista)=>lista.map(p=>{
       const sob=inv[p]||0;const base=ch.inv?.[p]||0;const esExtra=!(p in ch.inv);
       const tiene=esExtra?0:sob;const vend=esExtra?sob:Math.max(0,base-sob);const rd=vend*(PRECIOS[p]||0);
-      tTiene+=tiene;tVend+=vend;tRD+=rd;
+      tTiene+=tiene;tVend+=vend;tRD+=rd;if(esExtra)tRDExtra+=rd;else tRDBase+=rd;
       return`<div class="inv-row"${esExtra?' style="background:rgba(212,43,43,0.06)"':''}><span class="inv-row-name">${p}${esExtra?' <span style="color:#D42B2B;font-size:8px">⚠</span>':''}</span><div class="inv-vals"><div class="inv-val"><div class="inv-val-n" style="color:${esExtra?'var(--sub)':'#92660a'}">${esExtra?'—':tiene}</div><div class="inv-val-l">Tiene</div></div><div class="inv-val"><div class="inv-val-n" style="color:${esExtra?'#D42B2B':'#1E8C3A'}">${vend}</div><div class="inv-val-l">Vendió</div></div><div class="inv-val"><div class="inv-val-n" style="color:${esExtra?'#D42B2B':'#1E8C3A'};font-size:11px">${rd>0?'RD$'+rd.toLocaleString('es-DO'):'—'}</div><div class="inv-val-l">Total</div></div></div></div>`;
     }).join('');
     const tPts=Math.round(tVend*8.5);
@@ -554,6 +554,7 @@ function abrirInvReg(f){
       (palItems.length?`<div class="inv-sec">🍦 Paletas</div>${rows(palItems)}`:'')+
       (helItems.length?`<div class="inv-sec">🍨 Helados</div>${rows(helItems)}`:'')+
       (extraItems.length?`<div class="inv-sec" style="color:#D42B2B">⚠ Extras (fuera del inventario base)</div>${rows(extraItems)}`:'')+
+      (extraItems.length?`<div style="border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-top:10px;display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:1px">Subtotal base</span><span style="font-size:14px;font-weight:900;color:#1E8C3A">${tRDBase>0?'RD$'+tRDBase.toLocaleString('es-DO'):'—'}</span></div><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:1px">Subtotal extras ⚠</span><span style="font-size:14px;font-weight:900;color:#D42B2B">${tRDExtra>0?'RD$'+tRDExtra.toLocaleString('es-DO'):'—'}</span></div><div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:6px;margin-top:2px"><span style="font-size:9px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:1px">Total general</span><span style="font-size:15px;font-weight:900;color:#D42B2B">RD$${tRD.toLocaleString('es-DO')}</span></div></div>`:'')+
       `<div class="inv-totales"><div class="inv-tot"><div class="inv-tot-l">Sobrante</div><div class="inv-tot-v">${tTiene} uds</div></div><div class="inv-tot"><div class="inv-tot-l">Vendido</div><div class="inv-tot-v" style="color:#1E8C3A">${tVend} uds</div></div><div class="inv-tot"><div class="inv-tot-l">⭐ Pts venta</div><div class="inv-tot-v" style="color:#1E8C3A">${tPts.toLocaleString('es-DO')}</div></div><div class="inv-tot"><div class="inv-tot-l">Total RD$</div><div class="inv-tot-v" style="color:#D42B2B">RD$${tRD.toLocaleString('es-DO')}</div></div></div>`;
   }
   document.getElementById('invReg').classList.remove('hidden');
