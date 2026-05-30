@@ -71,6 +71,7 @@ Tres roles operativos:
 - Modal de inventario registrado se muestra centrado en desktop (max-width 580px)
 - Productos extras aparecen en sección "⚠ Extras" dentro del detalle de inventario guardado
 - Detalle de inventario guardado: Total RD$ por fila (verde=base, rojo=extra) + totales al pie: Sobrante · Vendido · ⭐ Pts venta · Total RD$
+- Cuando hay extras: bloque de subtotales con Subtotal base (verde) · Subtotal extras (rojo) · Total general
 - **NO TOCAR** la lógica de PIN ni la estructura de datos
 
 ### FAB Flotante
