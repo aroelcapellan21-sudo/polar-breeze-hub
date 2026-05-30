@@ -27,6 +27,9 @@ Tres roles operativos:
 
 ### Portal de entrada
 - Login con email/contraseña + Firebase Auth
+- Admin, Despachador y Encargado: campos email + contraseña libres
+- Chofer: número de ficha (construye email como `ficha@chofer.polarbreeze.com`)
+- El rol mostrado siempre viene de Firestore, nunca del selector del portal
 - Redirección automática por rol
 - **NO TOCAR**: `app/page.tsx`, `lib/auth-context.tsx`
 
@@ -98,6 +101,7 @@ Sin bugs activos. Todos los bugs anteriores fueron corregidos el 30 Mayo 2026:
 | 3 | C.Tiene y C.Vendida invertidos en app inventario | `90d2b39` | ✅ Corregido |
 | 4 | Deploy Vercel fallando por `middleware.ts` renombrado | `9845f1e` | ✅ Corregido |
 | 5 | Productos extras no aparecían en detalle de inventario guardado | `2e29efd` | ✅ Corregido |
+| 6 | Portal solo abría área Encargado — emails hardcodeados en LoginForm | `fbb9a7b` | ✅ Corregido |
 
 ---
 
