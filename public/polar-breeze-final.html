@@ -715,7 +715,7 @@ function abrirResumen(){
     const tiene=esExtra?0:Math.max(0,base-vend);
     const rd=vend*(PRECIOS[p]||0);
     tV+=vend;tRD+=rd;tT+=tiene;
-    return`<tr><td title="${p}">${p.length>16?p.substring(0,14)+'…':p}${esExtra?` <span style="color:#D42B2B;font-size:8px">⚠</span>`:''}</td><td class="td-tiene">${tiene}</td><td class="${esExtra?'':'td-vend'}">${esExtra?'—':vend}</td><td class="td-monto">${rd>0?'RD$'+rd.toLocaleString('es-DO'):'—'}</td></tr>`;
+    return`<tr${esExtra?' style="background:rgba(212,43,43,0.07)"':''}><td title="${p}">${p.length>16?p.substring(0,14)+'…':p}${esExtra?` <span style="color:#D42B2B;font-size:8px">⚠</span>`:''}</td><td class="td-tiene">${esExtra?'—':tiene}</td><td class="${esExtra?'td-vend':''}" style="${esExtra?'color:#D42B2B;font-weight:900':''}">${vend}</td><td class="td-monto">${rd>0?'RD$'+rd.toLocaleString('es-DO'):'—'}</td></tr>`;
   }).join('');
   const fecha=document.getElementById('fechaInput').value;
   document.getElementById('modalResBody').innerHTML=
@@ -733,7 +733,6 @@ function pedirGuardar(){
   let udsVendidas=0,rdVendido=0;
   for(const [p,vend] of Object.entries(valores)){
     if(vend==null||vend<0)continue;
-    if(choferActual&&!(p in choferActual.inv))continue;
     udsVendidas+=vend;rdVendido+=vend*(PRECIOS[p]||0);
   }
   const ptsVenta=Math.round(udsVendidas*8.5);
