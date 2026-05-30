@@ -69,6 +69,7 @@ Tres roles operativos:
 - Modal confirmación muestra pts venta + pts quincena
 - El encargado ingresa **sobrante** (C.Tiene); C.Vendida = base − sobrante
 - Modal de inventario registrado se muestra centrado en desktop (max-width 580px)
+- Productos extras aparecen en sección "⚠ Extras" dentro del detalle de inventario guardado
 - **NO TOCAR** la lógica de PIN ni la estructura de datos
 
 ### FAB Flotante
@@ -93,6 +94,7 @@ Sin bugs activos. Todos los bugs anteriores fueron corregidos el 30 Mayo 2026:
 | 2 | Ver inventario de choferes no funcionaba en desktop | `90d2b39` | ✅ Corregido |
 | 3 | C.Tiene y C.Vendida invertidos en app inventario | `90d2b39` | ✅ Corregido |
 | 4 | Deploy Vercel fallando por `middleware.ts` renombrado | `9845f1e` | ✅ Corregido |
+| 5 | Productos extras no aparecían en detalle de inventario guardado | `2e29efd` | ✅ Corregido |
 
 ---
 
