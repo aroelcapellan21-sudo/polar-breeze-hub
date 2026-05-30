@@ -178,7 +178,7 @@ export default function AdminDashboard() {
             >
               <span className="text-base">🧊</span>
             </div>
-            <div>
+            <div className="hidden sm:block">
               <p className="text-white/60 text-[9px] leading-none uppercase tracking-widest">Polar Breeze</p>
               <p className="text-white font-black text-sm leading-tight">Admin</p>
             </div>
@@ -217,8 +217,8 @@ export default function AdminDashboard() {
             <RolePill rol="admin" nombre={profile?.nombre ?? ""} />
             <button
               onClick={logout}
-              className="bg-white/10 hover:bg-white/20 active:scale-95 px-2 py-1.5
-                rounded-lg text-xs transition-all duration-100 font-medium"
+              className="bg-white/15 hover:bg-white/25 active:scale-95 px-2.5 py-1.5
+                rounded-lg text-xs transition-all duration-100 font-medium flex-shrink-0"
             >
               Salir
             </button>
