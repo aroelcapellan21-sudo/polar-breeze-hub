@@ -547,13 +547,14 @@ function abrirInvReg(f){
       const sob=inv[p]||0;const base=ch.inv?.[p]||0;const esExtra=!(p in ch.inv);
       const tiene=esExtra?0:sob;const vend=esExtra?sob:Math.max(0,base-sob);const rd=vend*(PRECIOS[p]||0);
       tTiene+=tiene;tVend+=vend;tRD+=rd;
-      return`<div class="inv-row"${esExtra?' style="background:rgba(212,43,43,0.06)"':''}><span class="inv-row-name">${p}${esExtra?' <span style="color:#D42B2B;font-size:8px">⚠</span>':''}</span><div class="inv-vals"><div class="inv-val"><div class="inv-val-n" style="color:${esExtra?'var(--sub)':'#92660a'}">${esExtra?'—':tiene}</div><div class="inv-val-l">Tiene</div></div><div class="inv-val"><div class="inv-val-n" style="color:${esExtra?'#D42B2B':'#1E8C3A'}">${vend}</div><div class="inv-val-l">Vendió</div></div><div class="inv-val"><div class="inv-val-n" style="color:#D42B2B;font-size:11px">${rd>0?'RD$'+rd.toLocaleString('es-DO'):'—'}</div><div class="inv-val-l">Total</div></div></div></div>`;
+      return`<div class="inv-row"${esExtra?' style="background:rgba(212,43,43,0.06)"':''}><span class="inv-row-name">${p}${esExtra?' <span style="color:#D42B2B;font-size:8px">⚠</span>':''}</span><div class="inv-vals"><div class="inv-val"><div class="inv-val-n" style="color:${esExtra?'var(--sub)':'#92660a'}">${esExtra?'—':tiene}</div><div class="inv-val-l">Tiene</div></div><div class="inv-val"><div class="inv-val-n" style="color:${esExtra?'#D42B2B':'#1E8C3A'}">${vend}</div><div class="inv-val-l">Vendió</div></div><div class="inv-val"><div class="inv-val-n" style="color:${esExtra?'#D42B2B':'#1E8C3A'};font-size:11px">${rd>0?'RD$'+rd.toLocaleString('es-DO'):'—'}</div><div class="inv-val-l">Total</div></div></div></div>`;
     }).join('');
+    const tPts=Math.round(tVend*8.5);
     body.innerHTML=
       (palItems.length?`<div class="inv-sec">🍦 Paletas</div>${rows(palItems)}`:'')+
       (helItems.length?`<div class="inv-sec">🍨 Helados</div>${rows(helItems)}`:'')+
       (extraItems.length?`<div class="inv-sec" style="color:#D42B2B">⚠ Extras (fuera del inventario base)</div>${rows(extraItems)}`:'')+
-      `<div class="inv-totales"><div class="inv-tot"><div class="inv-tot-l">Sobrante</div><div class="inv-tot-v">${tTiene} uds</div></div><div class="inv-tot"><div class="inv-tot-l">Vendido</div><div class="inv-tot-v" style="color:#1E8C3A">${tVend} uds</div></div><div class="inv-tot"><div class="inv-tot-l">Total RD$</div><div class="inv-tot-v" style="color:#D42B2B">RD$${tRD.toLocaleString('es-DO')}</div></div></div>`;
+      `<div class="inv-totales"><div class="inv-tot"><div class="inv-tot-l">Sobrante</div><div class="inv-tot-v">${tTiene} uds</div></div><div class="inv-tot"><div class="inv-tot-l">Vendido</div><div class="inv-tot-v" style="color:#1E8C3A">${tVend} uds</div></div><div class="inv-tot"><div class="inv-tot-l">⭐ Pts venta</div><div class="inv-tot-v" style="color:#1E8C3A">${tPts.toLocaleString('es-DO')}</div></div><div class="inv-tot"><div class="inv-tot-l">Total RD$</div><div class="inv-tot-v" style="color:#D42B2B">RD$${tRD.toLocaleString('es-DO')}</div></div></div>`;
   }
   document.getElementById('invReg').classList.remove('hidden');
   cerrarModalChoferes();
