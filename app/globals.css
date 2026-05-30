@@ -22,11 +22,17 @@
 html { color-scheme: light; }
 
 body {
+  color-scheme: light;
   background: var(--background);
   color: var(--foreground);
   font-family: 'Nunito', Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Forzar fondo blanco en todos los inputs — evita que el OS en dark mode los oscurezca */
+input, textarea, select {
+  color-scheme: light;
 }
 
 /* ── Banda tricolor reutilizable ───────────────────────────────────────── */

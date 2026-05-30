@@ -580,7 +580,7 @@ export default function ChoferDashboard() {
                            :                     "Sin despacho registrado hoy"}
                         </p>
                       </div>
-                      {semaforo === key && <span className="text-xs font-bold text-purple-600 flex-shrink-0">← Actual</span>}
+                      {semaforo === key && <span className="text-xs font-bold text-[#D42B2B] flex-shrink-0">← Actual</span>}
                     </div>
                   ))}
                 </div>

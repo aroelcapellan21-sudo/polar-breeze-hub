@@ -205,7 +205,7 @@ export default function StatusDashboard() {
   if (ownerPwdSet === null) {
     return (
       <div className="flex items-center justify-center py-20">
-        <span className="w-6 h-6 border-2 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+        <span className="w-6 h-6 border-2 border-gray-300 border-t-[#D42B2B] rounded-full animate-spin" />
       </div>
     );
   }
@@ -232,11 +232,11 @@ export default function StatusDashboard() {
                 onChange={(e) => setOwnerPwd(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && ownerPwd && verifyOwner()}
                 placeholder="Contraseña del dueño"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"
               />
               <button
                 onClick={verifyOwner} disabled={!ownerPwd || ownerLoading}
-                className="w-full bg-purple-700 hover:bg-purple-800 active:scale-95 text-white py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+                className="w-full bg-[#D42B2B] hover:bg-[#b82424] active:scale-95 text-white py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
               >
                 {ownerLoading ? "Verificando..." : "🔓 Entrar"}
               </button>
@@ -250,18 +250,18 @@ export default function StatusDashboard() {
                 type="password" value={ownerPwdNew} autoFocus
                 onChange={(e) => setOwnerPwdNew(e.target.value)}
                 placeholder="Nueva contraseña del dueño (mín. 4 car.)"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"
               />
               <input
                 type="password" value={ownerPwdNew2}
                 onChange={(e) => setOwnerPwdNew2(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && saveOwnerPassword()}
                 placeholder="Confirmar contraseña"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"
               />
               <button
                 onClick={saveOwnerPassword} disabled={!ownerPwdNew || !ownerPwdNew2 || ownerLoading}
-                className="w-full bg-purple-700 hover:bg-purple-800 active:scale-95 text-white py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+                className="w-full bg-[#D42B2B] hover:bg-[#b82424] active:scale-95 text-white py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
               >
                 {ownerLoading ? "Guardando..." : "👑 Establecer contraseña"}
               </button>
@@ -315,7 +315,7 @@ export default function StatusDashboard() {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="font-bold text-gray-800 text-lg">Estado del Sistema</h2>
-            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+            <span className="text-xs bg-[#F5C800]/20 text-[#1A1A1A] px-2 py-0.5 rounded-full font-medium">
               👑 Dueño
             </span>
           </div>
@@ -332,7 +332,7 @@ export default function StatusDashboard() {
           </div>
           <button
             onClick={fetchStatus} disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D42B2B] hover:bg-[#b82424]
               active:scale-95 text-white rounded-lg text-sm font-medium transition-all duration-100 disabled:opacity-60"
           >
             {loading
@@ -363,7 +363,7 @@ export default function StatusDashboard() {
           />
           <button
             onClick={() => { setOwnerChangePw(!ownerChangePw); setOwnerPwd(""); setOwnerPwdNew(""); setOwnerPwdNew2(""); }}
-            className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 active:scale-95 text-purple-700 rounded-lg text-xs font-medium transition"
+            className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 active:scale-95 text-[#1A1A1A] rounded-lg text-xs font-medium transition"
           >
             🔑 Cambiar clave
           </button>
@@ -372,26 +372,26 @@ export default function StatusDashboard() {
 
       {/* ── Change owner password ── */}
       {ownerChangePw && (
-        <div className="bg-purple-50 border border-purple-200 rounded-xl p-5 space-y-3 max-w-md">
-          <p className="font-semibold text-purple-800 text-sm">🔑 Cambiar contraseña del dueño</p>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-3 max-w-md">
+          <p className="font-semibold text-[#1A1A1A] text-sm">🔑 Cambiar contraseña del dueño</p>
           <input
             type="password" value={ownerPwd}
             onChange={(e) => setOwnerPwd(e.target.value)}
             placeholder="Contraseña actual"
-            className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"
             autoFocus
           />
           <input
             type="password" value={ownerPwdNew}
             onChange={(e) => setOwnerPwdNew(e.target.value)}
             placeholder="Nueva contraseña (mín. 4 car.)"
-            className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"
           />
           <input
             type="password" value={ownerPwdNew2}
             onChange={(e) => setOwnerPwdNew2(e.target.value)}
             placeholder="Confirmar nueva contraseña"
-            className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"
           />
           <div className="flex gap-2">
             <button
@@ -403,7 +403,7 @@ export default function StatusDashboard() {
             <button
               onClick={changeOwnerPassword}
               disabled={ownerLoading || !ownerPwd || ownerPwdNew.length < 4 || !ownerPwdNew2}
-              className="flex-1 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold transition disabled:opacity-60"
+              className="flex-1 py-2 rounded-lg bg-[#D42B2B] hover:bg-[#b82424] text-white text-sm font-semibold transition disabled:opacity-60"
             >
               {ownerLoading ? "Guardando..." : "Guardar"}
             </button>

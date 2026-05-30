@@ -640,11 +640,11 @@ export default function Inventario() {
       {/* ── 1. Dashboard del día ─────────────────────────────────────────────── */}
       {!cargando && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-indigo-700 to-purple-800">
+          <div className="px-4 py-3 bg-gradient-to-r from-[#1A1A1A] to-[#333333]">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-white font-bold text-sm">📊 Dashboard del día</h2>
-                <p className="text-indigo-200 text-xs capitalize mt-0.5">{hoyLabel}</p>
+                <p className="text-gray-300 text-xs capitalize mt-0.5">{hoyLabel}</p>
               </div>
               {dashboard.productosAlerta > 0 && (
                 <span className="flex-shrink-0 text-xs bg-red-500 text-white
@@ -658,7 +658,7 @@ export default function Inventario() {
           <div className="p-4 space-y-4">
             {/* Stats 2×2 en móvil, 4 en escritorio */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard icon="📦" label="En loker"       value={dashboard.totalEnLoker}    color="purple"
+              <StatCard icon="📦" label="En loker"       value={dashboard.totalEnLoker}    color="red"
                 onClick={() => setInvModal({ type: "stat", key: "loker" })} />
               <StatCard icon="🚚" label="Despachado hoy" value={dashboard.totalDespachado} color="orange"
                 onClick={() => setInvModal({ type: "stat", key: "despachado" })} />
@@ -766,13 +766,13 @@ export default function Inventario() {
         <button
           onClick={() => setSaldoAbierto((v) => !v)}
           className="w-full flex items-center justify-between px-4 py-3
-            bg-gradient-to-r from-purple-50 to-purple-100 hover:from-purple-100
-            hover:to-purple-150 transition-colors duration-100"
+            bg-gradient-to-r from-[#F5C800]/10 to-[#F5C800]/20 hover:from-[#F5C800]/20
+            hover:to-[#F5C800]/30 transition-colors duration-100"
         >
           <div className="flex items-center gap-2">
             <span className="text-lg">📦</span>
-            <span className="font-semibold text-purple-900 text-sm">Stock del loker</span>
-            <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">
+            <span className="font-semibold text-[#1A1A1A] text-sm">Stock del loker</span>
+            <span className="text-xs bg-[#F5C800]/30 text-[#1A1A1A] px-2 py-0.5 rounded-full">
               {saldoConDetalle.length} {saldoConDetalle.length === 1 ? "producto" : "productos"}
             </span>
             {saldoConDetalle.some((p) => p.saldo <= 0) && (
@@ -782,7 +782,7 @@ export default function Inventario() {
               </span>
             )}
           </div>
-          <span className="text-purple-600 text-sm">{saldoAbierto ? "▲" : "▼"}</span>
+          <span className="text-[#D42B2B] text-sm">{saldoAbierto ? "▲" : "▼"}</span>
         </button>
 
         {saldoAbierto && (
@@ -1628,7 +1628,7 @@ export default function Inventario() {
         {/* Formulario */}
         <div className="md:col-span-2">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 bg-gradient-to-r from-purple-700 to-purple-900">
+            <div className="px-4 py-3 bg-gradient-to-r from-[#1A1A1A] to-[#333333]">
               <h2 className="text-white font-semibold text-sm">+ Registrar movimiento</h2>
             </div>
             <form onSubmit={handleGuardar} className="p-4 space-y-3">
@@ -1639,7 +1639,7 @@ export default function Inventario() {
                   value={tipo}
                   onChange={(e) => setTipo(e.target.value as TipoLoker)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                    focus:outline-none focus:ring-2 focus:ring-[#F5C800] bg-white"
                 >
                   {TIPOS_ORDEN.map((t) => (
                     <option key={t} value={t}>{TIPO_CFG[t].label}</option>
@@ -1659,7 +1659,7 @@ export default function Inventario() {
                   onChange={(e) => setNombre(e.target.value)}
                   placeholder="Ej. Helado de fresa"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-purple-400"
+                    focus:outline-none focus:ring-2 focus:ring-[#F5C800]"
                 />
               </div>
 
@@ -1684,7 +1684,7 @@ export default function Inventario() {
                     onChange={(e) => setCantidad(e.target.value)}
                     placeholder="0" min="0" step="any"
                     className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm
-                      focus:outline-none focus:ring-2 focus:ring-purple-400"
+                      focus:outline-none focus:ring-2 focus:ring-[#F5C800]"
                   />
                 </div>
               </div>
@@ -1697,7 +1697,7 @@ export default function Inventario() {
                   value={notas} onChange={(e) => setNotas(e.target.value)}
                   rows={2} placeholder="Observaciones, lote, proveedor…"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+                    focus:outline-none focus:ring-2 focus:ring-[#F5C800] resize-none"
                 />
               </div>
 
@@ -1720,8 +1720,8 @@ export default function Inventario() {
 
               <button
                 type="submit" disabled={guardando}
-                className="w-full bg-gradient-to-r from-purple-700 to-purple-900 hover:from-purple-600
-                  hover:to-purple-800 text-white font-semibold py-2.5 rounded-lg text-sm
+                className="w-full bg-gradient-to-r from-[#D42B2B] to-[#8B0000] hover:from-[#b82424]
+                  hover:to-[#6B0000] text-white font-semibold py-2.5 rounded-lg text-sm
                   transition-all duration-100 active:scale-95 disabled:opacity-60"
               >
                 {guardando ? "Guardando…" : "Registrar movimiento"}
@@ -2173,12 +2173,12 @@ function StatCard({
   icon:    string;
   label:   string;
   value:   number | string;
-  color:   "purple" | "orange" | "green" | "yellow";
+  color:   "red" | "orange" | "green" | "yellow";
   sub?:    string;
   onClick?: () => void;
 }) {
   const bg = {
-    purple: "from-purple-500 to-purple-700",
+    red: "from-[#D42B2B] to-[#8B0000]",
     orange: "from-orange-400 to-orange-600",
     green:  "from-emerald-500 to-emerald-700",
     yellow: "from-yellow-500 to-amber-600",

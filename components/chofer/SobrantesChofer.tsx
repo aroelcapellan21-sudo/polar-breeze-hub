@@ -265,8 +265,8 @@ export default function SobrantesChofer() {
                       className={`w-full border rounded-lg px-3 py-2 text-sm
                         focus:outline-none focus:ring-2 transition-colors ${
                           invalido
-                            ? "border-red-400 bg-red-50 focus:ring-red-300"
-                            : "border-gray-300 focus:ring-teal-400"
+                            ? "border-red-400 bg-red-50 text-red-800 focus:ring-red-300"
+                            : "border-gray-300 bg-white text-gray-800 focus:ring-teal-400"
                         }`}
                     />
                   </div>

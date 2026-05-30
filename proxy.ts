@@ -1,5 +1,5 @@
 /**
- * Middleware — Polar Breeze Hub
+ * Proxy — Polar Breeze Hub
  * Enruta subdominios a sus rutas PWA correspondientes:
  *
  *   despachador.polarbreezeapp.com  →  /app-despachador
@@ -21,7 +21,7 @@ const DOMAIN_MAP: Record<string, string> = {
   hub:         "/",
 };
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const host     = request.headers.get("host") ?? "";
   const hostname = host.split(":")[0]; // quitar puerto
   const parts    = hostname.split(".");

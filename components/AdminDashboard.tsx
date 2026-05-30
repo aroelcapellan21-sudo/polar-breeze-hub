@@ -491,8 +491,8 @@ function NavTab({ active, onClick, children, "data-active": dataActive }: {
       className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium
         transition-all duration-100 active:scale-95 whitespace-nowrap flex-shrink-0 ${
         active
-          ? "bg-white text-purple-800 shadow-sm"
-          : "text-purple-200 hover:bg-white/10 hover:text-white"
+          ? "bg-[#F5C800] text-[#1A1A1A] shadow-sm font-bold"
+          : "text-white/80 hover:bg-white/15 hover:text-white"
       }`}
     >
       {children}
