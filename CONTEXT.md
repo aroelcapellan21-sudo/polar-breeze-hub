@@ -52,6 +52,7 @@ Tres roles operativos:
 - Alertas unificadas en tiempo real
 - Tablero de rutas activas por zona
 - Módulo gestión de usuarios (crear, editar, desactivar)
+- En móvil el texto del logo ("Polar Breeze / Admin") está oculto (`hidden sm:block`) para liberar espacio en el header; el botón Salir tiene `flex-shrink-0`
 - **NO TOCAR SIN AUTORIZACIÓN**: `components/AdminDashboard.tsx`
 
 ### Bot Telegram
@@ -92,7 +93,7 @@ Sin bugs activos. Todos los bugs anteriores fueron corregidos el 30 Mayo 2026:
 
 | # | Bug | Commit | Estado |
 |---|-----|--------|--------|
-| 1 | Botón Salir no aparecía en móvil en Hub Admin | `06b3da5` | ✅ Corregido |
+| 1 | Botón Salir no aparecía en móvil en Hub Admin | `d93501c` | ✅ Corregido (fix definitivo) |
 | 2 | Ver inventario de choferes no funcionaba en desktop | `90d2b39` | ✅ Corregido |
 | 3 | C.Tiene y C.Vendida invertidos en app inventario | `90d2b39` | ✅ Corregido |
 | 4 | Deploy Vercel fallando por `middleware.ts` renombrado | `9845f1e` | ✅ Corregido |
