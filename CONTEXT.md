@@ -70,6 +70,7 @@ Tres roles operativos:
 - El encargado ingresa **sobrante** (C.Tiene); C.Vendida = base − sobrante
 - Modal de inventario registrado se muestra centrado en desktop (max-width 580px)
 - Productos extras aparecen en sección "⚠ Extras" dentro del detalle de inventario guardado
+- Detalle de inventario guardado muestra Total RD$ por producto (base y extras) + Total General al pie
 - **NO TOCAR** la lógica de PIN ni la estructura de datos
 
 ### FAB Flotante
