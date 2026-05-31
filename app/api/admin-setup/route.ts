@@ -92,26 +92,44 @@ function authHeader(req: NextRequest): boolean {
   return token === process.env.SETUP_SECRET;
 }
 
-// GET — lista todos los usuarios en Firestore (diagnóstico)
+// Extrae el UID del payload de un Firebase JWT (base64 sin verificar — solo para bootstrap)
+function uidFromJwt(idToken: string): string | null {
+  try {
+    const payload = idToken.split(".")[1];
+    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { user_id?: string; sub?: string };
+    return decoded.user_id ?? decoded.sub ?? null;
+  } catch { return null; }
+}
+
+// GET — crea/confirma documento admin@polarbreeze.com con role="admin"
+// Las reglas de Firestore siempre permiten que un usuario escriba su propio doc.
 export async function GET(req: NextRequest) {
   if (!authHeader(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const idToken = await getAdminToken();
-    if (!idToken) return NextResponse.json({ error: "Admin auth failed" }, { status: 500 });
+    if (!idToken) {
+      return NextResponse.json({
+        error: "No se pudo autenticar admin@polarbreeze.com. Verifica ADMIN_PASSWORD en Vercel.",
+      }, { status: 500 });
+    }
 
-    const r = await fetch(`${FS_URL}/usuarios`, {
-      headers: { Authorization: `Bearer ${idToken}` },
+    const uid = uidFromJwt(idToken);
+    if (!uid) return NextResponse.json({ error: "No se pudo extraer UID del token" }, { status: 500 });
+
+    // Escribir/actualizar el propio documento — siempre permitido por reglas de Firestore
+    const err = await upsertFirestoreDoc(uid, "admin@polarbreeze.com", "admin", "Admin", idToken);
+    if (err) {
+      return NextResponse.json({ error: "Error al escribir en Firestore.", detail: err }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      ok:    true,
+      uid,
+      email: "admin@polarbreeze.com",
+      role:  "admin",
+      msg:   "✅ Documento admin creado/actualizado. Inicia sesión con admin@polarbreeze.com y el valor de ADMIN_PASSWORD en Vercel.",
     });
-    const data = await r.json() as { documents?: Array<{ name: string; fields: Record<string, { stringValue?: string; booleanValue?: boolean }> }> };
-    const users = (data.documents ?? []).map(d => ({
-      uid:    d.name.split("/").pop(),
-      email:  d.fields.email?.stringValue,
-      nombre: d.fields.nombre?.stringValue,
-      role:   d.fields.role?.stringValue,
-      activo: d.fields.activo?.booleanValue,
-    }));
-    return NextResponse.json({ count: users.length, users });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error" }, { status: 500 });
   }
