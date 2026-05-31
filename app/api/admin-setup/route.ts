@@ -21,6 +21,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+
 const FS_URL   = "https://firestore.googleapis.com/v1/projects/polar-breeze/databases/(default)/documents";
 const AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
 const API_KEY  = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
