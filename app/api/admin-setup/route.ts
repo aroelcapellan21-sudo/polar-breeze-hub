@@ -18,6 +18,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 
 const FS_URL   = "https://firestore.googleapis.com/v1/projects/polar-breeze/databases/(default)/documents";
 const AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
@@ -35,6 +36,39 @@ async function getAdminToken(): Promise<string | null> {
   });
   const data = await r.json();
   return (data as { idToken?: string }).idToken ?? null;
+}
+
+// Obtiene un access token de Google usando el service account (bypass reglas Firestore)
+async function getServiceAccountToken(): Promise<string | null> {
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const key   = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  if (!email || !key) return null;
+
+  const now = Math.floor(Date.now() / 1000);
+  const header  = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    iss:   email,
+    scope: "https://www.googleapis.com/auth/datastore",
+    aud:   "https://oauth2.googleapis.com/token",
+    iat:   now,
+    exp:   now + 3600,
+  })).toString("base64url");
+
+  const sign = crypto.createSign("RSA-SHA256");
+  sign.update(`${header}.${payload}`);
+  const sig = sign.sign(key, "base64url");
+  const jwt = `${header}.${payload}.${sig}`;
+
+  const r = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion:  jwt,
+    }),
+  });
+  const data = await r.json() as { access_token?: string };
+  return data.access_token ?? null;
 }
 
 // Busca el UID consultando Firestore por campo email (no requiere Admin SDK)
@@ -101,34 +135,44 @@ function uidFromJwt(idToken: string): string | null {
   } catch { return null; }
 }
 
-// GET — crea/confirma documento admin@polarbreeze.com con role="admin"
-// Las reglas de Firestore siempre permiten que un usuario escriba su propio doc.
+// GET — crea documento de admin@polarbreeze.com con role="admin" usando service account
 export async function GET(req: NextRequest) {
   if (!authHeader(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const idToken = await getAdminToken();
+    // Preferir service account (bypass reglas); fallback a idToken propio
+    const saToken  = await getServiceAccountToken();
+    const idToken  = saToken ?? await getAdminToken();
     if (!idToken) {
       return NextResponse.json({
-        error: "No se pudo autenticar admin@polarbreeze.com. Verifica ADMIN_PASSWORD en Vercel.",
+        error: "Sin credenciales: configura GOOGLE_PRIVATE_KEY + GOOGLE_SERVICE_ACCOUNT_EMAIL o ADMIN_PASSWORD.",
       }, { status: 500 });
     }
 
-    const uid = uidFromJwt(idToken);
-    if (!uid) return NextResponse.json({ error: "No se pudo extraer UID del token" }, { status: 500 });
+    // Si usamos idToken de admin@polarbreeze.com, extraer su UID del JWT
+    const uid = saToken ? null : uidFromJwt(idToken);
 
-    // Escribir/actualizar el propio documento — siempre permitido por reglas de Firestore
-    const err = await upsertFirestoreDoc(uid, "admin@polarbreeze.com", "admin", "Admin", idToken);
-    if (err) {
-      return NextResponse.json({ error: "Error al escribir en Firestore.", detail: err }, { status: 500 });
+    if (saToken) {
+      // Con service account podemos escribir cualquier documento — usamos el de admin
+      const adminIdToken = await getAdminToken();
+      const adminUid = adminIdToken ? uidFromJwt(adminIdToken) : null;
+      if (!adminUid) {
+        return NextResponse.json({ error: "No se pudo obtener UID de admin@polarbreeze.com" }, { status: 500 });
+      }
+      const err = await upsertFirestoreDoc(adminUid, "admin@polarbreeze.com", "admin", "Admin", saToken);
+      if (err) return NextResponse.json({ error: "Error Firestore.", detail: err }, { status: 500 });
+      return NextResponse.json({
+        ok: true, uid: adminUid, email: "admin@polarbreeze.com", role: "admin",
+        msg: "✅ Documento admin creado/actualizado. Inicia sesión con admin@polarbreeze.com y ADMIN_PASSWORD.",
+      });
     }
 
+    if (!uid) return NextResponse.json({ error: "No se pudo extraer UID del token" }, { status: 500 });
+    const err = await upsertFirestoreDoc(uid, "admin@polarbreeze.com", "admin", "Admin", idToken);
+    if (err) return NextResponse.json({ error: "Error Firestore.", detail: err }, { status: 500 });
     return NextResponse.json({
-      ok:    true,
-      uid,
-      email: "admin@polarbreeze.com",
-      role:  "admin",
-      msg:   "✅ Documento admin creado/actualizado. Inicia sesión con admin@polarbreeze.com y el valor de ADMIN_PASSWORD en Vercel.",
+      ok: true, uid, email: "admin@polarbreeze.com", role: "admin",
+      msg: "✅ Documento admin creado/actualizado. Inicia sesión con admin@polarbreeze.com y ADMIN_PASSWORD.",
     });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error" }, { status: 500 });
