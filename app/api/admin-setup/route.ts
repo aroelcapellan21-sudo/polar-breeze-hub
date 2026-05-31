@@ -37,17 +37,32 @@ async function getAdminToken(): Promise<string | null> {
   return (data as { idToken?: string }).idToken ?? null;
 }
 
+// Busca el UID consultando Firestore por campo email (no requiere Admin SDK)
 async function getUidByEmail(email: string, idToken: string): Promise<string | null> {
-  const r = await fetch(`${AUTH_URL}:lookup?key=${API_KEY}`, {
+  const r = await fetch(`${FS_URL}:runQuery`, {
     method: "POST",
     headers: {
       "Content-Type":  "application/json",
       "Authorization": `Bearer ${idToken}`,
     },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({
+      structuredQuery: {
+        from:  [{ collectionId: "usuarios" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "email" },
+            op:    "EQUAL",
+            value: { stringValue: email },
+          },
+        },
+        limit: 1,
+      },
+    }),
   });
-  const data = await r.json() as { users?: { localId: string }[] };
-  return data.users?.[0]?.localId ?? null;
+  const rows = await r.json() as Array<{ document?: { name: string } }>;
+  const name = rows[0]?.document?.name;
+  if (!name) return null;
+  return name.split("/").pop() ?? null;
 }
 
 async function upsertFirestoreDoc(uid: string, email: string, role: string, nombre: string, idToken: string) {
