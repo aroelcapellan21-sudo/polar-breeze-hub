@@ -88,6 +88,20 @@ Tres roles operativos:
 ### Google Sheets
 - Sincronización activa con hoja "Polar Breeze Hub"
 - Variables configuradas en Vercel: GOOGLE_SHEETS_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY
+- ⚠️ GOOGLE_PRIVATE_KEY en Vercel está truncada (305 chars, falta END marker) — sync-sheets y admin-setup fallarán hasta que se corrija con la clave RSA completa (~1700+ chars)
+
+### Endpoint de bootstrap de roles
+- Ruta: `POST /api/admin-setup` y `GET /api/admin-setup`
+- Protegido con header `x-setup-token: <SETUP_SECRET>` (guardado en Vercel como variable de entorno)
+- **GET** → crea/actualiza documento `admin@polarbreeze.com` con `role="admin"` (requiere ADMIN_PASSWORD configurada)
+- **POST** → `{"email":"...","role":"admin","nombre":"..."}` actualiza role de cualquier usuario
+- Requiere que GOOGLE_PRIVATE_KEY esté completa y ADMIN_PASSWORD configurada en Vercel
+
+**Para activar el acceso admin (una sola vez):**
+1. Corregir `GOOGLE_PRIVATE_KEY` en Vercel con la clave RSA completa del service account
+2. Agregar `ADMIN_PASSWORD` en Vercel (contraseña de `admin@polarbreeze.com` en Firebase Auth)
+3. Llamar: `curl https://polar-breeze-hub.vercel.app/api/admin-setup -H "x-setup-token: <SETUP_SECRET>"`
+4. Iniciar sesión en el portal con `admin@polarbreeze.com` + ADMIN_PASSWORD
 
 ---
 
