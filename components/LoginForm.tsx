@@ -76,13 +76,14 @@ export default function LoginForm() {
     }
   }, []);
 
-  const roleConfig  = ROLES.find((r) => r.key === selectedRole) ?? null;
-  const isChofer    = selectedRole === "chofer";
-  const isEncargado = selectedRole === "encargado";
+  const roleConfig = ROLES.find((r) => r.key === selectedRole) ?? null;
+  const isChofer   = selectedRole === "chofer";
 
   const handleRoleSelect = (role: UserRole) => {
     setSelectedRole(role);
-    setCredential("");
+    const rc = ROLES.find(r => r.key === role);
+    // Pre-rellenar el email para roles con email conocido (admin, despachador)
+    setCredential(rc?.email ?? "");
     setCredentialPwd("");
     setError("");
   };
@@ -101,14 +102,10 @@ export default function LoginForm() {
     try {
       const email = isChofer
         ? `${credential.trim()}@chofer.polarbreeze.com`
-        : isEncargado
-        ? credential.trim()
-        : roleConfig.email;
+        : credential.trim();
       const password = isChofer
         ? credential.trim().padStart(6, "0")
-        : isEncargado
-        ? credentialPwd
-        : credential;
+        : credentialPwd;
       await login(email, password);
     } catch {
       const msg = isChofer
@@ -217,7 +214,8 @@ export default function LoginForm() {
           {/* Password / Ficha field */}
           {selectedRole && (
             <form onSubmit={handleSubmit} className="space-y-4">
-              {isEncargado ? (
+              {!isChofer ? (
+                /* Admin, Despachador, Encargado — email + contraseña */
                 <div className="space-y-3">
                   <div>
                     <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
@@ -250,26 +248,25 @@ export default function LoginForm() {
                   </div>
                 </div>
               ) : (
+                /* Chofer — número de ficha */
                 <div>
                   <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
-                    {isChofer ? "🪪 Número de Ficha" : "🔑 Contraseña"}
+                    🪪 Número de Ficha
                   </label>
                   <input
-                    type={isChofer ? "text" : "password"}
+                    type="text"
                     value={credential}
                     onChange={(e) => setCredential(e.target.value)}
                     required
                     autoFocus
                     minLength={3}
-                    placeholder={isChofer ? "Ej: 0042" : "••••••••"}
+                    placeholder="Ej: 0042"
                     className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none text-gray-800 text-base transition
                       focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
                   />
-                  {isChofer && (
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      Usa el número de ficha que te asignó el admin. Mínimo 3 dígitos.
-                    </p>
-                  )}
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    Usa el número de ficha que te asignó el admin. Mínimo 3 dígitos.
+                  </p>
                 </div>
               )}
 
@@ -281,7 +278,7 @@ export default function LoginForm() {
 
               <button
                 type="submit"
-                disabled={loading || (isEncargado
+                disabled={loading || (!isChofer
                   ? !credential || !credentialPwd || credentialPwd.length < 3
                   : !credential || credential.length < 3)}
                 className={`w-full bg-gradient-to-r ${roleConfig?.btn} text-white py-3.5 rounded-xl font-bold text-base
