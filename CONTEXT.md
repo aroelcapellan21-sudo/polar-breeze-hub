@@ -31,6 +31,7 @@ Tres roles operativos:
 - Chofer: número de ficha (construye email como `ficha@chofer.polarbreeze.com`)
 - El rol mostrado siempre viene de Firestore, nunca del selector del portal
 - Redirección automática por rol
+- Si un usuario queda con rol incorrecto en Firestore: usar `POST /api/admin-setup` con header `x-setup-token: SETUP_SECRET` y body `{email, role, nombre}`
 - **NO TOCAR**: `app/page.tsx`, `lib/auth-context.tsx`
 
 ### App Despachador
@@ -102,6 +103,7 @@ Sin bugs activos. Todos los bugs anteriores fueron corregidos el 30 Mayo 2026:
 | 4 | Deploy Vercel fallando por `middleware.ts` renombrado | `9845f1e` | ✅ Corregido |
 | 5 | Productos extras no aparecían en detalle de inventario guardado | `2e29efd` | ✅ Corregido |
 | 6 | Portal solo abría área Encargado — emails hardcodeados en LoginForm | `fbb9a7b` | ✅ Corregido |
+| 7 | Admin con role="encargado" en Firestore no podía acceder al Hub | `ca23aef` | ✅ Endpoint /api/admin-setup |
 
 ---
 
