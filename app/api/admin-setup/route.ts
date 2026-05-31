@@ -87,23 +87,50 @@ async function upsertFirestoreDoc(uid: string, email: string, role: string, nomb
   return r.ok ? null : await r.text();
 }
 
-export async function POST(req: NextRequest) {
-  // Verificar token de autorización
+function authHeader(req: NextRequest): boolean {
   const token = req.headers.get("x-setup-token");
-  if (!token || token !== process.env.SETUP_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  return token === process.env.SETUP_SECRET;
+}
 
-  let body: { email?: string; role?: string; nombre?: string };
+// GET — lista todos los usuarios en Firestore (diagnóstico)
+export async function GET(req: NextRequest) {
+  if (!authHeader(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  try {
+    const idToken = await getAdminToken();
+    if (!idToken) return NextResponse.json({ error: "Admin auth failed" }, { status: 500 });
+
+    const r = await fetch(`${FS_URL}/usuarios`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+    const data = await r.json() as { documents?: Array<{ name: string; fields: Record<string, { stringValue?: string; booleanValue?: boolean }> }> };
+    const users = (data.documents ?? []).map(d => ({
+      uid:    d.name.split("/").pop(),
+      email:  d.fields.email?.stringValue,
+      nombre: d.fields.nombre?.stringValue,
+      role:   d.fields.role?.stringValue,
+      activo: d.fields.activo?.booleanValue,
+    }));
+    return NextResponse.json({ count: users.length, users });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Error" }, { status: 500 });
+  }
+}
+
+// POST — actualizar rol de un usuario (por uid directo o por email en Firestore)
+export async function POST(req: NextRequest) {
+  if (!authHeader(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  let body: { email?: string; uid?: string; role?: string; nombre?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { email, role, nombre } = body;
-  if (!email || !role) {
-    return NextResponse.json({ error: "Se requieren email y role" }, { status: 400 });
+  const { email, uid: uidDirecto, role, nombre } = body;
+  if ((!email && !uidDirecto) || !role) {
+    return NextResponse.json({ error: "Se requieren (email o uid) y role" }, { status: 400 });
   }
   const validRoles = ["admin", "despachador", "encargado", "chofer"];
   if (!validRoles.includes(role)) {
@@ -113,37 +140,33 @@ export async function POST(req: NextRequest) {
   try {
     const idToken = await getAdminToken();
     if (!idToken) {
-      return NextResponse.json({
-        error: "No se pudo autenticar admin@polarbreeze.com. Verifica ADMIN_PASSWORD en Vercel.",
-      }, { status: 500 });
+      return NextResponse.json({ error: "Admin auth failed. Verifica ADMIN_PASSWORD en Vercel." }, { status: 500 });
     }
 
-    const uid = await getUidByEmail(email, idToken);
-    if (!uid) {
-      return NextResponse.json({
-        error: `Usuario ${email} no encontrado en Firebase Auth. Créalo primero en GestionUsuarios o Firebase Console.`,
-      }, { status: 404 });
+    // Resolver UID: usar el directo si fue proporcionado, si no buscar por email en Firestore
+    let uid = uidDirecto ?? null;
+    if (!uid && email) {
+      uid = await getUidByEmail(email, idToken);
+      if (!uid) {
+        return NextResponse.json({
+          error: `No se encontró documento en Firestore con email="${email}". Usa GET /api/admin-setup para listar usuarios y obtener el uid correcto, o pasa uid directamente.`,
+        }, { status: 404 });
+      }
     }
 
-    const err = await upsertFirestoreDoc(uid, email, role, nombre ?? email.split("@")[0], idToken);
+    const emailFinal = email ?? `${uid}@unknown`;
+    const err = await upsertFirestoreDoc(uid!, emailFinal, role, nombre ?? emailFinal.split("@")[0], idToken);
     if (err) {
-      return NextResponse.json({
-        error: "Error al escribir en Firestore. Revisa las reglas de seguridad.",
-        detail: err,
-      }, { status: 500 });
+      return NextResponse.json({ error: "Error al escribir en Firestore.", detail: err }, { status: 500 });
     }
 
     return NextResponse.json({
-      ok:    true,
+      ok:   true,
       uid,
-      email,
       role,
-      msg:   `✅ Documento de ${email} actualizado a role="${role}". El usuario puede iniciar sesión ahora.`,
+      msg:  `✅ role="${role}" aplicado al uid ${uid}. El usuario puede iniciar sesión ahora.`,
     });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Error interno" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Error interno" }, { status: 500 });
   }
 }
