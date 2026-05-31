@@ -7,6 +7,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { PuntoProducto, LoteLoker, toProductoId } from "@/lib/types";
+import CameraScanner from "@/components/shared/CameraScanner";
 
 interface ProductoLote {
   nombre:        string;
@@ -38,8 +39,10 @@ export default function RegistroLote() {
   const [waNum,       setWaNum]       = useState("");
 
   // Escáner de factura
-  const [showScanner, setShowScanner] = useState(false);
-  const [scanFocused, setScanFocused] = useState(false);
+  const [showScanner,  setShowScanner]  = useState(false);
+  const [scanFocused,  setScanFocused]  = useState(false);
+  const [scanValue,    setScanValue]    = useState("");
+  const [showCamera,   setShowCamera]   = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
 
   // Dropdown de búsqueda de productos
@@ -90,19 +93,29 @@ export default function RegistroLote() {
     return () => document.removeEventListener("mousedown", handler);
   }, [showDrop, selProd]);
 
-  // Auto-enfocar el input del escáner al abrir el panel
+  // Al abrir el escáner: limpiar valor anterior y enfocar
   useEffect(() => {
-    if (showScanner) setTimeout(() => scanRef.current?.focus(), 50);
+    if (showScanner) {
+      setScanValue("");
+      setTimeout(() => scanRef.current?.focus(), 80);
+    }
   }, [showScanner]);
 
   function handleScanKey(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
-      const val = (e.currentTarget as HTMLInputElement).value.trim();
+      const val = scanValue.trim();
       if (val) {
         setFactNum(val);
+        setScanValue("");
         setShowScanner(false);
       }
     }
+  }
+
+  function handleCameraResult(code: string) {
+    setFactNum(code);
+    setShowCamera(false);
+    setShowScanner(false);
   }
 
   function selectProd(nombre: string) {
@@ -221,6 +234,15 @@ export default function RegistroLote() {
   return (
     <div className="space-y-4 max-w-lg mx-auto">
 
+      {/* Escáner por cámara */}
+      {showCamera && (
+        <CameraScanner
+          title="Escanear Nº Factura"
+          onResult={handleCameraResult}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
 
         {/* ── Header con botón escáner ── */}
@@ -255,26 +277,40 @@ export default function RegistroLote() {
                   {scanFocused ? "Listo ●" : "Sin foco"}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowScanner(false)}
-                className="text-xs text-emerald-600 hover:text-emerald-800 font-semibold px-2 py-1 rounded"
-              >
-                ✕ Cerrar
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowCamera(true)}
+                  title="Escanear con cámara"
+                  className="text-xs bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white
+                    px-2.5 py-1 rounded-lg transition-all font-medium"
+                >
+                  📷 Cámara
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowScanner(false)}
+                  className="text-xs text-emerald-600 hover:text-emerald-800 font-semibold px-2 py-1 rounded"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <input
               ref={scanRef}
+              value={scanValue}
+              onChange={(e) => setScanValue(e.target.value)}
               onFocus={() => setScanFocused(true)}
               onBlur={() => setScanFocused(false)}
               onKeyDown={handleScanKey}
-              defaultValue=""
-              placeholder="Apunta el escáner a la factura o escribe el número…"
+              placeholder="Apunta el escáner HID o escribe el número…"
+              autoComplete="off"
+              spellCheck={false}
               className="w-full border border-emerald-300 rounded-lg px-3 py-2 text-sm
                 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white font-mono"
             />
             <p className="text-xs text-emerald-600">
-              Presiona <kbd className="bg-emerald-100 px-1 rounded text-xs font-mono">Enter</kbd> para copiar el número al campo Nº Factura.
+              Escáner HID: apunta y presiona el gatillo · Cámara: toca 📷 para usar la cámara del dispositivo.
             </p>
           </div>
         )}

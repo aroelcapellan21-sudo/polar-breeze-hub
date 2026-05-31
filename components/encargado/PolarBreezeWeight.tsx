@@ -25,6 +25,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { CodigoCaja, WeightItem, LoteWeight, toDate } from "@/lib/types";
+import CameraScanner from "@/components/shared/CameraScanner";
 
 // ─── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -76,6 +77,8 @@ export default function PolarBreezeWeight() {
   const [buscando,      setBuscando]      = useState(false);
   const [itemPendiente, setItemPendiente] = useState<ItemPendiente | null>(null);
   const [errorCodigo,   setErrorCodigo]   = useState("");
+  const [showCamera,    setShowCamera]    = useState(false);
+  const [inputFocused,  setInputFocused]  = useState(false);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
   // ── Modal nombrar código ──────────────────────────────────────────────────
@@ -399,14 +402,24 @@ export default function PolarBreezeWeight() {
 
           {/* ── Input de escaneo ── */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-4 py-3 bg-[#1A1A1A] flex items-center justify-between">
+            <div className="px-4 py-3 bg-[#1A1A1A] flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-white font-bold text-sm">📷 Escanear código</h2>
-                <p className="text-gray-400 text-xs">Conecta el escáner HID o escribe el código</p>
+                <p className="text-gray-400 text-xs">Escáner HID · cámara · entrada manual</p>
               </div>
-              {buscando && (
-                <span className="text-xs text-[#F5C800] animate-pulse">Buscando…</span>
-              )}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {buscando && (
+                  <span className="text-xs text-[#F5C800] animate-pulse">Buscando…</span>
+                )}
+                <button
+                  onClick={() => setShowCamera(true)}
+                  title="Escanear con cámara"
+                  className="flex items-center gap-1.5 text-xs bg-[#F5C800] text-[#1A1A1A] font-bold
+                    px-3 py-1.5 rounded-lg active:scale-95 transition-all hover:brightness-95"
+                >
+                  📷 Cámara
+                </button>
+              </div>
             </div>
             <div className="h-0.5 flex">
               <div className="flex-1 bg-[#F5C800]" />
@@ -415,36 +428,60 @@ export default function PolarBreezeWeight() {
             </div>
             <div className="p-4">
               <div className="flex gap-2">
-                <input
-                  ref={scanInputRef}
-                  value={codigoInput}
-                  onChange={(e) => setCodigoInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && codigoInput.trim()) {
-                      buscarCodigo(codigoInput);
-                    }
-                  }}
-                  placeholder="Escanea o escribe el código de barras…"
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="flex-1 px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm
-                    outline-none focus:ring-2 focus:ring-[#F5C800] focus:border-[#F5C800]
-                    font-mono tracking-widest bg-gray-50"
-                />
-                <button
-                  onClick={() => codigoInput.trim() && buscarCodigo(codigoInput)}
-                  disabled={!codigoInput.trim() || buscando}
-                  className="px-4 py-2.5 bg-[#1A1A1A] text-white rounded-lg text-sm font-bold
-                    active:scale-95 transition-all disabled:opacity-40"
-                >
-                  🔍
-                </button>
+                <div className="flex-1 relative">
+                  <input
+                    ref={scanInputRef}
+                    value={codigoInput}
+                    onChange={(e) => setCodigoInput(e.target.value)}
+                    onFocus={() => setInputFocused(true)}
+                    onBlur={() => setInputFocused(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && codigoInput.trim()) {
+                        buscarCodigo(codigoInput);
+                      }
+                    }}
+                    placeholder="Código de barras o QR…"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className={`w-full px-3 py-2.5 border-2 rounded-lg text-sm
+                      outline-none font-mono tracking-widest bg-gray-50 transition-colors ${
+                      inputFocused
+                        ? "border-[#F5C800]"
+                        : "border-gray-200"
+                    }`}
+                  />
+                  {/* Indicador de foco para HID */}
+                  <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded-full pointer-events-none ${
+                    inputFocused ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                  }`}>
+                    {inputFocused ? "HID ●" : ""}
+                  </span>
+                </div>
+                {!inputFocused && !codigoInput && (
+                  <button
+                    onClick={() => scanInputRef.current?.focus()}
+                    className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg
+                      text-xs font-semibold active:scale-95 transition-all whitespace-nowrap"
+                  >
+                    Activar HID
+                  </button>
+                )}
+                {(codigoInput || inputFocused) && (
+                  <button
+                    onClick={() => codigoInput.trim() && buscarCodigo(codigoInput)}
+                    disabled={!codigoInput.trim() || buscando}
+                    className="px-4 py-2.5 bg-[#1A1A1A] text-white rounded-lg text-sm font-bold
+                      active:scale-95 transition-all disabled:opacity-40"
+                  >
+                    🔍
+                  </button>
+                )}
               </div>
               {errorCodigo && (
                 <p className="text-xs text-red-500 mt-2">{errorCodigo}</p>
               )}
               <p className="text-xs text-gray-400 mt-2">
-                💡 El escáner USB/BT envía el código automáticamente al hacer Enter
+                📷 Cámara: barcode + QR · 🔌 HID: toca &quot;Activar&quot; y apunta el lector
               </p>
             </div>
           </div>
@@ -868,6 +905,20 @@ export default function PolarBreezeWeight() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════
+          MODAL: ESCÁNER POR CÁMARA
+      ═══════════════════════════════════════════════════════════ */}
+      {showCamera && (
+        <CameraScanner
+          title="Escanear código de producto"
+          onResult={(code) => {
+            setShowCamera(false);
+            buscarCodigo(code);
+          }}
+          onClose={() => setShowCamera(false)}
+        />
       )}
 
       {/* ═══════════════════════════════════════════════════════════
