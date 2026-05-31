@@ -41,8 +41,14 @@ async function getAdminToken(): Promise<string | null> {
 // Obtiene un access token de Google usando el service account (bypass reglas Firestore)
 async function getServiceAccountToken(): Promise<string | null> {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const key   = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  let   key   = process.env.GOOGLE_PRIVATE_KEY;
   if (!email || !key) return null;
+
+  // Normalizar la clave: reemplazar \\n literales y asegurar headers PEM
+  key = key.replace(/\\n/g, "\n").replace(/^"|"$/g, "");
+  if (!key.includes("-----BEGIN")) {
+    key = `-----BEGIN PRIVATE KEY-----\n${key}\n-----END PRIVATE KEY-----`;
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const header  = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
@@ -54,10 +60,9 @@ async function getServiceAccountToken(): Promise<string | null> {
     exp:   now + 3600,
   })).toString("base64url");
 
-  const sign = crypto.createSign("RSA-SHA256");
-  sign.update(`${header}.${payload}`);
-  const sig = sign.sign(key, "base64url");
-  const jwt = `${header}.${payload}.${sig}`;
+  const sigBuf = crypto.sign("SHA256", Buffer.from(`${header}.${payload}`), { key, dsaEncoding: "ieee-p1363" });
+  const sig    = sigBuf.toString("base64url");
+  const jwt    = `${header}.${payload}.${sig}`;
 
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -67,7 +72,8 @@ async function getServiceAccountToken(): Promise<string | null> {
       assertion:  jwt,
     }),
   });
-  const data = await r.json() as { access_token?: string };
+  const data = await r.json() as { access_token?: string; error?: string };
+  if (data.error) return null;
   return data.access_token ?? null;
 }
 
