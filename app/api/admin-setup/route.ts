@@ -141,30 +141,44 @@ function authOk(req: NextRequest): boolean {
   return req.headers.get("x-setup-token") === process.env.SETUP_SECRET;
 }
 
-// ─── GET — crea/actualiza documento admin@polarbreeze.com con role="admin" ───
+// ─── GET — diagnóstico + crea doc admin@polarbreeze.com con role="admin" ─────
 
 export async function GET(req: NextRequest) {
   if (!authOk(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const diag: Record<string, unknown> = {};
+
+  // Diagnóstico de la clave
+  const pemRaw = process.env.GOOGLE_PRIVATE_KEY ?? "";
+  const pemNorm = pemRaw.replace(/\\n/g, "\n").replace(/^"|"$/g, "");
+  diag.keyLength     = pemRaw.length;
+  diag.keyNormLength = pemNorm.length;
+  diag.keyHasBegin   = pemNorm.includes("-----BEGIN");
+  diag.keyHasEnd     = pemNorm.includes("-----END");
+  diag.keyFirstChars = pemNorm.slice(0, 27);
+  diag.serviceEmail  = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ? "configurado" : "FALTA";
+  diag.adminPassword = process.env.ADMIN_PASSWORD ? "configurado" : "FALTA";
+
   try {
     const saToken = await getServiceAccountToken();
-    if (!saToken) return NextResponse.json({ error: "Sin service account token. Verifica GOOGLE_SERVICE_ACCOUNT_EMAIL y GOOGLE_PRIVATE_KEY en Vercel." }, { status: 500 });
+    diag.saToken = saToken ? "ok" : "falló";
+    if (!saToken) return NextResponse.json({ error: "Sin service account token.", diag }, { status: 500 });
 
     const idToken = await getAdminIdToken();
-    if (!idToken) return NextResponse.json({ error: "No se pudo autenticar admin@polarbreeze.com. Verifica ADMIN_PASSWORD en Vercel." }, { status: 500 });
+    diag.adminIdToken = idToken ? "ok" : "falló";
+    if (!idToken) return NextResponse.json({ error: "No se pudo autenticar admin@polarbreeze.com.", diag }, { status: 500 });
 
     const uid = uidFromJwt(idToken);
-    if (!uid) return NextResponse.json({ error: "No se pudo extraer UID del JWT" }, { status: 500 });
+    diag.adminUid = uid ?? "no extraído";
+    if (!uid) return NextResponse.json({ error: "No se pudo extraer UID del JWT", diag }, { status: 500 });
 
     const err = await fsSet(saToken, `usuarios/${uid}`, { uid, email: "admin@polarbreeze.com", nombre: "Admin", role: "admin", activo: true });
-    if (err) return NextResponse.json({ error: "Error al escribir en Firestore.", detail: err }, { status: 500 });
+    if (err) return NextResponse.json({ error: "Error Firestore.", detail: err, diag }, { status: 500 });
 
-    return NextResponse.json({
-      ok: true, uid,
-      msg: "✅ Documento admin@polarbreeze.com creado/actualizado con role=admin. Inicia sesión con esa cuenta y ADMIN_PASSWORD.",
-    });
+    return NextResponse.json({ ok: true, uid, diag, msg: "✅ Documento admin@polarbreeze.com actualizado con role=admin." });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Error" }, { status: 500 });
+    diag.exception = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: diag.exception, diag }, { status: 500 });
   }
 }
 
