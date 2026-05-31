@@ -60,8 +60,9 @@ async function getServiceAccountToken(): Promise<string | null> {
     exp:   now + 3600,
   })).toString("base64url");
 
-  const sigBuf = crypto.sign("SHA256", Buffer.from(`${header}.${payload}`), { key, dsaEncoding: "ieee-p1363" });
-  const sig    = sigBuf.toString("base64url");
+  const signer = crypto.createSign("SHA256");
+  signer.update(`${header}.${payload}`);
+  const sig = signer.sign({ key, padding: crypto.constants.RSA_PKCS1_PADDING }, "base64url");
   const jwt    = `${header}.${payload}.${sig}`;
 
   const r = await fetch("https://oauth2.googleapis.com/token", {
