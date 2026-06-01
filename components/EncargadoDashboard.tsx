@@ -154,7 +154,7 @@ export default function EncargadoDashboard() {
             <button
               onClick={logout}
               className="bg-white/15 hover:bg-white/25 active:scale-95 px-2 py-1.5
-                rounded-lg text-xs transition-all font-medium hidden sm:block"
+                rounded-lg text-xs transition-all font-medium"
             >
               Salir
             </button>
