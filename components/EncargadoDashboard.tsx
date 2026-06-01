@@ -13,6 +13,7 @@ import ConsultarTablaModal from "@/components/shared/ConsultarTablaModal";
 import RolePill            from "@/components/shared/RolePill";
 import PWAInstallBanner    from "@/components/shared/PWAInstallBanner";
 import PolarBreezeHTML     from "@/components/encargado/PolarBreezeHTML";
+import BuscadorGlobal      from "@/components/encargado/BuscadorGlobal";
 import AsistenteAI         from "@/components/shared/AsistenteAI";
 import SyncSheetsPanel     from "@/components/shared/SyncSheetsPanel";
 
@@ -26,7 +27,8 @@ export default function EncargadoDashboard() {
 
   const [tab,          setTab]          = useState<Tab>("lote");
   const [movimientos,  setMovimientos]  = useState<MovimientoLoker[]>([]);
-  const [showTablas,   setShowTablas]   = useState(false);
+  const [showTablas,     setShowTablas]     = useState(false);
+  const [showBuscador,   setShowBuscador]   = useState(false);
   const [stockCargado, setStockCargado] = useState(false);
 
   // Badge del tab Choferes — recibe el conteo de ConsultaChoferes
@@ -142,6 +144,14 @@ export default function EncargadoDashboard() {
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              onClick={() => setShowBuscador(true)}
+              title="Buscar en el dashboard"
+              className="bg-white/15 hover:bg-white/25 active:scale-95 w-8 h-8 rounded-lg
+                flex items-center justify-center text-base transition-all"
+            >
+              🔍
+            </button>
             <button
               onClick={() => setShowTablas(true)}
               title="Consultar tablas"
@@ -341,6 +351,14 @@ export default function EncargadoDashboard() {
 
       {/* Modal Tablas */}
       {showTablas && <ConsultarTablaModal onClose={() => setShowTablas(false)} />}
+
+      {/* Buscador global */}
+      {showBuscador && (
+        <BuscadorGlobal
+          onClose={() => setShowBuscador(false)}
+          onNavigate={setTab}
+        />
+      )}
 
       {/* FAB Polar Breeze */}
       <FloatingFAB />
