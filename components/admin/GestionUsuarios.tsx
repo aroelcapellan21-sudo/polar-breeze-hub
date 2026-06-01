@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import PasswordInput from "@/components/shared/PasswordInput";
 import {
   collection, onSnapshot, doc, updateDoc, setDoc,
 } from "firebase/firestore";
@@ -227,8 +228,7 @@ export default function GestionUsuarios() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Contraseña * (mín. 6 caracteres)</label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={form.password}
                   onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))}
                   placeholder="••••••••"

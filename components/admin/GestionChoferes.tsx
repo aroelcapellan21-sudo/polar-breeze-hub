@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import PasswordInput from "@/components/shared/PasswordInput";
 import {
   collection, query, where, onSnapshot,
   doc, setDoc, updateDoc, deleteDoc, getDoc, Timestamp,
@@ -450,8 +451,8 @@ export default function GestionChoferes({ onVerDetalle }: Props) {
           <div className="flex flex-wrap items-end gap-3 max-w-md">
             <div className="flex-1 min-w-48">
               <label className="block text-xs font-medium text-gray-600 mb-1">Contraseña Admin para editar puntos</label>
-              <input
-                type="password" value={puntosPwd}
+              <PasswordInput
+                value={puntosPwd}
                 onChange={(e) => setPuntosPwd(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && puntosPwd && unlockPuntos()}
                 placeholder="Contraseña Admin"

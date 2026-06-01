@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { collection, query, limit, onSnapshot, doc, getDoc, setDoc } from "firebase/firestore";
 import { ShareBar } from "@/components/shared/ShareButtons";
+import PasswordInput from "@/components/shared/PasswordInput";
 import { db } from "@/lib/firebase";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
@@ -227,8 +228,8 @@ export default function StatusDashboard() {
 
           {ownerPwdSet ? (
             <>
-              <input
-                type="password" value={ownerPwd} autoFocus
+              <PasswordInput
+                value={ownerPwd} autoFocus
                 onChange={(e) => setOwnerPwd(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && ownerPwd && verifyOwner()}
                 placeholder="Contraseña del dueño"
@@ -246,14 +247,14 @@ export default function StatusDashboard() {
               <p className="text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
                 Esta clave es <strong>diferente</strong> a la del Admin. Solo el dueño la conoce y puede cambiarla desde aquí.
               </p>
-              <input
-                type="password" value={ownerPwdNew} autoFocus
+              <PasswordInput
+                value={ownerPwdNew} autoFocus
                 onChange={(e) => setOwnerPwdNew(e.target.value)}
                 placeholder="Nueva contraseña del dueño (mín. 4 car.)"
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"
               />
-              <input
-                type="password" value={ownerPwdNew2}
+              <PasswordInput
+                value={ownerPwdNew2}
                 onChange={(e) => setOwnerPwdNew2(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && saveOwnerPassword()}
                 placeholder="Confirmar contraseña"
@@ -374,21 +375,21 @@ export default function StatusDashboard() {
       {ownerChangePw && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-3 max-w-md">
           <p className="font-semibold text-[#1A1A1A] text-sm">🔑 Cambiar contraseña del dueño</p>
-          <input
-            type="password" value={ownerPwd}
+          <PasswordInput
+            value={ownerPwd}
             onChange={(e) => setOwnerPwd(e.target.value)}
             placeholder="Contraseña actual"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"
             autoFocus
           />
-          <input
-            type="password" value={ownerPwdNew}
+          <PasswordInput
+            value={ownerPwdNew}
             onChange={(e) => setOwnerPwdNew(e.target.value)}
             placeholder="Nueva contraseña (mín. 4 car.)"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"
           />
-          <input
-            type="password" value={ownerPwdNew2}
+          <PasswordInput
+            value={ownerPwdNew2}
             onChange={(e) => setOwnerPwdNew2(e.target.value)}
             placeholder="Confirmar nueva contraseña"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"

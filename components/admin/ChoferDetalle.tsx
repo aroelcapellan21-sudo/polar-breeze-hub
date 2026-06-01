@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import PasswordInput from "@/components/shared/PasswordInput";
 import {
   collection, query, where, orderBy, onSnapshot,
   doc, getDoc, setDoc, addDoc, Timestamp,
@@ -1196,8 +1197,8 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
           {invLocked ? (
             <div className="space-y-3 max-w-sm">
               <p className="text-sm text-gray-500">Ingresa tu contraseña Admin para editar el inventario del chofer.</p>
-              <input
-                type="password" value={invPwd} onChange={(e) => setInvPwd(e.target.value)}
+              <PasswordInput
+                value={invPwd} onChange={(e) => setInvPwd(e.target.value)}
                 placeholder="Contraseña Admin"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
               />

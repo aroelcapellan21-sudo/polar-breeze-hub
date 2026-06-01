@@ -5,6 +5,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { reauthenticateWithCredential, EmailAuthProvider, updatePassword } from "firebase/auth";
 import { FsConfig } from "@/lib/types";
+import PasswordInput from "@/components/shared/PasswordInput";
 
 const API_KEY  = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
 const AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
@@ -296,8 +297,7 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
                 </p>
                 {resetLock ? (
                   <>
-                    <input
-                      type="password" value={resetPwd}
+                    <PasswordInput value={resetPwd}
                       onChange={(e) => setResetPwd(e.target.value)}
                       placeholder="Tu contraseña Admin para desbloquear"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
@@ -443,8 +443,7 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
                     </p>
                   </div>
                   <p className="text-sm text-gray-500">Ingresa tu contraseña Admin para ver/editar la config de correo.</p>
-                  <input
-                    type="password" value={correoPwd} onChange={(e) => setCorreoPwd(e.target.value)}
+                  <PasswordInput value={correoPwd} onChange={(e) => setCorreoPwd(e.target.value)}
                     placeholder="Contraseña Admin"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
                   />
@@ -469,8 +468,7 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
                     <label className="block text-xs font-medium text-gray-600 mb-1">
                       Contraseña de Aplicación de Gmail
                     </label>
-                    <input
-                      type="password" value={correoPass} onChange={(e) => setCorreoPass(e.target.value)}
+                    <PasswordInput value={correoPass} onChange={(e) => setCorreoPass(e.target.value)}
                       placeholder="xxxx xxxx xxxx xxxx (nueva = reemplaza)"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
                     />
@@ -519,8 +517,7 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
               {tgLock ? (
                 <div className="space-y-3">
                   <p className="text-sm text-gray-500">Ingresa tu contraseña Admin para ver/editar la config de Telegram.</p>
-                  <input
-                    type="password" value={tgPwd} onChange={(e) => setTgPwd(e.target.value)}
+                  <PasswordInput value={tgPwd} onChange={(e) => setTgPwd(e.target.value)}
                     placeholder="Contraseña Admin"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
                   />
@@ -602,15 +599,15 @@ function Field({ label, value, onChange, placeholder = "", type = "text" }: {
   label: string; value: string; onChange: (v: string) => void;
   placeholder?: string; type?: string;
 }) {
+  const cls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-purple-400";
   return (
     <div>
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
-      <input
-        type={type} value={value} onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800
-          outline-none focus:ring-2 focus:ring-purple-400"
-      />
+      {type === "password" ? (
+        <PasswordInput value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={cls} />
+      ) : (
+        <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={cls} />
+      )}
     </div>
   );
 }

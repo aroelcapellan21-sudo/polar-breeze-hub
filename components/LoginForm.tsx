@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { UserRole } from "@/lib/types";
+import PasswordInput from "@/components/shared/PasswordInput";
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -238,8 +239,7 @@ export default function LoginForm() {
                     <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
                       🔑 Contraseña
                     </label>
-                    <input
-                      type="password"
+                    <PasswordInput
                       value={credentialPwd}
                       onChange={(e) => setCredentialPwd(e.target.value)}
                       required

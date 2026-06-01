@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import PasswordInput from "@/components/shared/PasswordInput";
 import {
   collection, query, where, onSnapshot,
   doc, setDoc, updateDoc, Timestamp, getDocs,
@@ -221,8 +222,7 @@ export default function GestionEncargados() {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Contraseña inicial</label>
-            <input
-              type="password"
+            <PasswordInput
               value={form.password}
               onChange={(e) => setForm(p => ({ ...p, password: e.target.value }))}
               onKeyDown={(e) => e.key === "Enter" && crear()}

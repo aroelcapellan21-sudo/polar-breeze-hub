@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import PasswordInput from "@/components/shared/PasswordInput";
 import {
   collection, getDocs, doc, setDoc, updateDoc, Timestamp, getDoc,
 } from "firebase/firestore";
@@ -393,8 +394,8 @@ export default function DespachadorDashboard() {
                 <strong>El historial en Firebase se conserva.</strong>
               </p>
             </div>
-            <input
-              type="password" value={resetPwd} autoFocus
+            <PasswordInput
+              value={resetPwd} autoFocus
               onChange={(e) => setResetPwd(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && resetPwd && handleReset()}
               placeholder="Clave de Restablecer"
