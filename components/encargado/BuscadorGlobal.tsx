@@ -23,13 +23,35 @@ function norm(s: string): string {
   return (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
+/** Iniciales de las palabras: "Paleta Sandia" → "ps" */
+function iniciales(s: string): string {
+  return norm(s).split(/\s+/).map(w => w[0] ?? "").join("");
+}
+
+/**
+ * Escala de relevancia (mayor = mejor):
+ *  6 — coincidencia exacta
+ *  5 — campo empieza con la consulta
+ *  4 — alguna palabra del campo empieza con la consulta
+ *  3 — campo contiene la consulta como subcadena
+ *  2 — todos los tokens de la consulta aparecen en el campo  (ej: "paleta san")
+ *  2 — la consulta coincide con las iniciales del campo      (ej: "ps" → "Paleta Sandia")
+ *  1 — algún token de la consulta aparece en el campo
+ */
 function puntuar(campo: string, q: string): number {
   const nc = norm(campo), nq = norm(q);
   if (!nq || !nc) return 0;
-  if (nc === nq)                                       return 4;
-  if (nc.startsWith(nq))                               return 3;
-  if (nc.split(/\s+/).some(w => w.startsWith(nq)))     return 2;
-  if (nc.includes(nq))                                 return 1;
+
+  if (nc === nq)                                           return 6;
+  if (nc.startsWith(nq))                                   return 5;
+  if (nc.split(/\s+/).some(w => w.startsWith(nq)))         return 4;
+  if (nc.includes(nq))                                     return 3;
+
+  const tokens = nq.split(/\s+/).filter(Boolean);
+  if (tokens.length > 1 && tokens.every(t => nc.includes(t))) return 2;
+  if (nq.length >= 2 && iniciales(campo).startsWith(nq))   return 2;
+  if (tokens.some(t => nc.includes(t)))                    return 1;
+
   return 0;
 }
 
@@ -96,10 +118,15 @@ export default function BuscadorGlobal({ onClose, onNavigate }: Props) {
     const out: Resultado[] = [];
 
     for (const lote of lotes) {
+      // supercampo: todos los nombres de productos juntos — permite buscar
+      // "paleta helado" y encontrar un lote que tenga ambos productos
+      const superProd = lote.productos.map(p => p.nombre).join(" ");
       const pts = Math.max(
         puntuar(lote.numero, q),
         puntuar(lote.proveedor ?? "", q),
         puntuar(lote.facturaNumero ?? "", q),
+        puntuar(lote.registradoPor, q),
+        puntuar(superProd, q),
         ...lote.productos.map(p => puntuar(p.nombre, q)),
       );
       if (pts > 0) out.push({ tipo: "lote", lote, pts });
