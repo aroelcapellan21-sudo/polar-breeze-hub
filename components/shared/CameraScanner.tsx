@@ -29,7 +29,18 @@ declare global {
   }
 }
 
-// Formatos soportados por la API — barcode + QR
+// Constraints extendidos — focusMode y torch no están en el tipo estándar
+interface ExtendedConstraintSet extends MediaTrackConstraintSet {
+  focusMode?: string;
+  focusDistance?: number;
+  torch?: boolean;
+}
+
+interface ExtendedCapabilities extends MediaTrackCapabilities {
+  focusMode?: string[];
+  torch?: boolean;
+}
+
 const TODOS_FORMATOS = [
   "qr_code", "code_128", "code_39", "code_93", "codabar",
   "ean_13", "ean_8", "upc_a", "upc_e", "itf",
@@ -43,14 +54,52 @@ export default function CameraScanner({ onResult, onClose, title = "Escanear có
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const doneRef   = useRef(false);
-  const [estado,   setEstado]   = useState<Estado>("iniciando");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [estado,        setEstado]        = useState<Estado>("iniciando");
+  const [errorMsg,      setErrorMsg]      = useState("");
+  const [tieneTorch,    setTieneTorch]    = useState(false);
+  const [torchActivo,   setTorchActivo]   = useState(false);
 
   const detener = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
   }, []);
+
+  // ── Aplicar autofocus continuo al track activo ────────────────────────────
+  const aplicarFoco = useCallback(async (track: MediaStreamTrack) => {
+    try {
+      const caps = track.getCapabilities() as ExtendedCapabilities;
+
+      const set: ExtendedConstraintSet = {};
+
+      // Prefiere continuo → si no, macro → si no, lo que haya
+      if (caps.focusMode?.includes("continuous")) {
+        set.focusMode = "continuous";
+      } else if (caps.focusMode?.includes("manual")) {
+        set.focusMode = "manual";
+        // Distancia corta para objetos cercanos (rango 0–1 normalizado)
+        set.focusDistance = 0;
+      }
+
+      if (Object.keys(set).length > 0) {
+        await track.applyConstraints({ advanced: [set as MediaTrackConstraintSet] });
+      }
+
+      // Detectar soporte de linterna
+      if (caps.torch) setTieneTorch(true);
+    } catch { /* silencioso — algunos dispositivos rechazan ciertos modos */ }
+  }, []);
+
+  // ── Toggle linterna ───────────────────────────────────────────────────────
+  const toggleTorch = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const siguiente = !torchActivo;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: siguiente } as MediaTrackConstraintSet] });
+      setTorchActivo(siguiente);
+    } catch { /* linterna no disponible en este momento */ }
+  }, [torchActivo]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -64,24 +113,49 @@ export default function CameraScanner({ onResult, onClose, title = "Escanear có
 
     const init = async () => {
       try {
+        // Formatos soportados
         const soportados = await window.BarcodeDetector!.getSupportedFormats().catch(() => TODOS_FORMATOS);
         const formatos   = TODOS_FORMATOS.filter(f => soportados.includes(f));
         detector = new window.BarcodeDetector!({ formats: formatos.length > 0 ? formatos : TODOS_FORMATOS });
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-        });
+        // ── Solicitar cámara con la mayor resolución posible y autofocus ──
+        const constraints: MediaStreamConstraints = {
+          video: {
+            facingMode: { ideal: "environment" },
+            width:  { ideal: 1920, min: 640 },
+            height: { ideal: 1080, min: 480 },
+            // advanced: focusMode continuo + sin zoom
+            advanced: [
+              { focusMode: "continuous" } as MediaTrackConstraintSet,
+            ],
+          },
+        };
+
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch {
+          // Fallback sin advanced si el navegador rechaza esas constraints
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          });
+        }
+
         streamRef.current = stream;
+
+        // Aplicar autofocus al track activo
+        const track = stream.getVideoTracks()[0];
+        if (track) await aplicarFoco(track);
 
         if (!videoRef.current) return;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         setEstado("activo");
 
-        // Escanear cada 250 ms — equilibrio entre velocidad y batería
+        // ── Bucle de escaneo ── espera HAVE_ENOUGH_DATA (readyState 4)
         timerRef.current = setInterval(async () => {
           if (doneRef.current || !videoRef.current) return;
-          if (videoRef.current.readyState < 2) return;
+          if (videoRef.current.readyState < 4) return;   // esperar frame completo
           try {
             const codes = await detector.detect(videoRef.current);
             if (codes.length > 0 && !doneRef.current) {
@@ -91,7 +165,8 @@ export default function CameraScanner({ onResult, onClose, title = "Escanear có
               onClose();
             }
           } catch { /* silencioso */ }
-        }, 250);
+        }, 150); // 150 ms — más rápido que antes (250 ms)
+
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("NotAllowed") || msg.includes("Permission")) {
@@ -105,7 +180,7 @@ export default function CameraScanner({ onResult, onClose, title = "Escanear có
 
     init();
     return detener;
-  }, [detener, onResult, onClose]);
+  }, [detener, aplicarFoco, onResult, onClose]);
 
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col bg-black">
@@ -116,13 +191,30 @@ export default function CameraScanner({ onResult, onClose, title = "Escanear có
           <p className="text-white font-bold text-sm">📷 {title}</p>
           <p className="text-gray-400 text-xs">Apunta al código de barras o QR</p>
         </div>
-        <button
-          onClick={() => { detener(); onClose(); }}
-          className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center
-            text-white text-lg hover:bg-white/20 active:scale-90 transition-all"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Linterna (si el dispositivo la soporta) */}
+          {tieneTorch && (
+            <button
+              onClick={toggleTorch}
+              title={torchActivo ? "Apagar linterna" : "Encender linterna"}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center text-base
+                transition-all active:scale-90 ${
+                torchActivo
+                  ? "bg-[#F5C800] text-[#1A1A1A]"
+                  : "bg-white/10 text-white hover:bg-white/20"
+              }`}
+            >
+              🔦
+            </button>
+          )}
+          <button
+            onClick={() => { detener(); onClose(); }}
+            className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center
+              text-white text-lg hover:bg-white/20 active:scale-90 transition-all"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Banda tricolor */}
@@ -135,7 +227,7 @@ export default function CameraScanner({ onResult, onClose, title = "Escanear có
       {/* Área de cámara / estado */}
       <div className="flex-1 flex items-center justify-center relative overflow-hidden">
 
-        {/* Video (siempre montado, oculto hasta que esté activo) */}
+        {/* Video */}
         <video
           ref={videoRef}
           autoPlay
@@ -146,25 +238,21 @@ export default function CameraScanner({ onResult, onClose, title = "Escanear có
           }`}
         />
 
-        {/* Overlay de guía (solo en estado activo) */}
+        {/* Overlay de guía */}
         {estado === "activo" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            {/* Oscurecer fuera del recuadro */}
             <div className="absolute inset-0 bg-black/40" />
 
             {/* Recuadro de escaneo */}
             <div className="relative w-64 h-64 z-10">
-              <div className="absolute inset-0 rounded-2xl border border-white/20" />
               {/* Esquinas amarillas */}
               <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-[#F5C800] rounded-tl-2xl" />
               <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-[#F5C800] rounded-tr-2xl" />
               <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-[#F5C800] rounded-bl-2xl" />
               <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-[#F5C800] rounded-br-2xl" />
-              {/* Línea de escaneo animada */}
-              <div
-                className="absolute inset-x-4 h-0.5 bg-[#D42B2B] opacity-80 animate-bounce"
-                style={{ top: "50%" }}
-              />
+              {/* Línea de escaneo */}
+              <div className="absolute inset-x-4 h-0.5 bg-[#D42B2B] opacity-80 animate-bounce"
+                style={{ top: "50%" }} />
             </div>
 
             <p className="z-10 mt-6 text-white text-xs font-medium bg-black/60 px-4 py-2 rounded-full">
