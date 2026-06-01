@@ -254,17 +254,30 @@ export default function LoginForm() {
                   <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
                     {isChofer ? "🪪 Número de Ficha" : "🔑 Contraseña"}
                   </label>
-                  <input
-                    type={isChofer ? "text" : "password"}
-                    value={credential}
-                    onChange={(e) => setCredential(e.target.value)}
-                    required
-                    autoFocus
-                    minLength={3}
-                    placeholder={isChofer ? "Ej: 0042" : "••••••••"}
-                    className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none text-gray-800 text-base transition
-                      focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
-                  />
+                  {isChofer ? (
+                    <input
+                      type="text"
+                      value={credential}
+                      onChange={(e) => setCredential(e.target.value)}
+                      required
+                      autoFocus
+                      minLength={3}
+                      placeholder="Ej: 0042"
+                      className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none text-gray-800 text-base transition
+                        focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
+                    />
+                  ) : (
+                    <PasswordInput
+                      value={credential}
+                      onChange={(e) => setCredential(e.target.value)}
+                      required
+                      autoFocus
+                      minLength={3}
+                      placeholder="••••••••"
+                      className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none text-gray-800 text-base transition
+                        focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
+                    />
+                  )}
                   {isChofer && (
                     <p className="text-xs text-gray-400 mt-1.5">
                       Usa el número de ficha que te asignó el admin. Mínimo 3 dígitos.
