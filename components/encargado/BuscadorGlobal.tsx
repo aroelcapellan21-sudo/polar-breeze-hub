@@ -122,6 +122,8 @@ export default function BuscadorGlobal({ onClose, onNavigate }: Props) {
       // "paleta helado" y encontrar un lote que tenga ambos productos
       const superProd = lote.productos.map(p => p.nombre).join(" ");
       const pts = Math.max(
+        // palabras clave de categoría: "lote" o "lotes" devuelve todos
+        puntuar("lote lotes entrada mercancia almacen", q),
         puntuar(lote.numero, q),
         puntuar(lote.proveedor ?? "", q),
         puntuar(lote.facturaNumero ?? "", q),
@@ -133,12 +135,21 @@ export default function BuscadorGlobal({ onClose, onNavigate }: Props) {
     }
 
     for (const item of stockRaw) {
-      const pts = puntuar(item.nombre, q);
+      const pts = Math.max(
+        // "stock", "inventario", "productos" → devuelve todos
+        puntuar("stock inventario productos loker almacen", q),
+        puntuar(item.nombre, q),
+      );
       if (pts > 0) out.push({ tipo: "stock", ...item, pts });
     }
 
     for (const c of choferes) {
-      const pts = Math.max(puntuar(c.nombre ?? "", q), puntuar(c.ficha ?? "", q));
+      const pts = Math.max(
+        // "chofer" o "choferes" → devuelve todos
+        puntuar("chofer choferes conductor ruta", q),
+        puntuar(c.nombre ?? "", q),
+        puntuar(c.ficha ?? "", q),
+      );
       if (pts > 0) out.push({ tipo: "chofer", chofer: c, pts });
     }
 
