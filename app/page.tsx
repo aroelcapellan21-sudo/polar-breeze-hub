@@ -46,7 +46,7 @@ export default function Home() {
 
   if (loading) return <Spinner mensaje="Cargando..." />;
 
-  if (!user || !profile) return <LoginForm />;
+  if (!user || !profile) return <LoginForm modo="admin" />;
 
   // Admin: Hub Admin en "/"
   if (profile.role === "admin") return <AdminDashboard />;

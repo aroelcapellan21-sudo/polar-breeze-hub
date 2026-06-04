@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import DespachadorDashboard from "@/components/DespachadorDashboard";
+import LoginForm from "@/components/LoginForm";
 import PWAServiceWorker from "@/components/shared/PWAServiceWorker";
 
 /** Punto de entrada de la PWA Despachador. Solo accesible para rol=despachador. */
@@ -38,9 +39,7 @@ export default function AppDespachadorPage() {
   }
 
   if (!user || !profile) {
-    // Redirigir al login principal
-    if (typeof window !== "undefined") window.location.href = "/";
-    return null;
+    return <LoginForm modo="despachador" />;
   }
 
   if (profile.role !== "despachador") {

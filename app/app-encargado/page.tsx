@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import EncargadoDashboard from "@/components/EncargadoDashboard";
+import LoginForm from "@/components/LoginForm";
 import PWAServiceWorker from "@/components/shared/PWAServiceWorker";
 
 /** Punto de entrada de la PWA Encargado. Solo accesible para rol=encargado. */
@@ -37,8 +38,7 @@ export default function AppEncargadoPage() {
   }
 
   if (!user || !profile) {
-    if (typeof window !== "undefined") window.location.href = "/";
-    return null;
+    return <LoginForm modo="encargado" />;
   }
 
   if (profile.role !== "encargado") {

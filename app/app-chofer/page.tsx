@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import ChoferDashboard from "@/components/ChoferDashboard";
+import LoginForm from "@/components/LoginForm";
 import PWAServiceWorker from "@/components/shared/PWAServiceWorker";
 
 /** Punto de entrada de la PWA Chofer. Solo accesible para rol=chofer. */
@@ -42,8 +43,7 @@ export default function AppChoferPage() {
   }
 
   if (!user || !profile) {
-    if (typeof window !== "undefined") window.location.href = "/";
-    return null;
+    return <LoginForm modo="chofer" />;
   }
 
   if (profile.role !== "chofer") {

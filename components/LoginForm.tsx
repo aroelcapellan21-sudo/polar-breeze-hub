@@ -58,9 +58,14 @@ const ROLES = [
   },
 ] as const;
 
-export default function LoginForm() {
+interface Props {
+  /** Si se proporciona, pre-selecciona ese rol y oculta el selector de 4 bloques. */
+  modo?: UserRole;
+}
+
+export default function LoginForm({ modo }: Props) {
   const { login, devLogin } = useAuth();
-  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(modo ?? null);
   const [credential,    setCredential]    = useState("");
   const [credentialPwd, setCredentialPwd] = useState("");
   const [error,  setError]  = useState("");
@@ -81,6 +86,9 @@ export default function LoginForm() {
   const isChofer    = selectedRole === "chofer";
   const isEncargado = selectedRole === "encargado";
 
+  // En modo fijo: solo los roles visibles en el selector (sin modo = todos)
+  const rolesVisibles = modo ? ROLES.filter((r) => r.key === modo) : ROLES;
+
   const handleRoleSelect = (role: UserRole) => {
     setSelectedRole(role);
     setCredential("");
@@ -89,9 +97,7 @@ export default function LoginForm() {
   };
 
   const handleDevLogin = (role: UserRole) => {
-    if (devLogin) {
-      devLogin(role);
-    }
+    if (devLogin) devLogin(role);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,6 +127,10 @@ export default function LoginForm() {
     }
   };
 
+  const subtitulo = modo
+    ? `Acceso ${ROLES.find((r) => r.key === modo)?.label ?? modo}`
+    : "¿Quién eres?";
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-cyan-900 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
@@ -133,7 +143,7 @@ export default function LoginForm() {
             <span className="text-4xl relative z-10">🧊</span>
           </div>
           <h1 className="text-white text-2xl font-bold">Polar Breeze Hub</h1>
-          <p className="text-blue-300 text-sm mt-1">¿Quién eres?</p>
+          <p className="text-blue-300 text-sm mt-1">{subtitulo}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl shadow-black/30 p-6">
@@ -149,7 +159,7 @@ export default function LoginForm() {
                 <span className="flex-1 h-px bg-orange-200" />
               </div>
               <div className="space-y-2">
-                {ROLES.map((role) => (
+                {rolesVisibles.map((role) => (
                   <button
                     key={role.key}
                     type="button"
@@ -184,148 +194,153 @@ export default function LoginForm() {
           )}
 
           {/* ── Formulario normal (siempre en prod, toggle en dev) ── */}
-          {(!IS_DEV || showNormalForm) && <>
-
-          {/* Role buttons — mismo tamaño, efecto punch */}
-          <div className="space-y-3 mb-6">
-            {ROLES.map((role) => (
-              <button
-                key={role.key}
-                type="button"
-                onClick={() => handleRoleSelect(role.key)}
-                className={`w-full h-[72px] flex items-center gap-4 px-4 rounded-xl border-2
-                  transition-all duration-100 text-left
-                  active:scale-95 active:brightness-95
-                  ${selectedRole === role.key
-                    ? role.active + " " + role.border.replace("hover:", "")
-                    : "border-gray-200 hover:border-gray-300 bg-white"
-                  }`}
-              >
-                <span className="text-3xl leading-none flex-shrink-0">{role.icon}</span>
-                <div className="flex-1">
-                  <p className={`font-bold text-base tracking-wide ${selectedRole === role.key ? role.text : "text-gray-700"}`}>
-                    {role.label}
-                  </p>
-                  <p className="text-xs text-gray-400">{role.hint}</p>
+          {(!IS_DEV || showNormalForm) && (
+            <>
+              {/* Selector de rol — solo cuando no hay modo fijo */}
+              {!modo && (
+                <div className="space-y-3 mb-6">
+                  {ROLES.map((role) => (
+                    <button
+                      key={role.key}
+                      type="button"
+                      onClick={() => handleRoleSelect(role.key)}
+                      className={`w-full h-[72px] flex items-center gap-4 px-4 rounded-xl border-2
+                        transition-all duration-100 text-left
+                        active:scale-95 active:brightness-95
+                        ${selectedRole === role.key
+                          ? role.active + " " + role.border.replace("hover:", "")
+                          : "border-gray-200 hover:border-gray-300 bg-white"
+                        }`}
+                    >
+                      <span className="text-3xl leading-none flex-shrink-0">{role.icon}</span>
+                      <div className="flex-1">
+                        <p className={`font-bold text-base tracking-wide ${selectedRole === role.key ? role.text : "text-gray-700"}`}>
+                          {role.label}
+                        </p>
+                        <p className="text-xs text-gray-400">{role.hint}</p>
+                      </div>
+                      {selectedRole === role.key && (
+                        <span className={`text-lg ${role.text} flex-shrink-0`}>✓</span>
+                      )}
+                    </button>
+                  ))}
                 </div>
-                {selectedRole === role.key && (
-                  <span className={`text-lg ${role.text} flex-shrink-0`}>✓</span>
-                )}
-              </button>
-            ))}
-          </div>
+              )}
 
-          {/* Password / Ficha field */}
-          {selectedRole && (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {isEncargado ? (
-                <div className="space-y-3">
-                  <div>
-                    <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
-                      📧 Email
-                    </label>
-                    <input
-                      type="email"
-                      value={credential}
-                      onChange={(e) => setCredential(e.target.value)}
-                      required
-                      autoFocus
-                      placeholder="tu@correo.com"
-                      className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none
-                        text-gray-800 text-base transition focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
-                      🔑 Contraseña
-                    </label>
-                    <PasswordInput
-                      value={credentialPwd}
-                      onChange={(e) => setCredentialPwd(e.target.value)}
-                      required
-                      placeholder="••••••••"
-                      className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none
-                        text-gray-800 text-base transition focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
-                    {isChofer ? "🪪 Número de Ficha" : "🔑 Contraseña"}
-                  </label>
-                  {isChofer ? (
-                    <input
-                      type="text"
-                      value={credential}
-                      onChange={(e) => setCredential(e.target.value)}
-                      required
-                      autoFocus
-                      minLength={3}
-                      placeholder="Ej: 0042"
-                      className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none text-gray-800 text-base transition
-                        focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
-                    />
+              {/* Credencial — aparece cuando hay un rol seleccionado */}
+              {selectedRole && (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {isEncargado ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
+                          📧 Email
+                        </label>
+                        <input
+                          type="email"
+                          value={credential}
+                          onChange={(e) => setCredential(e.target.value)}
+                          required
+                          autoFocus
+                          placeholder="tu@correo.com"
+                          className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none
+                            text-gray-800 text-base transition focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
+                          🔑 Contraseña
+                        </label>
+                        <PasswordInput
+                          value={credentialPwd}
+                          onChange={(e) => setCredentialPwd(e.target.value)}
+                          required
+                          placeholder="••••••••"
+                          className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none
+                            text-gray-800 text-base transition focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
+                        />
+                      </div>
+                    </div>
                   ) : (
-                    <PasswordInput
-                      value={credential}
-                      onChange={(e) => setCredential(e.target.value)}
-                      required
-                      autoFocus
-                      minLength={3}
-                      placeholder="••••••••"
-                      className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none text-gray-800 text-base transition
-                        focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
-                    />
+                    <div>
+                      <label className={`block text-sm font-semibold mb-2 ${roleConfig?.text}`}>
+                        {isChofer ? "🪪 Número de Ficha" : "🔑 Contraseña"}
+                      </label>
+                      {isChofer ? (
+                        <input
+                          type="text"
+                          value={credential}
+                          onChange={(e) => setCredential(e.target.value)}
+                          required
+                          autoFocus
+                          minLength={3}
+                          placeholder="Ej: 0042"
+                          className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none text-gray-800 text-base transition
+                            focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
+                        />
+                      ) : (
+                        <PasswordInput
+                          value={credential}
+                          onChange={(e) => setCredential(e.target.value)}
+                          required
+                          autoFocus
+                          minLength={3}
+                          placeholder="••••••••"
+                          className={`w-full px-4 py-3 border-2 border-gray-200 rounded-xl outline-none text-gray-800 text-base transition
+                            focus:ring-2 focus:border-transparent ${roleConfig?.ring}`}
+                        />
+                      )}
+                      {isChofer && (
+                        <p className="text-xs text-gray-400 mt-1.5">
+                          Usa el número de ficha que te asignó el admin. Mínimo 3 dígitos.
+                        </p>
+                      )}
+                    </div>
                   )}
-                  {isChofer && (
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      Usa el número de ficha que te asignó el admin. Mínimo 3 dígitos.
-                    </p>
+
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-2.5 rounded-lg">
+                      {error}
+                    </div>
                   )}
-                </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading || (isEncargado
+                      ? !credential || !credentialPwd || credentialPwd.length < 3
+                      : !credential || credential.length < 3)}
+                    className={`w-full bg-gradient-to-r ${roleConfig?.btn} text-white py-3.5 rounded-xl font-bold text-base
+                      hover:opacity-90 active:scale-95 transition-all duration-100 disabled:opacity-50 shadow-md`}
+                  >
+                    {loading ? "Entrando..." : `Entrar como ${roleConfig?.label}`}
+                  </button>
+
+                  {/* "Cambiar rol" solo en modo libre (sin modo fijo) */}
+                  {!modo && (
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedRole(null); setCredential(""); setError(""); }}
+                      className="w-full text-sm text-gray-400 hover:text-gray-600 active:scale-95
+                        transition-all duration-100 py-1"
+                    >
+                      ← Cambiar rol
+                    </button>
+                  )}
+                </form>
               )}
 
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-2.5 rounded-lg">
-                  {error}
-                </div>
+              {/* Volver al panel dev */}
+              {IS_DEV && showNormalForm && (
+                <button
+                  type="button"
+                  onClick={() => { setShowNormalForm(false); setSelectedRole(modo ?? null); setCredential(""); setError(""); }}
+                  className="w-full mt-3 text-xs text-orange-400 hover:text-orange-600 active:scale-95 transition-all py-1"
+                >
+                  ← Volver a modo desarrollo
+                </button>
               )}
-
-              <button
-                type="submit"
-                disabled={loading || (isEncargado
-                  ? !credential || !credentialPwd || credentialPwd.length < 3
-                  : !credential || credential.length < 3)}
-                className={`w-full bg-gradient-to-r ${roleConfig?.btn} text-white py-3.5 rounded-xl font-bold text-base
-                  hover:opacity-90 active:scale-95 transition-all duration-100 disabled:opacity-50 shadow-md`}
-              >
-                {loading ? "Entrando..." : `Entrar como ${roleConfig?.label}`}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setSelectedRole(null); setCredential(""); setError(""); }}
-                className="w-full text-sm text-gray-400 hover:text-gray-600 active:scale-95
-                  transition-all duration-100 py-1"
-              >
-                ← Cambiar rol
-              </button>
-            </form>
+            </>
           )}
-
-          {/* Volver al panel dev */}
-          {IS_DEV && showNormalForm && (
-            <button
-              type="button"
-              onClick={() => { setShowNormalForm(false); setSelectedRole(null); setCredential(""); setError(""); }}
-              className="w-full mt-3 text-xs text-orange-400 hover:text-orange-600 active:scale-95 transition-all py-1"
-            >
-              ← Volver a modo desarrollo
-            </button>
-          )}
-
-          </> /* fin formulario normal */}
         </div>
 
         <p className="text-center text-blue-400/60 text-xs mt-6">
