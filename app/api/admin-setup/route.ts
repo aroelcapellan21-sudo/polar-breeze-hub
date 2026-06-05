@@ -7,6 +7,10 @@
  * GET  → crea/actualiza documento de admin@polarbreeze.com con role="admin"
  * POST → actualiza role de cualquier usuario por email (busca en Firestore) o uid
  *
+ * Seguridad (Deuda D):
+ *   - ADMIN_SETUP_DISABLED=true en Vercel → 410 Gone; deshabilitar tras bootstrap inicial.
+ *   - Rate limit: 5 intentos / 60 s por IP (in-memory, best-effort en serverless).
+ *
  * Requiere: GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY + SETUP_SECRET en Vercel
  *
  * Ejemplos:
@@ -22,6 +26,30 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+
+// ─── Rate limiter (in-memory, best-effort para serverless) ───────────────────
+const _attempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT  = 5;
+const RATE_WINDOW = 60_000;
+
+function checkRate(ip: string): boolean {
+  const now = Date.now();
+  const e   = _attempts.get(ip);
+  if (!e || now > e.resetAt) { _attempts.set(ip, { count: 1, resetAt: now + RATE_WINDOW }); return true; }
+  if (e.count >= RATE_LIMIT) return false;
+  e.count++;
+  return true;
+}
+
+// ─── Guard combinado: disabled + rate limit ───────────────────────────────────
+function earlyDeny(req: NextRequest): NextResponse | null {
+  if (process.env.ADMIN_SETUP_DISABLED === "true")
+    return NextResponse.json({ error: "Endpoint deshabilitado." }, { status: 410 });
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (!checkRate(ip))
+    return NextResponse.json({ error: "Demasiadas solicitudes. Intenta más tarde." }, { status: 429 });
+  return null;
+}
 
 const FS_URL   = "https://firestore.googleapis.com/v1/projects/polar-breeze/databases/(default)/documents";
 const AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
@@ -144,6 +172,8 @@ function authOk(req: NextRequest): boolean {
 // ─── GET — diagnóstico + crea doc admin@polarbreeze.com con role="admin" ─────
 
 export async function GET(req: NextRequest) {
+  const deny = earlyDeny(req);
+  if (deny) return deny;
   if (!authOk(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const diag: Record<string, unknown> = {};
@@ -185,6 +215,8 @@ export async function GET(req: NextRequest) {
 // ─── POST — actualiza role de cualquier usuario por email o uid ───────────────
 
 export async function POST(req: NextRequest) {
+  const deny = earlyDeny(req);
+  if (deny) return deny;
   if (!authOk(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { email?: string; uid?: string; role?: string; nombre?: string };
