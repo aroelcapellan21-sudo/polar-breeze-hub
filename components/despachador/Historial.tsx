@@ -9,9 +9,9 @@ import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
 
 const TIPO_CFG: Record<string, { icon: string; label: string; color: string }> = {
-  cuarto_frio:    { icon: "🥶", label: "Cuarto Frío",   color: "bg-blue-50   text-blue-700   border-blue-200"   },
-  entrega_chofer: { icon: "🚚", label: "Entrega chofer", color: "bg-cyan-50   text-cyan-700   border-cyan-200"   },
-  despacho:       { icon: "📦", label: "Despacho",       color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  cuarto_frio:    { icon: "🥶", label: "Cuarto Frío",   color: "bg-[#FFF5F5] text-[#D42B2B]  border-[#D42B2B]/30" },
+  entrega_chofer: { icon: "🚚", label: "Entrega chofer", color: "bg-[#F0FBF4] text-[#1E8C3A]  border-[#1E8C3A]/30" },
+  despacho:       { icon: "📦", label: "Despacho",       color: "bg-[#FFFBE6] text-[#1A1A1A]  border-[#F5C800]/40" },
   factura:        { icon: "🧾", label: "Factura",         color: "bg-green-50  text-green-700  border-green-200"  },
 };
 
@@ -145,7 +145,7 @@ export default function Historial() {
                             {cfg.label}
                           </span>
                           {r.choferNombre && (
-                            <span className="text-xs text-cyan-700 font-medium">{r.choferNombre}</span>
+                            <span className="text-xs text-[#1E8C3A] font-medium">{r.choferNombre}</span>
                           )}
                           {r.despachadorNombre && (
                             <span className="text-xs text-gray-400">{r.despachadorNombre}</span>
@@ -194,8 +194,8 @@ function FiltroBtn({ active, onClick, children }: {
       onClick={onClick}
       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
         active
-          ? "bg-blue-600 text-white"
-          : "bg-white text-gray-600 border border-gray-200 hover:border-blue-300"
+          ? "bg-[#D42B2B] text-white"
+          : "bg-white text-gray-600 border border-gray-200 hover:border-[#F5C800]"
       }`}
     >
       {children}

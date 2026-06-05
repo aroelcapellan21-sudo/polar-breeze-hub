@@ -299,7 +299,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
         {/* ── Panel izquierdo: entrada ── */}
         <div className="bg-white rounded-xl shadow-sm p-5 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="font-bold text-blue-700">🥶 Cuarto Frío</h2>
+            <h2 className="font-bold text-[#D42B2B]">🥶 Cuarto Frío</h2>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setScannerActivo((v) => !v)}
@@ -366,7 +366,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                     <select
                       value={manualProd}
                       onChange={(e) => setManualProd(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#F5C800] bg-white"
                     >
                       {catalogo.map((p) => (
                         <option key={p.nombre} value={p.nombre}>{p.nombre}</option>
@@ -383,7 +383,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                         value={manualCajas || ""}
                         onChange={(e) => setManualCajas(Math.max(0, Number(e.target.value)))}
                         placeholder="0"
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-400 text-center"
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#F5C800] text-center"
                       />
                     </div>
                     <div>
@@ -393,7 +393,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                         value={manualUnids || ""}
                         onChange={(e) => setManualUnids(Math.max(0, Number(e.target.value)))}
                         placeholder="0"
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-blue-400 text-center"
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#F5C800] text-center"
                       />
                     </div>
                   </div>
@@ -401,7 +401,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                   <button
                     onClick={addManual}
                     disabled={!manualProd || (manualCajas === 0 && manualUnids === 0)}
-                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-50"
+                    className="w-full py-2.5 bg-[#D42B2B] hover:bg-[#b82424] active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-50"
                   >
                     + Agregar a lista
                   </button>
@@ -461,7 +461,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                 const bgCls =
                   est.estado === "recibido"    ? "bg-green-50 border-green-300" :
                   est.estado === "no_recibido" ? "bg-red-50 border-red-300"    :
-                                                  "bg-blue-100 border-blue-300";
+                                                  "bg-[#FFFBE6] border-[#F5C800]/50";
                 return (
                   <div key={i}>
                     <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-colors duration-200 ${bgCls}`}>
@@ -496,8 +496,8 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                             }}
                             className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all active:scale-95 ${
                               editando === p.nombre
-                                ? "bg-blue-500 text-white shadow-sm"
-                                : "bg-white border border-blue-200 text-blue-500 hover:bg-blue-50"
+                                ? "bg-[#F5C800] text-[#1A1A1A] shadow-sm"
+                                : "bg-white border border-[#F5C800]/40 text-[#D42B2B] hover:bg-[#FFFBE6]"
                             }`}
                             title="Editar cantidad y cajas"
                           >✏️</button>
@@ -572,7 +572,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                               onChange={(e) => setEditCajas(Math.max(0, Number(e.target.value)))}
                               placeholder="0"
                               autoFocus
-                              className="w-full px-2 py-1.5 border border-blue-300 rounded-lg text-xs text-gray-700 outline-none focus:ring-2 focus:ring-blue-300 text-center"
+                              className="w-full px-2 py-1.5 border border-[#F5C800]/50 rounded-lg text-xs text-gray-700 outline-none focus:ring-2 focus:ring-[#F5C800] text-center"
                             />
                           </div>
                           <div className="flex-1">
@@ -583,12 +583,12 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                               onChange={(e) => setEditUnids(Math.max(0, Number(e.target.value)))}
                               onKeyDown={(e) => e.key === "Enter" && confirmarEdicion(p.nombre)}
                               placeholder="0"
-                              className="w-full px-2 py-1.5 border border-blue-300 rounded-lg text-xs text-gray-700 outline-none focus:ring-2 focus:ring-blue-300 text-center"
+                              className="w-full px-2 py-1.5 border border-[#F5C800]/50 rounded-lg text-xs text-gray-700 outline-none focus:ring-2 focus:ring-[#F5C800] text-center"
                             />
                           </div>
                           <button
                             onClick={() => confirmarEdicion(p.nombre)}
-                            className="self-end px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg font-semibold active:scale-95 transition-all whitespace-nowrap"
+                            className="self-end px-3 py-1.5 bg-[#D42B2B] hover:bg-[#b82424] text-white text-xs rounded-lg font-semibold active:scale-95 transition-all whitespace-nowrap"
                           >
                             Guardar
                           </button>
@@ -612,7 +612,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                   placeholder="Ej: 3 cajas de leche sobrantes, falta queso fresco..."
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800
-                    focus:ring-2 focus:ring-blue-400 outline-none resize-none"
+                    focus:ring-2 focus:ring-[#F5C800] outline-none resize-none"
                 />
               </div>
             </>
@@ -630,7 +630,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                 placeholder="Ej: 3 cajas sobrantes de leche..."
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800
-                  focus:ring-2 focus:ring-blue-400 outline-none resize-none"
+                  focus:ring-2 focus:ring-[#F5C800] outline-none resize-none"
               />
             </div>
           )}
@@ -639,7 +639,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
             type="button"
             onClick={guardar}
             disabled={guardando || productos.length === 0}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white
+            className="w-full py-3 bg-[#D42B2B] hover:bg-[#b82424] active:scale-95 text-white
               rounded-xl font-semibold transition-all duration-100 disabled:opacity-50"
           >
             {guardando ? "Guardando sesión..." : "💾 Guardar sesión de cuarto frío"}
@@ -687,7 +687,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                       </p>
                       <p className="text-xs text-gray-400">{h.despachadorNombre}</p>
                     </div>
-                    <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
+                    <span className="text-xs bg-[#FFFBE6] text-[#D42B2B] px-2 py-0.5 rounded-full font-medium">
                       {h.totalUnidades} uds{h.totalCajas ? ` · ${h.totalCajas} caj` : ""}
                     </span>
                   </div>

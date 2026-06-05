@@ -152,7 +152,7 @@ export default function Comparar() {
             <p className="text-xs opacity-75">Entregado</p>
           </div>
           <div className="text-center">
-            <p className={`text-xl font-bold ${totalDiff > 0 ? "text-orange-600" : ""}`}>{totalDiff}</p>
+            <p className={`text-xl font-bold ${totalDiff > 0 ? "text-[#D42B2B]" : ""}`}>{totalDiff}</p>
             <p className="text-xs opacity-75">Diferencia</p>
           </div>
           {session?.fecha && (
@@ -200,7 +200,7 @@ export default function Comparar() {
                 {filas.map((f) => {
                   const icon = Math.abs(f.pct) < 5 ? "✅" : Math.abs(f.pct) < 15 ? "⚠️" : "🚨";
                   const diffClass = f.diferencia > 0
-                    ? "text-orange-500 font-semibold"
+                    ? "text-[#D42B2B] font-semibold"
                     : f.diferencia < 0
                     ? "text-red-500 font-semibold"
                     : "text-gray-400";
@@ -208,7 +208,7 @@ export default function Comparar() {
                   return (
                     <tr key={f.nombre} className="hover:bg-gray-50">
                       <td className="px-4 py-2.5 font-medium text-gray-800">{f.nombre}</td>
-                      <td className="px-4 py-2.5 text-right text-blue-600">{f.cuartoFrio}</td>
+                      <td className="px-4 py-2.5 text-right text-[#D42B2B]">{f.cuartoFrio}</td>
                       <td className="px-4 py-2.5 text-right text-green-600">{f.entregado}</td>
                       <td className={`px-4 py-2.5 text-right ${diffClass}`}>
                         {f.diferencia > 0 ? `+${f.diferencia}` : f.diferencia}
@@ -224,7 +224,7 @@ export default function Comparar() {
                           {Object.entries(f.porChofer).map(([nombre, cant]) => (
                             <span
                               key={nombre}
-                              className="text-xs bg-cyan-50 text-cyan-700 border border-cyan-100
+                              className="text-xs bg-[#F0FBF4] text-[#1E8C3A] border border-[#1E8C3A]/20
                                 px-1.5 py-0.5 rounded-full"
                             >
                               {nombre.split(" ")[0]}: {cant}
@@ -250,7 +250,7 @@ export default function Comparar() {
             return (
               <div key={d.id} className="bg-white rounded-xl shadow-sm p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 bg-cyan-500 rounded-full flex items-center
+                  <div className="w-8 h-8 bg-[#D42B2B] rounded-full flex items-center
                     justify-center text-white font-bold text-sm">
                     {(d.nombre ?? "?").charAt(0).toUpperCase()}
                   </div>

@@ -596,7 +596,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
       <div className="flex justify-end">
         <button
           onClick={() => setShowConfronta(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white rounded-lg text-sm font-medium transition-all duration-100"
+          className="flex items-center gap-2 px-4 py-2 bg-[#D42B2B] hover:bg-[#b82424] active:scale-95 text-white rounded-lg text-sm font-medium transition-all duration-100"
         >
           ⚖️ Confrontar antes de despachar
         </button>
@@ -606,7 +606,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
 
         {/* ── Lista de choferes ── */}
         <div className="bg-white rounded-xl shadow-sm p-5">
-          <h2 className="font-bold text-blue-700 mb-3">
+          <h2 className="font-bold text-[#D42B2B] mb-3">
             👥 Choferes ({choferes.length})
           </h2>
           {choferes.length === 0 ? (
@@ -625,12 +625,12 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                     className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left
                       transition-all duration-100 active:scale-95 ${
                       sel?.uid === c.uid
-                        ? "border-blue-500 bg-blue-50"
+                        ? "border-[#D42B2B] bg-[#FFF5F5]"
                         : "border-gray-100 hover:border-gray-200 bg-white"
                     }`}
                   >
                     <div className="w-9 h-9 rounded-full flex items-center justify-center
-                      text-white font-bold text-sm flex-shrink-0 bg-cyan-500">
+                      text-white font-bold text-sm flex-shrink-0 bg-[#D42B2B]">
                       {c.nombre.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -649,14 +649,14 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
           {/* Lista del día del chofer seleccionado */}
           {sel && selEntregas.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-xs font-semibold text-blue-600 mb-2">
+              <p className="text-xs font-semibold text-[#D42B2B] mb-2">
                 📋 Lista actual — {sel.nombre.split(" ")[0]}
               </p>
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
                 {selEntregas.map((e, i) => (
-                  <button key={i} onClick={() => setChofModal({ type: "entrega", item: e })} className="w-full flex items-center justify-between text-xs px-2 py-1.5 bg-blue-50 rounded-lg active:scale-[0.99] transition-all duration-100 hover:bg-blue-100 text-left">
+                  <button key={i} onClick={() => setChofModal({ type: "entrega", item: e })} className="w-full flex items-center justify-between text-xs px-2 py-1.5 bg-[#FFFBE6] rounded-lg active:scale-[0.99] transition-all duration-100 hover:bg-[#FFF5D6] text-left">
                     <span className="text-gray-700 truncate mr-2">{e.nombre}</span>
-                    <span className="font-semibold text-blue-700 flex-shrink-0">
+                    <span className="font-semibold text-[#D42B2B] flex-shrink-0">
                       {e.cantidad} {e.unidad ?? ""}
                     </span>
                   </button>
@@ -682,7 +682,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
             <>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <h3 className="font-bold text-blue-700">{sel.nombre}</h3>
+                  <h3 className="font-bold text-[#D42B2B]">{sel.nombre}</h3>
                   <p className="text-xs text-gray-400">Ficha {sel.ficha ?? "—"}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -744,7 +744,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                         value={manualProdCh}
                         onChange={(e) => setManualProdCh(e.target.value)}
                         className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm
-                          text-gray-800 outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                          text-gray-800 outline-none focus:ring-2 focus:ring-[#F5C800] bg-white"
                       >
                         {precios.map((p) => {
                           const yaAgregado = productos.some((pr) => pr.nombre === p.nombre);
@@ -778,14 +778,14 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                         onChange={(e) => setManualCantCh(Math.max(1, Number(e.target.value)))}
                         placeholder="0"
                         className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm
-                          text-gray-800 outline-none focus:ring-2 focus:ring-blue-400 text-center"
+                          text-gray-800 outline-none focus:ring-2 focus:ring-[#F5C800] text-center"
                       />
                     </div>
 
                     <button
                       onClick={addManualCh}
                       disabled={!manualProdCh || manualCantCh <= 0}
-                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white
+                      className="w-full py-2.5 bg-[#D42B2B] hover:bg-[#b82424] active:scale-95 text-white
                         rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-50"
                     >
                       + Agregar a lista
@@ -852,7 +852,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                   placeholder="Ej: 2 cajas sobrantes de leche, cliente rechazó queso..."
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm
-                    text-gray-800 focus:ring-2 focus:ring-blue-400 outline-none resize-none"
+                    text-gray-800 focus:ring-2 focus:ring-[#F5C800] outline-none resize-none"
                 />
               </div>
             </>
@@ -908,7 +908,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
             type="button"
             onClick={guardar}
             disabled={guardando || !sel || productos.length === 0}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white
+            className="w-full py-3 bg-[#D42B2B] hover:bg-[#b82424] active:scale-95 text-white
               rounded-xl font-semibold transition-all duration-100 disabled:opacity-50"
           >
             {guardando ? "Verificando stock…" : `💾 Guardar entrega${sel ? ` — ${sel.nombre}` : ""}`}
@@ -921,20 +921,19 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
       </div>
 
       {/* ── Despachos del día ── */}
-      <div className="bg-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-[#F5C800]/30 overflow-hidden">
         <button
           onClick={() => setDespachosAb((v) => !v)}
           className="w-full flex items-center justify-between px-4 py-3
-            bg-gradient-to-r from-indigo-50 to-indigo-100 hover:from-indigo-100
-            hover:to-indigo-200 transition-colors duration-100"
+            bg-[#FFFBE6] hover:bg-[#FFF5D6] transition-colors duration-100"
         >
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-bold text-indigo-800">📋 Despachos del día</span>
-            <span className="text-xs bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full font-bold">
+            <span className="text-sm font-bold text-[#1A1A1A]">📋 Despachos del día</span>
+            <span className="text-xs bg-[#F5C800]/30 text-[#1A1A1A] px-2 py-0.5 rounded-full font-bold">
               {despachosHoy.length} {despachosHoy.length === 1 ? "chofer" : "choferes"}
             </span>
             {totalDiaUnidades > 0 && (
-              <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
+              <span className="text-xs bg-[#F5C800]/20 text-[#1A1A1A] px-2 py-0.5 rounded-full font-medium">
                 {totalDiaUnidades} uds
               </span>
             )}
@@ -944,7 +943,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
               </span>
             )}
           </div>
-          <span className="text-indigo-500 text-sm flex-shrink-0 ml-2">
+          <span className="text-[#1A1A1A]/50 text-sm flex-shrink-0 ml-2">
             {despachosAb ? "▲" : "▼"}
           </span>
         </button>
@@ -963,7 +962,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                   <div key={d.uid} className="px-4 py-3">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center
+                        <div className="w-7 h-7 rounded-full bg-[#D42B2B] flex items-center justify-center
                           text-white text-xs font-bold flex-shrink-0">
                           {d.choferNombre.charAt(0).toUpperCase()}
                         </div>
@@ -973,7 +972,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                        <span className="text-xs bg-[#F5C800]/20 text-[#1A1A1A] px-2 py-0.5 rounded-full font-medium">
                           {d.totalUnidades} uds
                         </span>
                         {d.totalMonto > 0 && (
@@ -988,7 +987,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                         <span key={i} className="inline-flex items-center gap-1 text-xs
                           bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">
                           <span className="text-gray-700">{p.nombre}</span>
-                          <span className="font-bold text-indigo-600">×{p.cantidad}</span>
+                          <span className="font-bold text-[#D42B2B]">×{p.cantidad}</span>
                         </span>
                       ))}
                     </div>
@@ -997,13 +996,13 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
               </div>
 
               {/* Total general */}
-              <div className="px-4 py-3 bg-indigo-50 border-t border-indigo-100
+              <div className="px-4 py-3 bg-[#FFFBE6] border-t border-[#F5C800]/30
                 flex items-center justify-between flex-wrap gap-2">
-                <span className="text-sm font-bold text-indigo-800">
+                <span className="text-sm font-bold text-[#1A1A1A]">
                   Total del día — {despachosHoy.length} {despachosHoy.length === 1 ? "chofer" : "choferes"}
                 </span>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-indigo-700">{totalDiaUnidades} uds</span>
+                  <span className="text-sm font-bold text-[#1A1A1A]">{totalDiaUnidades} uds</span>
                   {totalDiaMonto > 0 && (
                     <span className="text-base font-bold text-green-700">
                       RD${totalDiaMonto.toLocaleString("es-DO")}
@@ -1018,21 +1017,20 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
 
       {/* ── Consignación actual del chofer ── */}
       {sel && (
-        <div className="bg-white rounded-xl shadow-sm border border-cyan-100 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-[#1E8C3A]/20 overflow-hidden">
           <button
             onClick={() => setConsigAbierto((v) => !v)}
             className="w-full flex items-center justify-between px-4 py-3
-              bg-gradient-to-r from-cyan-50 to-cyan-100 hover:from-cyan-100
-              hover:to-cyan-150 transition-colors duration-100"
+              bg-[#F0FBF4] hover:bg-[#E0F5E9] transition-colors duration-100"
           >
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-cyan-800">📦 Consignación actual</span>
-              <span className="text-xs bg-cyan-200 text-cyan-800 px-2 py-0.5 rounded-full font-bold">
+              <span className="text-sm font-bold text-[#1E8C3A]">📦 Consignación actual</span>
+              <span className="text-xs bg-[#1E8C3A]/20 text-[#1E8C3A] px-2 py-0.5 rounded-full font-bold">
                 {consigChofer.reduce((s, p) => s + p.cantidad, 0)} uds
               </span>
-              <span className="text-xs text-cyan-500">{sel.nombre.split(" ")[0]}</span>
+              <span className="text-xs text-[#1E8C3A]/70">{sel.nombre.split(" ")[0]}</span>
             </div>
-            <span className="text-cyan-600 text-sm">{consigAbierto ? "▲" : "▼"}</span>
+            <span className="text-[#1E8C3A] text-sm">{consigAbierto ? "▲" : "▼"}</span>
           </button>
 
           {consigAbierto && (
@@ -1045,11 +1043,11 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                 <div className="space-y-1.5">
                   {consigChofer.map((p) => (
                     <div key={p.nombre}
-                      className="flex items-center justify-between bg-cyan-50
-                        border border-cyan-100 rounded-lg px-3 py-2"
+                      className="flex items-center justify-between bg-[#F0FBF4]
+                        border border-[#1E8C3A]/20 rounded-lg px-3 py-2"
                     >
                       <span className="text-sm text-gray-800 flex-1 truncate mr-2">{p.nombre}</span>
-                      <span className="text-sm font-bold text-cyan-700 flex-shrink-0">{p.cantidad} uds</span>
+                      <span className="text-sm font-bold text-[#1E8C3A] flex-shrink-0">{p.cantidad} uds</span>
                     </div>
                   ))}
                   <p className="text-xs text-gray-400 text-center pt-1">
@@ -1067,15 +1065,15 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
         <div className="space-y-3">
 
           {/* PRODUCTOS RETIRADOS */}
-          <div className="bg-white rounded-xl shadow-sm border border-orange-100">
-            <div className="flex items-center gap-2 px-4 py-3 bg-orange-50 rounded-t-xl flex-wrap">
-              <span className="text-sm font-bold text-orange-700">📦 PRODUCTOS RETIRADOS</span>
+          <div className="bg-white rounded-xl shadow-sm border border-[#D42B2B]/20">
+            <div className="flex items-center gap-2 px-4 py-3 bg-[#FFF5F5] rounded-t-xl flex-wrap">
+              <span className="text-sm font-bold text-[#D42B2B]">📦 PRODUCTOS RETIRADOS</span>
               {retiros.length > 0 && (
-                <span className="bg-orange-200 text-orange-700 text-xs px-1.5 py-0.5 rounded-full font-bold">
+                <span className="bg-[#D42B2B]/20 text-[#D42B2B] text-xs px-1.5 py-0.5 rounded-full font-bold">
                   {retiros.length}
                 </span>
               )}
-              <span className="text-xs text-orange-400 ml-auto">loker sube</span>
+              <span className="text-xs text-[#D42B2B]/60 ml-auto">loker sube</span>
             </div>
             <div className="p-4 space-y-3">
               {retiros.length === 0 ? (
@@ -1083,9 +1081,9 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
               ) : (
                 <div className="space-y-1.5">
                   {retiros.map((r) => (
-                    <button key={r.id} onClick={() => setChofModal({ type: "extra", item: r })} className="w-full flex items-center gap-2 text-sm bg-orange-50 rounded-lg px-3 py-2 active:scale-[0.99] transition-all duration-100 hover:bg-orange-100 text-left">
-                      <span className="font-medium text-orange-800 flex-1 truncate">{r.nombre}</span>
-                      <span className="text-orange-600 font-bold flex-shrink-0">+{r.cantidad}</span>
+                    <button key={r.id} onClick={() => setChofModal({ type: "extra", item: r })} className="w-full flex items-center gap-2 text-sm bg-[#FFF5F5] rounded-lg px-3 py-2 active:scale-[0.99] transition-all duration-100 hover:bg-[#FFE8E8] text-left">
+                      <span className="font-medium text-[#1A1A1A] flex-1 truncate">{r.nombre}</span>
+                      <span className="text-[#D42B2B] font-bold flex-shrink-0">+{r.cantidad}</span>
                       {r.motivo && <span className="text-gray-400 text-xs truncate max-w-[120px]">{r.motivo}</span>}
                     </button>
                   ))}
@@ -1097,7 +1095,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                     <select
                       value={retiroForm.nombre}
                       onChange={(e) => setRetiroForm((f) => ({ ...f, nombre: e.target.value }))}
-                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-300 bg-white"
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#D42B2B]/30 bg-white"
                     >
                       <option value="">Elegir producto…</option>
                       {precios.map((p) => (
@@ -1110,7 +1108,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                       placeholder="Producto"
                       value={retiroForm.nombre}
                       onChange={(e) => setRetiroForm((f) => ({ ...f, nombre: e.target.value }))}
-                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-300"
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#D42B2B]/30"
                     />
                   )}
                   <input
@@ -1118,7 +1116,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                     placeholder="Cant."
                     value={retiroForm.cantidad}
                     onChange={(e) => setRetiroForm((f) => ({ ...f, cantidad: Math.max(1, Number(e.target.value)) }))}
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-300"
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#D42B2B]/30"
                   />
                 </div>
                 <input
@@ -1126,12 +1124,12 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                   placeholder="Motivo del retiro"
                   value={retiroForm.nota}
                   onChange={(e) => setRetiroForm((f) => ({ ...f, nota: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-300"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#D42B2B]/30"
                 />
                 <button
                   onClick={() => guardarExtra("retiro_despacho", retiroForm)}
                   disabled={savingRetiro || !retiroForm.nombre.trim()}
-                  className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-50"
+                  className="w-full py-2.5 bg-[#D42B2B] hover:bg-[#b82424] active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-50"
                 >
                   {savingRetiro ? "Guardando…" : "↩ Registrar retiro"}
                 </button>
@@ -1310,14 +1308,14 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                 const e = chofModal.item;
                 return (
                   <div className="space-y-3">
-                    <div className="bg-blue-50 rounded-xl p-4">
+                    <div className="bg-[#FFFBE6] rounded-xl p-4">
                       <p className="font-bold text-gray-800 text-lg">{e.nombre}</p>
                       <p className="text-sm text-gray-500 mt-1">{sel?.nombre}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-blue-50 rounded-xl p-3 text-center">
-                        <p className="text-2xl font-bold text-blue-700">{e.cantidad}</p>
-                        <p className="text-xs text-blue-500">{e.unidad ?? "unidades"}</p>
+                      <div className="bg-[#FFFBE6] rounded-xl p-3 text-center">
+                        <p className="text-2xl font-bold text-[#D42B2B]">{e.cantidad}</p>
+                        <p className="text-xs text-[#D42B2B]/70">{e.unidad ?? "unidades"}</p>
                       </div>
                       {(e.precio ?? 0) > 0 && (
                         <div className="bg-green-50 rounded-xl p-3 text-center">
@@ -1339,16 +1337,16 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                 const esRetiro = r.categoria === "retiro_despacho";
                 return (
                   <div className="space-y-3">
-                    <div className={`rounded-xl p-4 ${esRetiro ? "bg-orange-50" : r.categoria === "agregado_1" ? "bg-green-50" : "bg-slate-50"}`}>
+                    <div className={`rounded-xl p-4 ${esRetiro ? "bg-[#FFF5F5]" : r.categoria === "agregado_1" ? "bg-green-50" : "bg-slate-50"}`}>
                       <p className="font-bold text-gray-800 text-lg">{r.nombre}</p>
                       <p className="text-sm text-gray-500 mt-1">{sel?.nombre}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className={`rounded-xl p-3 text-center ${esRetiro ? "bg-orange-50" : "bg-gray-50"}`}>
-                        <p className={`text-2xl font-bold ${esRetiro ? "text-orange-700" : "text-gray-700"}`}>
+                      <div className={`rounded-xl p-3 text-center ${esRetiro ? "bg-[#FFF5F5]" : "bg-gray-50"}`}>
+                        <p className={`text-2xl font-bold ${esRetiro ? "text-[#D42B2B]" : "text-gray-700"}`}>
                           {esRetiro ? `+${r.cantidad}` : `×${Math.abs(r.cantidad)}`}
                         </p>
-                        <p className={`text-xs ${esRetiro ? "text-orange-500" : "text-gray-400"}`}>
+                        <p className={`text-xs ${esRetiro ? "text-[#D42B2B]/70" : "text-gray-400"}`}>
                           {esRetiro ? "devuelto al loker" : "despachado del loker"}
                         </p>
                       </div>
@@ -1395,19 +1393,19 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                 <div className="space-y-4">
                   {/* Resumen */}
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-blue-50 rounded-xl p-3 text-center">
-                      <p className="text-xl font-bold text-blue-700">{cuartoFrio.reduce((s, p) => s + (p.cantidad ?? 0), 0)}</p>
-                      <p className="text-xs text-blue-500">Total Cuarto Frío</p>
+                    <div className="bg-[#FFFBE6] rounded-xl p-3 text-center">
+                      <p className="text-xl font-bold text-[#D42B2B]">{cuartoFrio.reduce((s, p) => s + (p.cantidad ?? 0), 0)}</p>
+                      <p className="text-xs text-[#D42B2B]/70">Total Cuarto Frío</p>
                     </div>
                     <div className="bg-green-50 rounded-xl p-3 text-center">
                       <p className="text-xl font-bold text-green-700">{Object.values(entregaMap).reduce((s, v) => s + v, 0)}</p>
                       <p className="text-xs text-green-500">Total Facturas</p>
                     </div>
-                    <div className="bg-orange-50 rounded-xl p-3 text-center">
-                      <p className="text-xl font-bold text-orange-700">
+                    <div className="bg-[#FFF5F5] rounded-xl p-3 text-center">
+                      <p className="text-xl font-bold text-[#D42B2B]">
                         {confrontaFilas.reduce((s, f) => s + f.diff, 0)}
                       </p>
-                      <p className="text-xs text-orange-500">Diferencia neta</p>
+                      <p className="text-xs text-[#D42B2B]/70">Diferencia neta</p>
                     </div>
                   </div>
 
@@ -1430,7 +1428,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
                           return (
                             <tr key={f.nombre} className="hover:bg-gray-50">
                               <td className="px-3 py-2.5 font-medium text-gray-800">{f.nombre}</td>
-                              <td className="px-3 py-2.5 text-right text-blue-600">{f.cf}</td>
+                              <td className="px-3 py-2.5 text-right text-[#D42B2B]">{f.cf}</td>
                               <td className="px-3 py-2.5 text-right text-green-600">{f.entr}</td>
                               <td className={`px-3 py-2.5 text-right font-semibold ${
                                 f.diff > 0 ? "text-yellow-600" : f.diff < 0 ? "text-red-600" : "text-gray-400"

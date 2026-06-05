@@ -41,10 +41,10 @@ export function ImageUploader({ preview, onFile, onClear }: ImageUploaderProps) 
         <div className="flex gap-2">
           {/* Cámara — en móvil abre cámara trasera, en PC abre explorador */}
           <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed
-            border-blue-200 rounded-xl py-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50
+            border-[#F5C800]/40 rounded-xl py-6 cursor-pointer hover:border-[#F5C800] hover:bg-[#FFFBE6]
             active:scale-95 transition-all duration-100">
             <span className="text-2xl mb-1">📷</span>
-            <span className="text-xs font-medium text-blue-600">Cámara</span>
+            <span className="text-xs font-medium text-[#D42B2B]">Cámara</span>
             <input
               type="file"
               accept="image/*"
@@ -55,7 +55,7 @@ export function ImageUploader({ preview, onFile, onClear }: ImageUploaderProps) 
           </label>
           {/* Galería / Archivo */}
           <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed
-            border-gray-200 rounded-xl py-6 cursor-pointer hover:border-blue-400 hover:bg-gray-50
+            border-gray-200 rounded-xl py-6 cursor-pointer hover:border-[#F5C800] hover:bg-gray-50
             active:scale-95 transition-all duration-100">
             <span className="text-2xl mb-1">📁</span>
             <span className="text-xs font-medium text-gray-500">Galería / Archivo</span>
@@ -121,7 +121,7 @@ export function ProductTable({ productos, onChange, showVisto = false, showPreci
                       value={p.nombre}
                       onChange={(e) => update(i, "nombre", e.target.value)}
                       className="w-full px-2 py-1 border border-gray-200 rounded text-gray-800
-                        focus:ring-1 focus:ring-blue-400 outline-none text-sm"
+                        focus:ring-1 focus:ring-[#F5C800] outline-none text-sm"
                       placeholder="Producto"
                     />
                   </td>
@@ -131,7 +131,7 @@ export function ProductTable({ productos, onChange, showVisto = false, showPreci
                       value={p.cantidad}
                       onChange={(e) => update(i, "cantidad", Number(e.target.value))}
                       className="w-full px-2 py-1 border border-gray-200 rounded text-gray-800
-                        focus:ring-1 focus:ring-blue-400 outline-none text-sm text-right"
+                        focus:ring-1 focus:ring-[#F5C800] outline-none text-sm text-right"
                     />
                   </td>
                   <td className="py-1 pr-2">
@@ -139,7 +139,7 @@ export function ProductTable({ productos, onChange, showVisto = false, showPreci
                       value={p.unidad ?? "cajas"}
                       onChange={(e) => update(i, "unidad", e.target.value)}
                       className="w-full px-2 py-1 border border-gray-200 rounded text-gray-700
-                        focus:ring-1 focus:ring-blue-400 outline-none text-xs"
+                        focus:ring-1 focus:ring-[#F5C800] outline-none text-xs"
                     >
                       {["cajas","bultos","piezas","kg","litros","unidades"].map((u) => (
                         <option key={u}>{u}</option>
@@ -153,7 +153,7 @@ export function ProductTable({ productos, onChange, showVisto = false, showPreci
                         value={p.precio ?? ""}
                         onChange={(e) => update(i, "precio", e.target.value ? Number(e.target.value) : null)}
                         className="w-full px-2 py-1 border border-gray-200 rounded text-gray-800
-                          focus:ring-1 focus:ring-blue-400 outline-none text-sm text-right"
+                          focus:ring-1 focus:ring-[#F5C800] outline-none text-sm text-right"
                         placeholder="$"
                       />
                     </td>
@@ -196,7 +196,7 @@ export function ProductTable({ productos, onChange, showVisto = false, showPreci
         type="button"
         onClick={add}
         className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-xs
-          text-gray-400 hover:border-blue-300 hover:text-blue-500 active:scale-95
+          text-gray-400 hover:border-[#F5C800] hover:text-[#D42B2B] active:scale-95
           transition-all duration-100"
       >
         + Agregar producto
@@ -220,7 +220,7 @@ export function ModeToggle({
           onClick={() => onChange(m)}
           className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all duration-100 active:scale-95 ${
             mode === m
-              ? "bg-white text-blue-700 shadow-sm"
+              ? "bg-white text-[#D42B2B] shadow-sm"
               : "text-gray-500 hover:text-gray-700"
           }`}
         >
@@ -242,7 +242,7 @@ export function AiButton({
       type="button"
       onClick={onClick}
       disabled={disabled || loading}
-      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700
+      className="flex items-center gap-2 px-4 py-2 bg-[#D42B2B] hover:bg-[#b82424]
         active:scale-95 text-white rounded-lg text-sm font-medium transition-all
         duration-100 disabled:opacity-50"
     >
@@ -285,7 +285,7 @@ export function ProgressSteps({
           <div key={i} className="flex items-center gap-1 flex-shrink-0">
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
               done   ? "bg-green-100 text-green-700 border border-green-200" :
-              active ? "bg-blue-100  text-blue-700  border border-blue-300 ring-1 ring-blue-300" :
+              active ? "bg-[#FFFBE6] text-[#1A1A1A] border border-[#F5C800] ring-1 ring-[#F5C800]" :
                        "bg-gray-100  text-gray-400  border border-gray-200"
             }`}>
               <span>{done ? "✓" : i + 1}</span>

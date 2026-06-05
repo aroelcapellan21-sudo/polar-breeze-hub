@@ -617,7 +617,7 @@ export default function InformeCierre() {
                   {sobrantesTotal.map((r) => (
                     <tr key={r.producto} className="hover:bg-gray-50/50">
                       <td className="px-3 py-2 font-medium text-gray-700">{r.producto}</td>
-                      <td className="px-3 py-2 text-right text-blue-700 font-semibold">+{r.cantidad}</td>
+                      <td className="px-3 py-2 text-right text-[#D42B2B] font-semibold">+{r.cantidad}</td>
                       <td className="px-3 py-2 text-gray-400">{r.fuente}</td>
                     </tr>
                   ))}
@@ -641,7 +641,7 @@ export default function InformeCierre() {
         badgeColor="cyan"
       >
         <div className="p-3 space-y-2">
-          <p className="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+          <p className="text-xs text-[#1A1A1A] bg-[#FFFBE6] border border-[#F5C800]/30 rounded-lg px-3 py-2">
             📌 Estos productos suman al reporte de despacho del siguiente día.
           </p>
 
@@ -716,7 +716,7 @@ export default function InformeCierre() {
                     transition-colors text-left"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-cyan-500 rounded-full flex items-center justify-center
+                    <div className="w-8 h-8 bg-[#D42B2B] rounded-full flex items-center justify-center
                       text-white font-bold text-sm flex-shrink-0">
                       {ch.nombre.charAt(0).toUpperCase()}
                     </div>
@@ -739,14 +739,14 @@ export default function InformeCierre() {
                   <div className="px-4 pb-4 space-y-4">
 
                     {/* Productos retirados (auto) */}
-                    <SubSeccion titulo="Productos Retirados" color="blue">
+                    <SubSeccion titulo="Productos Retirados" color="gray">
                       {ch.retirados.length === 0 ? (
                         <p className="text-xs text-gray-400 px-3 py-2">Sin productos</p>
                       ) : (
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs">
                             <thead>
-                              <tr className="bg-blue-50 text-blue-700">
+                              <tr className="bg-[#FFFBE6] text-[#1A1A1A]">
                                 <th className="text-left px-3 py-1.5 font-medium">Producto</th>
                                 <th className="text-right px-3 py-1.5 font-medium">Cant.</th>
                                 <th className="text-left px-3 py-1.5 font-medium">Unidad</th>
@@ -754,9 +754,9 @@ export default function InformeCierre() {
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                               {ch.retirados.map((p, i) => (
-                                <tr key={i} className="hover:bg-blue-50/30">
+                                <tr key={i} className="hover:bg-[#FFFBE6]/30">
                                   <td className="px-3 py-1.5 text-gray-700">{p.nombre}</td>
-                                  <td className="px-3 py-1.5 text-right font-semibold text-blue-700">{p.cantidad ?? 0}</td>
+                                  <td className="px-3 py-1.5 text-right font-semibold text-[#D42B2B]">{p.cantidad ?? 0}</td>
                                   <td className="px-3 py-1.5 text-gray-400">{p.unidad ?? ""}</td>
                                 </tr>
                               ))}
@@ -916,9 +916,9 @@ function SeccionTabla({
 }) {
   const badgeBg = {
     red:    "bg-red-100 text-red-700 border-red-200",
-    orange: "bg-orange-100 text-orange-700 border-orange-200",
-    blue:   "bg-blue-100 text-blue-700 border-blue-200",
-    cyan:   "bg-cyan-100 text-cyan-700 border-cyan-200",
+    orange: "bg-[#FFF5F5] text-[#D42B2B] border-[#D42B2B]/30",
+    blue:   "bg-[#FFFBE6] text-[#1A1A1A] border-[#F5C800]/40",
+    cyan:   "bg-[#F0FBF4] text-[#1E8C3A] border-[#1E8C3A]/30",
   }[badgeColor];
 
   return (
@@ -950,7 +950,7 @@ function SubSeccion({
   children: React.ReactNode;
 }) {
   const hdr = {
-    blue:  "bg-blue-50 text-blue-700 border-blue-100",
+    blue:  "bg-[#FFFBE6] text-[#1A1A1A] border-[#F5C800]/30",
     green: "bg-green-50 text-green-700 border-green-100",
     gray:  "bg-gray-50 text-gray-600 border-gray-200",
     red:   "bg-red-50 text-red-700 border-red-100",
@@ -966,11 +966,11 @@ function SubSeccion({
 
 // Estilos comunes reutilizables
 const inputCls = `w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs
-  focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-800
+  focus:outline-none focus:ring-1 focus:ring-[#F5C800] text-gray-800
   disabled:bg-gray-50 disabled:text-gray-400 placeholder:text-gray-300`;
 
 const btnRemCls = `w-7 h-7 flex items-center justify-center text-gray-300 hover:text-red-500
   hover:bg-red-50 rounded-lg text-base transition-colors active:scale-95 flex-shrink-0`;
 
-const btnAddCls = `w-full text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50
-  border border-dashed border-blue-200 rounded-lg py-1.5 transition-colors active:scale-95 font-medium`;
+const btnAddCls = `w-full text-xs text-[#D42B2B] hover:text-[#b82424] hover:bg-[#FFF5F5]
+  border border-dashed border-[#D42B2B]/30 rounded-lg py-1.5 transition-colors active:scale-95 font-medium`;

@@ -295,21 +295,21 @@ export default function DespachadorDashboard() {
       <WelcomeBanner nombre={profile?.nombre ?? ""} area="Despacho" acento="#D42B2B" />
 
       {/* ── Barra de identidad del despachador ── */}
-      <div className={`border-b ${despNombre ? "bg-blue-50 border-blue-100" : "bg-amber-50 border-amber-200"}`}>
+      <div className={`border-b ${despNombre ? "bg-[#FFFBE6] border-[#F5C800]/30" : "bg-[#FFFBE6] border-[#F5C800]/50"}`}>
         <div className="max-w-6xl mx-auto px-4 py-2 flex items-center gap-3">
           <span className="text-xs text-gray-500">Despachando como:</span>
           {despNombre ? (
             <button
               onClick={() => setShowNombreModal(true)}
-              className="flex items-center gap-1.5 text-sm font-semibold text-blue-800 active:scale-95 hover:text-blue-600 transition-all duration-100"
+              className="flex items-center gap-1.5 text-sm font-semibold text-[#1A1A1A] active:scale-95 hover:text-[#D42B2B] transition-all duration-100"
             >
               👤 {despNombre}
-              <span className="text-xs font-normal text-blue-400">cambiar</span>
+              <span className="text-xs font-normal text-[#D42B2B]/60">cambiar</span>
             </button>
           ) : (
             <button
               onClick={() => setShowNombreModal(true)}
-              className="text-xs bg-amber-200 text-amber-800 px-3 py-1 rounded-full active:scale-95 hover:bg-amber-300 transition-all duration-100 font-medium animate-pulse"
+              className="text-xs bg-[#F5C800]/40 text-[#1A1A1A] px-3 py-1 rounded-full active:scale-95 hover:bg-[#F5C800]/60 transition-all duration-100 font-medium animate-pulse"
             >
               ⚠️ ¿Quién despacha hoy? Toca para identificarte
             </button>
@@ -348,12 +348,12 @@ export default function DespachadorDashboard() {
                     onClick={() => selectDespachador(nombre)}
                     className={`w-full text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all duration-100 active:scale-95 ${
                       despNombre === nombre
-                        ? "border-blue-500 bg-blue-50 text-blue-800"
-                        : "border-gray-100 hover:border-blue-200 hover:bg-blue-50"
+                        ? "border-[#D42B2B] bg-[#FFF5F5] text-[#1A1A1A]"
+                        : "border-gray-100 hover:border-[#D42B2B]/30 hover:bg-[#FFF5F5]"
                     }`}
                   >
                     👤 {nombre}
-                    {despNombre === nombre && <span className="ml-2 text-xs text-blue-400">✓ activo</span>}
+                    {despNombre === nombre && <span className="ml-2 text-xs text-[#D42B2B]/60">✓ activo</span>}
                   </button>
                 ))}
               </div>
@@ -368,12 +368,12 @@ export default function DespachadorDashboard() {
                 onChange={(e) => setNombreCustom(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && nombreCustom.trim() && selectDespachador(nombreCustom.trim())}
                 placeholder="Escribir nombre..."
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"
               />
               <button
                 onClick={() => nombreCustom.trim() && selectDespachador(nombreCustom.trim())}
                 disabled={!nombreCustom.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium active:scale-95 disabled:opacity-50 transition-all duration-100"
+                className="px-4 py-2 bg-[#D42B2B] text-white rounded-lg text-sm font-medium active:scale-95 disabled:opacity-50 transition-all duration-100"
               >
                 OK
               </button>
@@ -402,7 +402,7 @@ export default function DespachadorDashboard() {
               onChange={(e) => setResetPwd(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && resetPwd && handleReset()}
               placeholder="Clave de Restablecer"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#F5C800]"
             />
             {resetMsg && (
               <div className={`text-sm px-3 py-2 rounded-lg text-center ${
@@ -424,7 +424,7 @@ export default function DespachadorDashboard() {
               <button
                 onClick={handleReset}
                 disabled={resetLoading || !resetPwd}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm font-bold transition-all duration-100 disabled:opacity-60"
+                className="flex-1 py-2.5 rounded-xl bg-[#D42B2B] hover:bg-[#b82424] active:scale-95 text-white text-sm font-bold transition-all duration-100 disabled:opacity-60"
               >
                 {resetLoading ? "Restableciendo..." : "Restablecer"}
               </button>
