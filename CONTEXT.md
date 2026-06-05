@@ -47,7 +47,7 @@ Cuatro roles:
 | 7 | Admin con role="encargado" en Firestore no podía acceder al Hub | `ca23aef` | ✅ Endpoint /api/admin-setup |
 | 8 | Buscador Encargado no encontraba "lote" ni "inventario" | `b2f8f41` | ✅ (4 Jun 2026) |
 | 9 | FAB imprimía URL/HTML crudo sin estilos Tailwind | `d5626a4` | ✅ (4 Jun 2026) |
-| 10 | Reglas Firestore abiertas — cualquier usuario autenticado leía/escribía todo | pendiente commit | ✅ (5 Jun 2026) — reglas por rol en `firestore.rules` |
+| 10 | Reglas Firestore abiertas — cualquier usuario autenticado leía/escribía todo | `eb9974a` | ✅ (5 Jun 2026) — reglas por rol en `firestore.rules` |
 
 ---
 
