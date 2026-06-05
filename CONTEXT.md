@@ -29,7 +29,6 @@ Cuatro roles:
 
 | # | Asunto | Impacto | Acción |
 |---|--------|---------|--------|
-| A | GOOGLE_PRIVATE_KEY truncada en Vercel (305 chars, falta END marker) | sync-sheets y admin-setup fallan. No se puede activar acceso admin. | Pegar clave RSA completa (~1700 chars) en Vercel como línea única con `\n` literales |
 
 **Historial de bugs ya corregidos:**
 
@@ -48,6 +47,7 @@ Cuatro roles:
 | 11 | PIN 1234 hardcoded en polar-breeze-final.html | pendiente | ✅ (5 Jun 2026) — migración Firebase Auth en 3 fases (postMessage relay + Firestore write + eliminar PIN) |
 | 12 | /api/admin-setup sin rate limit ni deshabilitación | pendiente | ✅ (5 Jun 2026) — 410 si ADMIN_SETUP_DISABLED=true; rate limit 5/60 s por IP |
 | 13 | Telegram webhook sin secret token | pendiente | ✅ (5 Jun 2026) — verifica X-Telegram-Bot-Api-Secret-Token contra TELEGRAM_WEBHOOK_SECRET; fail-safe si no está configurada |
+| 14 | GOOGLE_PRIVATE_KEY truncada en Vercel (305 chars) | — | ✅ (5 Jun 2026) — clave RSA completa pegada manualmente en Vercel |
 
 ---
 
