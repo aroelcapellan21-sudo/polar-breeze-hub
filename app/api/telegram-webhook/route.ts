@@ -4,7 +4,12 @@
  * Receptor de actualizaciones del Bot de Telegram.
  * Comandos: /estado, /choferes, /alertas, /resumen_hoy, /puntos, /ayuda
  *
+ * Seguridad (Deuda E):
+ *   Verifica header X-Telegram-Bot-Api-Secret-Token contra TELEGRAM_WEBHOOK_SECRET.
+ *   Si la variable no está configurada, rechaza todo (fail-safe).
+ *
  * Registrar webhook: GET /api/telegram-webhook?setup=1
+ *   (incluye secret_token automáticamente si TELEGRAM_WEBHOOK_SECRET está definida)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -417,6 +422,13 @@ function esAutorizado(chatId: number): boolean {
 // ─── Handler principal ───────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  // Verificar secret token de Telegram (Deuda E).
+  // Fail-safe: si TELEGRAM_WEBHOOK_SECRET no está configurada, rechazar todo.
+  const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!secret || req.headers.get("x-telegram-bot-api-secret-token") !== secret) {
+    return NextResponse.json({ ok: false }, { status: 401 });
+  }
+
   try {
     const body   = await req.json() as TgUpdate;
     const msg    = body.message;
@@ -469,11 +481,16 @@ export async function GET(req: NextRequest) {
 
   const host    = req.nextUrl.origin;
   const hookUrl = `${host}/api/telegram-webhook`;
-  const res     = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+
+  const webhookBody: Record<string, unknown> = { url: hookUrl, allowed_updates: ["message"] };
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (webhookSecret) webhookBody.secret_token = webhookSecret;
+
+  const res  = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ url: hookUrl, allowed_updates: ["message"] }),
+    body:    JSON.stringify(webhookBody),
   });
   const data = await res.json();
-  return NextResponse.json({ hookUrl, telegram: data });
+  return NextResponse.json({ hookUrl, secretConfigured: !!webhookSecret, telegram: data });
 }
