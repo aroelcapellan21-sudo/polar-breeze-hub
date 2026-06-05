@@ -2,11 +2,52 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Regla global: requiere autenticación para todo ──────────────────────
-    // Sistema interno — todos los usuarios autenticados pueden leer y escribir.
-    // Los roles se validan en el código de la app, no aquí.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    // Lee el rol del usuario autenticado desde Firestore
+    function rol() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role;
     }
+
+    function esAdmin()     { return request.auth != null && rol() == 'admin'; }
+    function esDespacha()  { return request.auth != null && rol() == 'despachador'; }
+    function esEncargado() { return request.auth != null && rol() == 'encargado'; }
+    function esChofer()    { return request.auth != null && rol() == 'chofer'; }
+
+    // ── Admin: acceso total a todas las colecciones ──────────────────────────
+    match /{path=**} {
+      allow read, write: if esAdmin();
+    }
+
+    // ── usuarios ─────────────────────────────────────────────────────────────
+    // Cada usuario lee su propio doc (auth-context necesita leer el rol al iniciar).
+    // Encargado lee todos (BuscadorGlobal busca choferes por nombre/ficha).
+    match /usuarios/{uid} {
+      allow read: if request.auth != null &&
+                     (request.auth.uid == uid || esEncargado());
+    }
+
+    // ── inventarios/{fecha}/choferes/{ficha} ─────────────────────────────────
+    // Encargado: acceso total para registrar y revisar inventarios del día.
+    // Chofer: solo lectura de su propia ficha, verificado por email.
+    match /inventarios/{fecha}/choferes/{ficha} {
+      allow read, write: if esEncargado();
+      allow read:        if esChofer() &&
+                            request.auth.token.email == ficha + '@chofer.polarbreeze.com';
+    }
+
+    // ── Despachador: history · talonario · drivers · movimientos_loker ───────
+    match /history/{id}          { allow read, write: if esDespacha(); }
+    match /talonario/{id}        { allow read, write: if esDespacha(); }
+    match /drivers/{id}          { allow read, write: if esDespacha(); }
+    match /movimientos_loker/{id} {
+      // Despachador registra salidas del día; Encargado gestiona stock del Loker
+      allow read, write: if esDespacha() || esEncargado();
+    }
+
+    // ── Encargado exclusivo: lotes_loker · codigos_cajas · weight_alerts ─────
+    match /lotes_loker/{id}       { allow read, write: if esEncargado(); }
+    match /codigos_cajas/{codigo} { allow read, write: if esEncargado(); }
+    match /weight_alerts/{id}     { allow read, write: if esEncargado(); }
+
+    // Colecciones no listadas (alertas, logs, etc.) → solo Admin vía catch-all
   }
 }
