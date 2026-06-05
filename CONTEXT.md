@@ -1,6 +1,6 @@
 # CONTEXT.md — Polar Breeze Hub
 # Lee esto ANTES de tocar cualquier archivo
-# Actualizado: 30 Mayo 2026
+# Actualizado: 4 Junio 2026
 
 ---
 
@@ -25,14 +25,28 @@ Tres roles operativos:
 
 ## ✅ CONSTRUIDO Y FUNCIONANDO — NO TOCAR SIN AUTORIZACIÓN
 
-### Portal de entrada
+### Portal de entrada y rutas por rol
+- **Arquitectura de particiones**: cada rol tiene su propia ruta y su propio login
 - Login con email/contraseña + Firebase Auth
 - Admin, Despachador y Encargado: campos email + contraseña libres
 - Chofer: número de ficha (construye email como `ficha@chofer.polarbreeze.com`)
 - El rol mostrado siempre viene de Firestore, nunca del selector del portal
-- Redirección automática por rol
 - Si un usuario queda con rol incorrecto en Firestore: usar `POST /api/admin-setup` con header `x-setup-token: SETUP_SECRET` y body `{email, role, nombre}`
-- **NO TOCAR**: `app/page.tsx`, `lib/auth-context.tsx`
+
+**Tabla de rutas y acceso:**
+
+| URL corta | URL PWA | Rol | Login que muestra |
+|-----------|---------|-----|-------------------|
+| `/` | — | admin | Solo login Admin |
+| `/despachador` | `/app-despachador` | despachador | Solo login Despachador |
+| `/encargado` | `/app-encargado` | encargado | Solo login Encargado |
+| `/chofer` | `/app-chofer` | chofer | Solo login Chofer (ficha) |
+
+- Las rutas cortas son redirects 307 en `next.config.ts` → rutas PWA.
+- `LoginForm` acepta prop `modo?: UserRole`: con modo muestra solo el formulario de ese rol, sin el selector de 4 bloques, sin botón "← Cambiar rol".
+- Cada ruta PWA tiene 3 niveles de guard: spinner → redirect si no autenticado → modal "Acceso restringido" si rol incorrecto → dashboard.
+- `app/page.tsx`: si el usuario autenticado no es admin, redirige a su ruta con `window.location.replace`.
+- **NO TOCAR**: `lib/auth-context.tsx`
 
 ### App Despachador
 - 6 tabs: Cuarto Frío, Choferes, Comparar, Historial, Cierre, Anomalías
@@ -46,6 +60,7 @@ Tres roles operativos:
 - Tab Choferes → cierre del día, puntos quincena, inventario despachado
 - Tab Stock → barras de progreso con semáforo de colores
 - Tab Weight → escáner HID + báscula Bluetooth
+- **Buscador global**: busca en `lotes_loker`, `movimientos_loker` (stock), `usuarios` (choferes) e `inventarios/{fecha}/choferes` (últimos 14 días). Sin `orderBy` en la consulta de lotes (evita requisito de índice Firestore compuesto); cada fetch tiene `.catch()` propio.
 - **NO TOCAR SIN AUTORIZACIÓN**: `components/EncargadoDashboard.tsx`
 
 ### Hub Admin
@@ -57,6 +72,7 @@ Tres roles operativos:
 - Tablero de rutas activas por zona
 - Módulo gestión de usuarios (crear, editar, desactivar)
 - En móvil el texto del logo ("Polar Breeze / Admin") está oculto (`hidden sm:block`) para liberar espacio en el header; el botón Salir tiene `flex-shrink-0`
+- **Stock del Loker mejorado**: estado general (chip ✅/⚠️/🚨 + contadores verde/amarillo/rojo) y barras de progreso con semáforo tricolor por producto, idéntico al Encargado. Sección en `components/admin/Inventario.tsx`.
 - **NO TOCAR SIN AUTORIZACIÓN**: `components/AdminDashboard.tsx`
 
 ### Bot Telegram
@@ -80,10 +96,14 @@ Tres roles operativos:
 - **NO TOCAR** la lógica de PIN ni la estructura de datos
 
 ### FAB Flotante
-- Componente: `components/FloatingFAB.tsx`
-- Rojo #D42B2B con pulso, opciones: Imprimir, WhatsApp, PDF
+- Componente: `components/shared/FloatingFAB.tsx`
+- Rojo #D42B2B con pulso, opciones: Imprimir, WhatsApp, PDF, Copiar lista
 - Presente en TODOS los dashboards
 - **NO DUPLICAR** — un solo FAB por pantalla
+- **Impresión**: usa `window.print()` en la página actual (estilos Tailwind intactos). Inyecta `<style id="pb-print-style">` temporal con `@media print` según el modo (factura/tabla/normal); se elimina al cerrar el diálogo (evento `afterprint` + timeout fallback de 8s). El FAB se oculta en impresión vía `.pb-fab-root { display:none }` en `globals.css`.
+- **Excepción**: si hay un modal activo con `getPrintHtml`, abre ventana nueva con HTML propio del modal (comportamiento anterior — solo para modales).
+- **Copiar lista**: copia `document.body.innerText` filtrado (texto visible real).
+- **WhatsApp**: mensaje incluye título + URL de la página actual.
 
 ### Google Sheets
 - Sincronización activa con hoja "Polar Breeze Hub"
@@ -107,17 +127,19 @@ Tres roles operativos:
 
 ## 🔴 BUGS CONOCIDOS AHORA MISMO
 
-Sin bugs activos. Todos los bugs anteriores fueron corregidos el 30 Mayo 2026:
+Sin bugs activos. Historial de correcciones:
 
 | # | Bug | Commit | Estado |
 |---|-----|--------|--------|
-| 1 | Botón Salir no aparecía en móvil en Hub Admin | `d93501c` | ✅ Corregido (fix definitivo) |
+| 1 | Botón Salir no aparecía en móvil en Hub Admin | `d93501c` | ✅ Corregido |
 | 2 | Ver inventario de choferes no funcionaba en desktop | `90d2b39` | ✅ Corregido |
 | 3 | C.Tiene y C.Vendida invertidos en app inventario | `90d2b39` | ✅ Corregido |
 | 4 | Deploy Vercel fallando por `middleware.ts` renombrado | `9845f1e` | ✅ Corregido |
 | 5 | Productos extras no aparecían en detalle de inventario guardado | `2e29efd` | ✅ Corregido |
 | 6 | Portal solo abría área Encargado — emails hardcodeados en LoginForm | `fbb9a7b` | ✅ Corregido |
 | 7 | Admin con role="encargado" en Firestore no podía acceder al Hub | `ca23aef` | ✅ Endpoint /api/admin-setup |
+| 8 | Buscador Encargado no encontraba "lote" ni "inventario" | `b2f8f41` | ✅ Corregido (4 Jun 2026) |
+| 9 | FAB imprimía URL/HTML crudo sin estilos Tailwind | `d5626a4` | ✅ Corregido (4 Jun 2026) |
 
 ---
 
@@ -135,14 +157,18 @@ Firebase Firestore (base de datos)
 └── talonario/{id}
 
 Next.js App Router
-├── app/page.tsx          → Portal entrada (NO TOCAR)
-├── app/api/              → Endpoints API
-├── components/           → Dashboards por rol
-├── components/admin/     → Módulos del Hub Admin
-├── components/encargado/ → Módulos del Encargado
-├── components/shared/    → Componentes compartidos
-├── lib/                  → Firebase, auth, types
-└── public/               → polar-breeze-final.html
+├── app/page.tsx               → Hub Admin "/" (solo admin) + login modo="admin"
+├── app/app-despachador/       → PWA Despachador (guard 3 niveles)
+├── app/app-encargado/         → PWA Encargado   (guard 3 niveles)
+├── app/app-chofer/            → PWA Chofer      (guard 3 niveles) ← nuevo
+├── app/api/                   → Endpoints API
+├── next.config.ts             → Redirects /despachador→/app-despachador, etc.
+├── components/                → Dashboards por rol
+├── components/admin/          → Módulos del Hub Admin
+├── components/encargado/      → Módulos del Encargado (incl. BuscadorGlobal)
+├── components/shared/         → FAB, ErrorBoundary, PWAServiceWorker, etc.
+├── lib/                       → Firebase, auth, types
+└── public/                    → polar-breeze-final.html, icon-chofer.svg ← nuevo
 ```
 
 ---
