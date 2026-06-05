@@ -95,6 +95,21 @@ Tres roles operativos:
 - Cuando hay extras: bloque de subtotales con Subtotal base (verde) · Subtotal extras (rojo) · Total general
 - **NO TOCAR** la lógica de PIN ni la estructura de datos
 
+### WelcomeBanner — Encabezado de bienvenida
+- Componente: `components/shared/WelcomeBanner.tsx`
+- Presente en los 4 dashboards, justo debajo del `<header>` sticky
+- Muestra: "Hola, {nombre real de Firebase} 👋" + badge de área coloreado + hora actual + fecha en español (es-DO)
+- La hora se actualiza cada 60 segundos con `setInterval`
+- Hidratación segura: `ahora = null` en SSR, se inicializa solo en cliente vía `useEffect`
+- Props: `nombre` (string), `area` (string), `acento` (hex del color del badge)
+
+| Dashboard | `area` | `acento` |
+|-----------|--------|----------|
+| Admin | Hub Admin | #F5C800 |
+| Despachador | Despacho | #D42B2B |
+| Encargado | Supervisor | #1E8C3A |
+| Chofer | Ruta del día | #1A1A1A |
+
 ### FAB Flotante
 - Componente: `components/shared/FloatingFAB.tsx`
 - Rojo #D42B2B con pulso, opciones: Imprimir, WhatsApp, PDF, Copiar lista
