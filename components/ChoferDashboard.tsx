@@ -15,6 +15,7 @@ import { ShareBar }          from "@/components/shared/ShareButtons";
 import { useRegisterModal } from "@/components/shared/ModalShareContext";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable, pbQrSection } from "@/lib/print-template";
+import WelcomeBanner from "@/components/shared/WelcomeBanner";
 
 function getTodayStart() {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d;
@@ -415,6 +416,8 @@ export default function ChoferDashboard() {
           </div>
         </div>
       </header>
+
+      <WelcomeBanner nombre={profile?.nombre ?? ""} area="Ruta del día" acento="#1A1A1A" />
 
       <div className="max-w-lg mx-auto px-4 py-5 space-y-4 pb-8">
 

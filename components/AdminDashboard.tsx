@@ -25,6 +25,7 @@ import FloatingFAB           from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 import RolePill              from "@/components/shared/RolePill";
 import AsistenteAI           from "@/components/shared/AsistenteAI";
+import WelcomeBanner         from "@/components/shared/WelcomeBanner";
 
 type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp" | "reportes" | "codigos" | "pwa" | "tiemporeal" | "proyecciones" | "usuarios";
 
@@ -369,6 +370,8 @@ export default function AdminDashboard() {
           </div>
         </div>
       </header>
+
+      <WelcomeBanner nombre={profile?.nombre ?? ""} area="Hub Admin" acento="#F5C800" />
 
       {/* ── Contenido ── */}
       <main className="max-w-7xl mx-auto px-4 py-5">

@@ -19,6 +19,7 @@ import ConsultarTablaModal  from "@/components/shared/ConsultarTablaModal";
 import RolePill             from "@/components/shared/RolePill";
 import PWAInstallBanner     from "@/components/shared/PWAInstallBanner";
 import AsistenteAI          from "@/components/shared/AsistenteAI";
+import WelcomeBanner        from "@/components/shared/WelcomeBanner";
 
 type Tab = "cuartofrio" | "choferes" | "comparar" | "historial" | "cierre" | "anomalias";
 
@@ -290,6 +291,8 @@ export default function DespachadorDashboard() {
           </div>
         </div>
       </header>
+
+      <WelcomeBanner nombre={profile?.nombre ?? ""} area="Despacho" acento="#D42B2B" />
 
       {/* ── Barra de identidad del despachador ── */}
       <div className={`border-b ${despNombre ? "bg-blue-50 border-blue-100" : "bg-amber-50 border-amber-200"}`}>

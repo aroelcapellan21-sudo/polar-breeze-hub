@@ -16,6 +16,7 @@ import PolarBreezeHTML     from "@/components/encargado/PolarBreezeHTML";
 import BuscadorGlobal      from "@/components/encargado/BuscadorGlobal";
 import AsistenteAI         from "@/components/shared/AsistenteAI";
 import SyncSheetsPanel     from "@/components/shared/SyncSheetsPanel";
+import WelcomeBanner       from "@/components/shared/WelcomeBanner";
 
 type Tab = "lote" | "weight" | "stock" | "choferes" | "vista";
 
@@ -240,6 +241,8 @@ export default function EncargadoDashboard() {
           </div>
         </div>
       </header>
+
+      <WelcomeBanner nombre={profile?.nombre ?? ""} area="Supervisor" acento="#1E8C3A" />
 
       {/* ══════════════════════════════════════════
           CONTENIDO
