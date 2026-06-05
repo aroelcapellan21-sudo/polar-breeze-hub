@@ -488,7 +488,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 
 <script>
 const PIN='1234';
-let pinActual='',confirmCb=null,darkMode=false;
+let pinActual='',confirmCb=null,darkMode=false,encargadoNombre='';
 
 // PIN
 function pinPress(n){if(pinActual.length>=4)return;pinActual+=n;pintDots();if(pinActual.length===4)verificarPin();}
@@ -517,7 +517,7 @@ let completados=new Set();
 let inventariosGuardados={};
 const DIAS=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"],MESES=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
-function iniciar(){setHoy();renderListas();renderChoferes();}
+function iniciar(){setHoy();renderListas();renderChoferes();cargarDesdeFirebase(document.getElementById('fechaInput').value);}
 
 function setHoy(){const h=new Date();document.getElementById('fechaInput').value=h.toISOString().split('T')[0];actualizarFechaHeader();}
 function actualizarFechaHeader(){
@@ -770,10 +770,63 @@ function pedirGuardar(){
     document.getElementById('bloqBanner').classList.remove('hidden');
     document.getElementById('turnoNombre').textContent=`✅ ${choferActual.nombre.split(' ')[0]} — Completado`;
     actualizarBtn();renderChoferes();
+    // Fase 2 — persistir en Firebase (fallo silencioso: ya está guardado en memoria)
+    guardarEnFirebase(document.getElementById('fechaInput').value,fichaActual,{...valores},encargadoNombre);
   });
 }
 
 function cerrar(id){document.getElementById(id).classList.add('hidden');}
+
+// ── Firebase REST — Fase 2 (Deuda C) ──────────────────────────────────────
+// Escribe y lee inventarios en Firestore usando el token obtenido en Fase 1.
+// Si no hay token (acceso directo sin dashboard), ambas funciones retornan
+// silenciosamente y el flujo en memoria sigue funcionando como antes.
+const FS='https://firestore.googleapis.com/v1/projects/polar-breeze/databases/(default)/documents';
+
+async function guardarEnFirebase(fecha,ficha,vals,enc){
+  if(!window.pbToken)return;
+  var vf={};
+  Object.keys(vals).forEach(function(k){vf[k]={integerValue:String(vals[k]||0)};});
+  var body={fields:{
+    ficha:{stringValue:String(ficha)},
+    fecha:{stringValue:String(fecha)},
+    guardadoPor:{stringValue:enc||'Encargado'},
+    savedAt:{timestampValue:new Date().toISOString()},
+    valores:{mapValue:{fields:vf}}
+  }};
+  try{
+    await fetch(FS+'/inventarios/'+fecha+'/choferes/'+ficha,{
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+window.pbToken,'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+  }catch(e){/* fallo silencioso — datos ya en memoria */}
+}
+
+async function cargarDesdeFirebase(fecha){
+  if(!window.pbToken)return;
+  try{
+    var res=await fetch(FS+'/inventarios/'+fecha+'/choferes',{
+      headers:{'Authorization':'Bearer '+window.pbToken}
+    });
+    if(!res.ok)return;
+    var data=await res.json();
+    (data.documents||[]).forEach(function(d){
+      var partes=d.name.split('/');
+      var f=partes[partes.length-1];
+      if(!CHOFERES[f])return;
+      var vFields=((d.fields||{}).valores||{}).mapValue?.fields||{};
+      var inv={};
+      Object.keys(vFields).forEach(function(k){
+        var v=vFields[k];
+        inv[k]=parseInt(v.integerValue||v.doubleValue||'0',10);
+      });
+      inventariosGuardados[f]=inv;
+      completados.add(f);
+    });
+    renderChoferes();
+  }catch(e){/* fallo silencioso */}
+}
 
 // ── Relay de sesión Firebase — Fase 1 (Deuda C) ──────────────────────────
 // El componente React padre (PolarBreezeHTML.tsx) envía el ID token de Firebase
@@ -802,6 +855,8 @@ function cerrar(id){document.getElementById(id).classList.add('hidden');}
     if (autenticado) return;
     if (e.origin !== window.location.origin) return;
     if (!e.data || e.data.type !== 'pb-auth') return;
+    window.pbToken = e.data.token || '';
+    encargadoNombre = e.data.nombre || '';
     desbloquearViaToken(e.data.nombre || '');
   });
 })();
