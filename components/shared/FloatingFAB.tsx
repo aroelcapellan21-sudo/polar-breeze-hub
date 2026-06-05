@@ -8,6 +8,11 @@
  *  - Abre abanico: 🖨️ Imprimir · 📲 WhatsApp · 📄 PDF · 📋 Lista
  *  - Imprimir pregunta el modo: Factura | Tabla | Normal
  *  - Se cierra al tocar fuera
+ *
+ * Estrategia de impresión:
+ *  - Contenido normal → window.print() con CSS @media print inyectado
+ *    (conserva todos los estilos Tailwind ya cargados en la página)
+ *  - Modal activo con getPrintHtml → ventana nueva con HTML específico del modal
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -23,9 +28,9 @@ interface Props {
 
 type PrintMode = "factura" | "tabla" | "normal";
 
-// ─── CSS de impresión por modo ────────────────────────────────────────────────
+// ─── CSS de impresión para ventana nueva (modales con HTML propio) ────────────
 
-function buildPrintStyles(mode: PrintMode): string {
+function buildModalPrintCSS(mode: PrintMode): string {
   const base = `
     @page { margin: 10mm; }
     body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; }
@@ -52,7 +57,6 @@ function buildPrintStyles(mode: PrintMode): string {
       tr:nth-child(even) { background: #f9f9f9; }
     `;
   }
-  // normal
   return base + `
     body { color: #000; }
     table { border-collapse: collapse; width: 100%; }
@@ -61,10 +65,11 @@ function buildPrintStyles(mode: PrintMode): string {
   `;
 }
 
-function doPrint(html: string, mode: PrintMode) {
+/** Abre una ventana nueva con HTML propio — usado solo para modales. */
+function doPrintWindow(html: string, mode: PrintMode) {
   const win = window.open("", "_blank");
   if (!win) return;
-  const styles = buildPrintStyles(mode);
+  const styles = buildModalPrintCSS(mode);
   win.document.write(`<!DOCTYPE html><html><head>
     <meta charset="utf-8">
     <title>Polar Breeze — Impresión</title>
@@ -72,6 +77,65 @@ function doPrint(html: string, mode: PrintMode) {
   </head><body>${html}</body></html>`);
   win.document.close();
   win.onload = () => { win.focus(); win.print(); };
+}
+
+// ─── CSS de impresión para la página actual ───────────────────────────────────
+
+function buildPagePrintCSS(mode: PrintMode): string {
+  // Ocultar chrome de UI: FAB, elementos fixed/sticky que no son contenido
+  const base = `
+    @media print {
+      .pb-fab-root { display: none !important; }
+      @page { margin: 12mm; }
+      body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
+  `;
+  if (mode === "tabla") {
+    return base + `
+      @media print {
+        table { border-collapse: collapse !important; width: 100% !important; }
+        th, td { border: 1px solid #666 !important; padding: 4px 8px !important; }
+        th { background: #eee !important; font-weight: bold !important; }
+        tr:nth-child(even) { background: #f9f9f9 !important; }
+      }
+    `;
+  }
+  if (mode === "factura") {
+    return base + `
+      @media print {
+        table { border-collapse: collapse !important; width: 100% !important; }
+        th, td { border: none !important; padding: 3px 6px !important; }
+        th { font-weight: bold !important; border-bottom: 1px solid #000 !important; }
+      }
+    `;
+  }
+  // normal
+  return base + `
+    @media print {
+      img { display: none !important; }
+    }
+  `;
+}
+
+/**
+ * Imprime la página actual con estilos Tailwind intactos.
+ * Inyecta un <style> temporal con reglas @media print para el modo elegido
+ * y lo elimina cuando el diálogo de impresión cierra.
+ */
+function doPrintPage(mode: PrintMode) {
+  document.getElementById("pb-print-style")?.remove();
+
+  const style = document.createElement("style");
+  style.id = "pb-print-style";
+  style.textContent = buildPagePrintCSS(mode);
+  document.head.appendChild(style);
+
+  window.print();
+
+  const cleanup = () => document.getElementById("pb-print-style")?.remove();
+  window.addEventListener("afterprint", cleanup, { once: true });
+  // Fallback: algunos navegadores no disparan afterprint
+  setTimeout(cleanup, 8000);
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -103,37 +167,67 @@ export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
     return () => document.removeEventListener("mousedown", handler);
   }, [open, waOpen, printOpen]);
 
+  /** Texto para WhatsApp / Copiar lista. */
   const activeGetMsg = (): string => {
     if (modalOpen && fnsRef.current?.getMessage) return fnsRef.current.getMessage();
-    return getMessage ? getMessage() : document.title;
+    if (getMessage) return getMessage();
+    return `${document.title}\n${window.location.href}`;
   };
 
-  const activeGetHtml = (): string => {
-    const modalHtml = modalOpen ? fnsRef.current?.getPrintHtml?.() ?? "" : "";
-    return modalHtml || (getPrintHtml ? getPrintHtml() : document.body.innerHTML);
+  /** HTML para imprimir en ventana nueva (solo modales). */
+  const activeGetModalHtml = (): string | null => {
+    if (modalOpen) return fnsRef.current?.getPrintHtml?.() ?? null;
+    if (getPrintHtml) return getPrintHtml();
+    return null;
   };
 
   // ── Acciones ──────────────────────────────────────────────────────────────
+
   const handlePrintMode = (mode: PrintMode) => {
     setPrintOpen(false); setOpen(false);
-    doPrint(activeGetHtml(), mode);
+    const modalHtml = activeGetModalHtml();
+    if (modalHtml) {
+      // Modal activo con HTML específico → ventana nueva
+      doPrintWindow(modalHtml, mode);
+    } else {
+      // Contenido normal → imprimir la página actual (estilos Tailwind intactos)
+      doPrintPage(mode);
+    }
   };
 
   const handlePdf = () => {
     setOpen(false);
-    doPrint(activeGetHtml(), "normal");
+    const modalHtml = activeGetModalHtml();
+    if (modalHtml) {
+      doPrintWindow(modalHtml, "normal");
+    } else {
+      doPrintPage("normal");
+    }
   };
 
   const handleCopyLista = async () => {
     setOpen(false);
-    const text = activeGetMsg();
+    let text: string;
+    if (modalOpen && fnsRef.current?.getMessage) {
+      text = fnsRef.current.getMessage();
+    } else if (getMessage) {
+      text = getMessage();
+    } else {
+      // Capturar el texto visible real de la pantalla, filtrar líneas vacías
+      text = document.body.innerText
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .join("\n");
+    }
     try {
       await navigator.clipboard.writeText(text);
     } catch {
-      // fallback
       const ta = document.createElement("textarea");
-      ta.value = text; document.body.appendChild(ta);
-      ta.select(); document.execCommand("copy");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
       document.body.removeChild(ta);
     }
   };
@@ -154,7 +248,7 @@ export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
     <div
       ref={ref}
       style={{ zIndex: 9999 }}
-      className="fixed bottom-5 right-5 flex flex-col items-end gap-2 select-none"
+      className="pb-fab-root fixed bottom-5 right-5 flex flex-col items-end gap-2 select-none"
     >
 
       {/* ── Modal: selector de modo de impresión ── */}

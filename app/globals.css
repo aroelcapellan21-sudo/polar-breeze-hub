@@ -54,3 +54,8 @@ input, textarea, select {
 /* ── Ocultar scrollbar horizontal en nav de tabs ──────────────────────── */
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Impresión: ocultar UI chrome, mostrar solo el contenido ──────────── */
+@media print {
+  .pb-fab-root { display: none !important; }
+}
