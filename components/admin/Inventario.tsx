@@ -796,73 +796,136 @@ export default function Inventario() {
                 <p className="text-2xl mb-2">📦</p>
                 <p className="text-sm text-gray-400">Sin productos — registra la primera entrada.</p>
               </div>
-            ) : (
-              <div className="divide-y divide-gray-50">
-                {saldoConDetalle.map((p) => {
-                  const negativo    = p.saldo < 0;
-                  const sinStock    = p.saldo === 0;
-                  const hayDesp     = p.despachHoy > 0;
-                  const haySobrante = p.sobranteHoy > 0;
+            ) : (() => {
+              const maxSaldo  = Math.max(...saldoConDetalle.map((p) => p.saldo), 1);
+              const nVerde    = saldoConDetalle.filter((p) => p.saldo > 0 && (p.saldo / maxSaldo) * 100 >= 60).length;
+              const nAmarillo = saldoConDetalle.filter((p) => p.saldo > 0 && (p.saldo / maxSaldo) * 100 < 60).length;
+              const nRojo     = saldoConDetalle.filter((p) => p.saldo <= 0).length;
+              const estadoGeneral = nRojo > 0 ? "crítico" : nAmarillo > 0 ? "atención" : "ok";
 
-                  return (
-                    <button
-                      key={p.pid}
-                      onClick={() => setInvModal({ type: "producto", pid: p.pid, nombre: p.nombre })}
-                      className={`w-full px-4 py-3 transition-colors text-left active:scale-[0.99] hover:bg-gray-50/80 ${negativo ? "bg-red-50/50" : ""}`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        {/* Ícono + nombre */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className={`flex-shrink-0 text-sm ${
-                            negativo ? "text-red-500" : sinStock ? "text-amber-400" : "text-green-500"
-                          }`}>
-                            {negativo ? "🚨" : sinStock ? "⚠️" : "✅"}
-                          </span>
-                          <p className="text-sm font-medium text-gray-800 truncate">{p.nombre}</p>
-                        </div>
-
-                        {/* Stock badge */}
-                        <span className={`flex-shrink-0 text-sm font-bold px-2.5 py-0.5 rounded-full border ${
-                          negativo
-                            ? "bg-red-100 text-red-700 border-red-300"
-                            : sinStock
-                            ? "bg-amber-100 text-amber-600 border-amber-200"
-                            : "bg-green-100 text-green-700 border-green-200"
-                        }`}>
-                          {p.saldo > 0 ? "+" : ""}{p.saldo}
+              return (
+                <>
+                  {/* ── Estado general del loker ── */}
+                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado general</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        estadoGeneral === "ok"       ? "bg-green-100 text-green-700" :
+                        estadoGeneral === "atención" ? "bg-amber-100 text-amber-700" :
+                                                       "bg-red-100 text-red-700"
+                      }`}>
+                        {estadoGeneral === "ok" ? "✅ Todo en orden" : estadoGeneral === "atención" ? "⚠️ Stock bajo" : "🚨 Crítico"}
+                      </span>
+                    </div>
+                    <div className="flex gap-3 text-xs font-semibold">
+                      <span className="flex items-center gap-1.5 text-[#1E8C3A]">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#1E8C3A] flex-shrink-0" />
+                        {nVerde} bien
+                      </span>
+                      {nAmarillo > 0 && (
+                        <span className="flex items-center gap-1.5 text-amber-600">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#F5C800] flex-shrink-0" />
+                          {nAmarillo} bajo
                         </span>
-                      </div>
-
-                      {/* Desglose del día (solo si hubo movimiento hoy) */}
-                      {hayDesp && (
-                        <div className="mt-2 flex gap-2 flex-wrap text-xs">
-                          <span className="flex items-center gap-1 bg-orange-50 text-orange-700
-                            border border-orange-200 px-2 py-0.5 rounded-full">
-                            🚚 {p.despachHoy} despachado
-                          </span>
-                          <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${
-                            haySobrante
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : "bg-gray-50 text-gray-400 border-gray-200"
-                          }`}>
-                            🔄 {haySobrante ? p.sobranteHoy : "—"} sobrante
-                          </span>
-                          {haySobrante && (
-                            <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${
-                              p.vendidoHoy < 0
-                                ? "bg-red-50 text-red-700 border-red-200"
-                                : "bg-green-50 text-green-700 border-green-200"
-                            }`}>
-                              ✅ {p.vendidoHoy < 0 ? "🚨 ERROR" : p.vendidoHoy} vendido
-                            </span>
-                          )}
-                        </div>
                       )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                      {nRojo > 0 && (
+                        <span className="flex items-center gap-1.5 text-[#D42B2B]">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#D42B2B] flex-shrink-0" />
+                          {nRojo} {nRojo === 1 ? "agotado" : "agotados"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ── Lista de productos con barras de progreso ── */}
+                  <div className="divide-y divide-gray-50">
+                    {saldoConDetalle.map((p) => {
+                      const negativo    = p.saldo < 0;
+                      const sinStock    = p.saldo === 0;
+                      const hayDesp     = p.despachHoy > 0;
+                      const haySobrante = p.sobranteHoy > 0;
+                      const pct         = p.saldo <= 0 ? 0 : Math.min((p.saldo / maxSaldo) * 100, 100);
+                      const barColor    = p.saldo <= 0 ? "#D42B2B"
+                                        : pct >= 60   ? "#1E8C3A"
+                                        : pct >= 25   ? "#F5C800"
+                                        :               "#D42B2B";
+
+                      return (
+                        <button
+                          key={p.pid}
+                          onClick={() => setInvModal({ type: "producto", pid: p.pid, nombre: p.nombre })}
+                          className={`w-full px-4 py-3 transition-colors text-left active:scale-[0.99] hover:bg-gray-50/80 ${negativo ? "bg-red-50/40" : ""}`}
+                        >
+                          {/* Fila superior: nombre + badge */}
+                          <div className="flex items-center justify-between gap-3 mb-1.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`flex-shrink-0 text-sm ${
+                                negativo ? "text-red-500" : sinStock ? "text-amber-400" : "text-green-500"
+                              }`}>
+                                {negativo ? "🚨" : sinStock ? "⚠️" : "✅"}
+                              </span>
+                              <p className="text-sm font-medium text-gray-800 truncate">{p.nombre}</p>
+                            </div>
+                            <span className={`flex-shrink-0 text-sm font-bold tabular-nums px-2.5 py-0.5 rounded-full border ${
+                              negativo  ? "bg-red-100 text-red-700 border-red-300" :
+                              sinStock  ? "bg-amber-100 text-amber-600 border-amber-200" :
+                                          "bg-green-100 text-green-700 border-green-200"
+                            }`}>
+                              {p.saldo > 0 ? "+" : ""}{p.saldo} uds
+                            </span>
+                          </div>
+
+                          {/* Barra de progreso con semáforo */}
+                          <div className="h-2 rounded-full overflow-hidden bg-gray-100">
+                            <div
+                              className="h-full rounded-full transition-all duration-700 ease-out"
+                              style={{
+                                width: negativo ? "100%" : `${Math.max(pct, sinStock ? 0 : 2)}%`,
+                                background: barColor,
+                                opacity: sinStock ? 0 : 1,
+                              }}
+                            />
+                          </div>
+
+                          {/* Etiqueta extrema */}
+                          {negativo && (
+                            <p className="text-[10px] text-red-500 font-semibold mt-0.5">
+                              Stock negativo — revisar registros
+                            </p>
+                          )}
+                          {sinStock && (
+                            <p className="text-[10px] text-amber-500 font-semibold mt-0.5">
+                              Sin unidades disponibles
+                            </p>
+                          )}
+
+                          {/* Desglose del día (solo si hubo movimiento hoy) */}
+                          {hayDesp && (
+                            <div className="mt-2 flex gap-2 flex-wrap text-xs">
+                              <span className="flex items-center gap-1 bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full">
+                                🚚 {p.despachHoy} despachado
+                              </span>
+                              <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${
+                                haySobrante ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-400 border-gray-200"
+                              }`}>
+                                🔄 {haySobrante ? p.sobranteHoy : "—"} sobrante
+                              </span>
+                              {haySobrante && (
+                                <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${
+                                  p.vendidoHoy < 0 ? "bg-red-50 text-red-700 border-red-200" : "bg-green-50 text-green-700 border-green-200"
+                                }`}>
+                                  ✅ {p.vendidoHoy < 0 ? "🚨 ERROR" : p.vendidoHoy} vendido
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
