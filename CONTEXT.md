@@ -30,7 +30,6 @@ Cuatro roles:
 | # | Asunto | Impacto | Acción |
 |---|--------|---------|--------|
 | A | GOOGLE_PRIVATE_KEY truncada en Vercel (305 chars, falta END marker) | sync-sheets y admin-setup fallan. No se puede activar acceso admin. | Pegar clave RSA completa (~1700 chars) en Vercel como línea única con `\n` literales |
-| C | PIN 1234 hardcoded en `public/polar-breeze-final.html` | La app de inventario choferes sigue con PIN fijo en lugar de Firebase Auth | Plan de migración pendiente, no eliminar el PIN sin reemplazo funcionando |
 | D | Endpoint `/api/admin-setup` sin rate limit ni deshabilitación tras uso | Si SETUP_SECRET se filtra, escalada a admin trivial | Tras el bootstrap inicial, considerar `if (process.env.ADMIN_SETUP_DISABLED) return 410` |
 | E | Webhook Telegram (`/api/telegram-webhook`) sin secret token documentado | Si la URL se descubre, cualquiera puede inyectar comandos | Verificar header `X-Telegram-Bot-Api-Secret-Token` contra `TELEGRAM_WEBHOOK_SECRET` |
 
@@ -48,6 +47,7 @@ Cuatro roles:
 | 8 | Buscador Encargado no encontraba "lote" ni "inventario" | `b2f8f41` | ✅ (4 Jun 2026) |
 | 9 | FAB imprimía URL/HTML crudo sin estilos Tailwind | `d5626a4` | ✅ (4 Jun 2026) |
 | 10 | Reglas Firestore abiertas — cualquier usuario autenticado leía/escribía todo | `eb9974a` | ✅ (5 Jun 2026) — reglas por rol en `firestore.rules` |
+| 11 | PIN 1234 hardcoded en polar-breeze-final.html | pendiente | ✅ (5 Jun 2026) — migración Firebase Auth en 3 fases (postMessage relay + Firestore write + eliminar PIN) |
 
 ---
 

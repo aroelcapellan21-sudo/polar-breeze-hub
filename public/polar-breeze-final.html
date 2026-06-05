@@ -36,6 +36,8 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .pin-dot.filled{background:#F5C800;border-color:#F5C800;box-shadow:0 0 10px rgba(245,200,0,0.5)}
 .pin-dot.error{background:#D42B2B;border-color:#D42B2B}
 .pin-dot.ok{background:#1E8C3A;border-color:#1E8C3A}
+.pin-dot.cargando{background:rgba(245,200,0,0.5);border-color:rgba(245,200,0,0.7);animation:pinCarga 1.2s ease-in-out infinite}
+@keyframes pinCarga{0%,100%{opacity:0.3;transform:scale(0.8)}50%{opacity:1;transform:scale(1.1)}}
 .pin-teclado{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;max-width:280px}
 .pin-btn{background:#2a2a2a;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:18px;font-size:22px;font-weight:900;color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;transition:all 0.15s}
 .pin-btn:active{background:#F5C800;color:#1a1a1a;transform:scale(0.93)}
@@ -311,7 +313,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </head>
 <body>
 
-<!-- PIN -->
+<!-- PANTALLA DE ACCESO -->
 <div class="pin-screen" id="pinScreen">
   <div class="pin-logo-wrap">
     <div class="pin-logo-box">
@@ -321,16 +323,12 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
     <div class="pin-empresa">POLAR BREEZE, S.R.L.</div>
     <div class="pin-sistema">Inventario de Choferes</div>
   </div>
-  <div class="pin-titulo">🔐 Ingresa tu PIN de acceso</div>
+  <div class="pin-titulo" id="pinTitulo">Verificando sesión…</div>
   <div class="pin-dots">
-    <div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div>
-    <div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div>
-  </div>
-  <div class="pin-teclado">
-    <button class="pin-btn" onclick="pinPress('1')">1</button><button class="pin-btn" onclick="pinPress('2')">2</button><button class="pin-btn" onclick="pinPress('3')">3</button>
-    <button class="pin-btn" onclick="pinPress('4')">4</button><button class="pin-btn" onclick="pinPress('5')">5</button><button class="pin-btn" onclick="pinPress('6')">6</button>
-    <button class="pin-btn" onclick="pinPress('7')">7</button><button class="pin-btn" onclick="pinPress('8')">8</button><button class="pin-btn" onclick="pinPress('9')">9</button>
-    <button class="pin-btn vacio"></button><button class="pin-btn" onclick="pinPress('0')">0</button><button class="pin-btn borrar" onclick="pinBorrar()">⌫</button>
+    <div class="pin-dot cargando" id="d0"></div>
+    <div class="pin-dot cargando" id="d1" style="animation-delay:0.2s"></div>
+    <div class="pin-dot cargando" id="d2" style="animation-delay:0.4s"></div>
+    <div class="pin-dot cargando" id="d3" style="animation-delay:0.6s"></div>
   </div>
   <div class="pin-error" id="pinError"></div>
 </div>
@@ -487,17 +485,9 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div><!-- fin appMain -->
 
 <script>
-const PIN='1234';
-let pinActual='',confirmCb=null,darkMode=false,encargadoNombre='';
+let confirmCb=null,darkMode=false,encargadoNombre='';
 
-// PIN
-function pinPress(n){if(pinActual.length>=4)return;pinActual+=n;pintDots();if(pinActual.length===4)verificarPin();}
-function pinBorrar(){pinActual=pinActual.slice(0,-1);pintDots();}
-function pintDots(estado='normal'){for(let i=0;i<4;i++){const d=document.getElementById('d'+i);d.className='pin-dot'+(estado==='error'?' error':estado==='ok'?' ok':i<pinActual.length?' filled':'');}}
-function verificarPin(){
-  if(pinActual===PIN){pintDots('ok');setTimeout(()=>{document.getElementById('pinScreen').classList.add('hidden');document.getElementById('appMain').style.display='block';iniciar();},600);}
-  else{pintDots('error');document.getElementById('pinError').textContent='PIN incorrecto.';setTimeout(()=>{pinActual='';pintDots();document.getElementById('pinError').textContent='';},1200);}
-}
+function pintDots(estado){for(let i=0;i<4;i++){const d=document.getElementById('d'+i);d.className='pin-dot'+(estado==='ok'?' ok':estado==='cargando'?' cargando':'');}}
 
 // TEMA
 function toggleTheme(){
@@ -828,16 +818,16 @@ async function cargarDesdeFirebase(fecha){
   }catch(e){/* fallo silencioso */}
 }
 
-// ── Relay de sesión Firebase — Fase 1 (Deuda C) ──────────────────────────
-// El componente React padre (PolarBreezeHTML.tsx) envía el ID token de Firebase
-// vía postMessage cuando el iframe termina de cargar. Si llega en tiempo,
-// se omite la pantalla de PIN. Si no llega en 2 s, el PIN queda activo.
+// ── Acceso vía Firebase Auth (Deuda C — Fases 1, 2 y 3) ─────────────────
+// El componente React padre envía el ID token vía postMessage al cargar el
+// iframe. Si llega, se desbloquea automáticamente. Si no llega en 2 s,
+// se muestra un mensaje de acceso restringido con enlace al dashboard.
 (function() {
   var autenticado = false;
 
   function desbloquearViaToken(nombre) {
     autenticado = true;
-    var titulo = document.querySelector('.pin-titulo');
+    var titulo = document.getElementById('pinTitulo');
     if (titulo) {
       var primer = nombre ? nombre.split(' ')[0] : 'Encargado';
       titulo.textContent = '✓ ' + primer + ' — Sesión verificada';
@@ -859,6 +849,21 @@ async function cargarDesdeFirebase(fecha){
     encargadoNombre = e.data.nombre || '';
     desbloquearViaToken(e.data.nombre || '');
   });
+
+  // Sin token en 2 s → acceso restringido
+  setTimeout(function() {
+    if (autenticado) return;
+    pintDots('');
+    var titulo = document.getElementById('pinTitulo');
+    if (titulo) { titulo.textContent = '🔒 Acceso restringido'; titulo.style.color = '#D42B2B'; }
+    var err = document.getElementById('pinError');
+    if (err) {
+      err.innerHTML = 'Esta pantalla solo funciona desde el<br>'
+        + '<strong>Dashboard del Encargado</strong>.<br><br>'
+        + '<a href="/app-encargado" style="color:#F5C800;font-weight:900;text-decoration:none;font-size:13px">← Ir al Dashboard</a>';
+      err.style.lineHeight = '1.8';
+    }
+  }, 2000);
 })();
 </script>
 </body>
