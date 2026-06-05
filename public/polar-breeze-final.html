@@ -774,6 +774,37 @@ function pedirGuardar(){
 }
 
 function cerrar(id){document.getElementById(id).classList.add('hidden');}
+
+// ── Relay de sesión Firebase — Fase 1 (Deuda C) ──────────────────────────
+// El componente React padre (PolarBreezeHTML.tsx) envía el ID token de Firebase
+// vía postMessage cuando el iframe termina de cargar. Si llega en tiempo,
+// se omite la pantalla de PIN. Si no llega en 2 s, el PIN queda activo.
+(function() {
+  var autenticado = false;
+
+  function desbloquearViaToken(nombre) {
+    autenticado = true;
+    var titulo = document.querySelector('.pin-titulo');
+    if (titulo) {
+      var primer = nombre ? nombre.split(' ')[0] : 'Encargado';
+      titulo.textContent = '✓ ' + primer + ' — Sesión verificada';
+      titulo.style.color = '#1E8C3A';
+    }
+    pintDots('ok');
+    setTimeout(function() {
+      document.getElementById('pinScreen').classList.add('hidden');
+      document.getElementById('appMain').style.display = 'block';
+      iniciar();
+    }, 600);
+  }
+
+  window.addEventListener('message', function(e) {
+    if (autenticado) return;
+    if (e.origin !== window.location.origin) return;
+    if (!e.data || e.data.type !== 'pb-auth') return;
+    desbloquearViaToken(e.data.nombre || '');
+  });
+})();
 </script>
 </body>
 </html>

@@ -8,10 +8,13 @@
  *   2. Este componente lo cargará automáticamente en el tab.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useAuth } from "@/lib/auth-context";
 
 export default function PolarBreezeHTML() {
   const [available, setAvailable] = useState<boolean | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { user, profile } = useAuth();
 
   useEffect(() => {
     // Verificar si el archivo existe en /public
@@ -19,6 +22,22 @@ export default function PolarBreezeHTML() {
       .then((r) => setAvailable(r.ok))
       .catch(() => setAvailable(false));
   }, []);
+
+  // Relay de sesión Firebase → iframe (Fase 1 migración Deuda C)
+  // El iframe escucha este mensaje y omite la pantalla de PIN si el token es válido.
+  // Fallback: si el token no llega en 2s, el iframe muestra el PIN normalmente.
+  const enviarToken = useCallback(async () => {
+    if (!user || !iframeRef.current?.contentWindow) return;
+    try {
+      const token = await user.getIdToken();
+      iframeRef.current.contentWindow.postMessage(
+        { type: "pb-auth", token, nombre: profile?.nombre ?? user.email ?? "" },
+        window.location.origin
+      );
+    } catch {
+      // Si falla la obtención del token, el iframe mostrará el PIN normalmente
+    }
+  }, [user, profile]);
 
   if (available === null) {
     return (
@@ -101,11 +120,13 @@ export default function PolarBreezeHTML() {
         <div className="flex-1 bg-[#1E8C3A]" />
       </div>
       <iframe
+        ref={iframeRef}
         src="/polar-breeze-final.html"
         className="w-full border-0"
         style={{ height: "calc(100vh - 180px)", minHeight: "500px" }}
         title="Polar Breeze Final"
         allow="clipboard-write"
+        onLoad={enviarToken}
       />
     </div>
   );
