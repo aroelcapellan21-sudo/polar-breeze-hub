@@ -55,34 +55,32 @@ Sistema de gestión de distribución de helados para **Polar Breeze, S.R.L.**, S
 - **Hub Admin:** dashboard con datos simulados, menú lateral, deploy en Vercel
 - **Portal:** login email+contraseña, 4 roles, redirección automática
 
-## 🐛 BUGS — CORREGIR PRIMERO
+## 🐛 BUGS / MEJORAS PENDIENTES
 
-| # | Bug | Prioridad |
-|---|-----|-----------|
-| 1 | Modo claro/oscuro roto en app inventario | Alta |
-| 2 | Botón 👥 necesita nueva función (ver inventarios guardados) | Alta |
-| 3 | Verificar flujo completo del Despachador de inicio a fin | Alta |
-| 4 | Verificar que registro de lotes guarda en Firebase | Alta |
-| 5 | Verificar que portal redirige correctamente según rol | Alta |
-| 6 | Reemplazar botón morado por FAB 📤 en TODAS las apps | Media |
-| 7 | App Despachador sin paleta Polar Breeze aplicada | Media |
+| # | Descripción | Prioridad |
+|---|-------------|-----------|
+| 1 | WhatsApp Web en FAB 📤 — separar código de país del número local, selector rápido (+1 RD/US, +52 MX, +34 ES, +57 CO) | Alta |
+| 2 | Campana de alertas no funciona en Dashboard del día | Alta |
+| 3 | Modo claro/oscuro roto en app inventario | Media |
+| 4 | Botón 👥 — nueva función: ver inventarios guardados | Media |
+| 5 | Verificar flujo completo del Despachador de inicio a fin | Media |
 
 ## 📋 ORDEN DE EJECUCIÓN
 
-| # | Tarea |
-|---|-------|
-| 1 | Corregir todos los bugs |
-| 2 | Aplicar paleta Polar Breeze a App Despachador |
-| 3 | Reemplazar botón morado por FAB 📤 en todas las apps |
-| 4 | Construir Dashboard del Encargado |
-| 5 | Integrar App Inventario Choferes dentro del Dashboard |
-| 6 | Construir módulo Polar Breeze Weight (escáner + báscula BT) |
-| 7 | Mejoras SPIKINSCAN (escáner USB/BT + base códigos en Sheets) |
-| 8 | Sincronización Weight ↔ SPIKINSCAN vía Google Sheets |
-| 9 | Conectar Hub Admin a Firebase real |
-| 10 | Construir pantallas internas del Hub Admin |
-| 11 | Bot Telegram (reportes choferes + alertas) |
-| 12 | Automatización nocturna completa |
+| # | Tarea | Estado |
+|---|-------|--------|
+| 1 | Corregir todos los bugs | ✅ |
+| 2 | Aplicar paleta Polar Breeze a App Despachador | ✅ |
+| 3 | Corregir mejoras pendientes (ver tabla arriba) | 🔄 En progreso |
+| 4 | Construir Dashboard del Encargado | Pendiente |
+| 5 | Integrar App Inventario Choferes dentro del Dashboard | Pendiente |
+| 6 | Construir módulo Polar Breeze Weight (escáner + báscula BT) | Pendiente |
+| 7 | Mejoras SPIKINSCAN (escáner USB/BT + base códigos en Sheets) | Pendiente |
+| 8 | Sincronización Weight ↔ SPIKINSCAN vía Google Sheets | Pendiente |
+| 9 | Conectar Hub Admin a Firebase real | Pendiente |
+| 10 | Construir pantallas internas del Hub Admin | Pendiente |
+| 11 | Bot Telegram (reportes choferes + alertas) | Pendiente |
+| 12 | Automatización nocturna completa | Pendiente |
 
 ## 📤 FAB FLOTANTE — EN TODAS LAS PANTALLAS
 

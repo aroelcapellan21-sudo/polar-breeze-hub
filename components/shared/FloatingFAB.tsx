@@ -19,7 +19,15 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useModalShare } from "./ModalShareContext";
 
-const LS_KEY = "wa_last_number";
+const LS_KEY    = "wa_last_number";
+const LS_KEY_CC = "wa_last_cc";
+
+const CC_OPTIONS = [
+  { code: "1",  flag: "🇩🇴", label: "RD / US" },
+  { code: "52", flag: "🇲🇽", label: "MX" },
+  { code: "34", flag: "🇪🇸", label: "ES" },
+  { code: "57", flag: "🇨🇴", label: "CO" },
+];
 
 interface Props {
   getMessage?:   () => string;
@@ -147,11 +155,13 @@ export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
   const [waOpen,     setWaOpen]     = useState(false);
   const [printOpen,  setPrintOpen]  = useState(false);
   const [num,        setNum]        = useState("");
+  const [cc,         setCc]         = useState("1");
   const [mounted,    setMounted]    = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setNum(localStorage.getItem(LS_KEY) ?? "");
+    setNum(localStorage.getItem(LS_KEY)    ?? "");
+    setCc(localStorage.getItem(LS_KEY_CC) ?? "1");
     setMounted(true);
   }, []);
 
@@ -233,11 +243,14 @@ export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
   };
 
   const handleWaSend = () => {
-    const cleaned = num.replace(/\D/g, "");
-    if (cleaned) localStorage.setItem(LS_KEY, num);
-    const text = encodeURIComponent(activeGetMsg());
-    window.open(cleaned
-      ? `https://wa.me/${cleaned}?text=${text}`
+    const cleanedCc  = cc.replace(/\D/g, "");
+    const cleanedNum = num.replace(/\D/g, "");
+    localStorage.setItem(LS_KEY_CC, cc);
+    if (cleanedNum) localStorage.setItem(LS_KEY, num);
+    const text   = encodeURIComponent(activeGetMsg());
+    const fullNum = cleanedNum ? `${cleanedCc}${cleanedNum}` : "";
+    window.open(fullNum
+      ? `https://wa.me/${fullNum}?text=${text}`
       : `https://wa.me/?text=${text}`, "_blank");
     setWaOpen(false); setOpen(false);
   };
@@ -303,26 +316,58 @@ export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
 
       {/* ── Popover WhatsApp ── */}
       {waOpen && (
-        <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 p-4 w-64 mb-1">
-          <p className="text-xs font-semibold text-gray-600 mb-1.5">Número destino</p>
-          <input
-            type="tel" value={num}
-            onChange={(e) => setNum(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleWaSend()}
-            placeholder="1829XXXXXXX"
-            autoFocus
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
-              text-gray-800 outline-none focus:ring-2 focus:ring-green-400 mb-1"
-          />
-          <p className="text-xs text-gray-400 mb-3">Opcional · recuerda el último número</p>
+        <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 p-4 w-72 mb-1">
+          <p className="text-xs font-bold text-gray-600 mb-2">📲 Número destino</p>
+
+          {/* Selector rápido de código de país */}
+          <div className="flex gap-1.5 mb-2">
+            {CC_OPTIONS.map((o) => (
+              <button
+                key={o.code}
+                onClick={() => setCc(o.code)}
+                className={`flex-1 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                  cc === o.code
+                    ? "bg-[#1E8C3A] text-white border-[#1E8C3A]"
+                    : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                }`}
+              >
+                {o.flag} +{o.code}
+              </button>
+            ))}
+          </div>
+
+          {/* Input: código + número local */}
+          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden
+            focus-within:ring-2 focus-within:ring-green-400 mb-1">
+            <span className="px-2.5 py-2 text-sm font-bold text-gray-500 bg-gray-50
+              border-r border-gray-300 select-none whitespace-nowrap">
+              +{cc}
+            </span>
+            <input
+              type="tel"
+              value={num}
+              onChange={(e) => setNum(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleWaSend()}
+              placeholder="8295551234"
+              autoFocus
+              className="flex-1 px-3 py-2 text-sm text-gray-800 outline-none bg-white"
+            />
+          </div>
+          <p className="text-xs text-gray-400 mb-3">Opcional · recuerda el último número y código</p>
+
           <div className="flex gap-2">
-            <button onClick={() => setWaOpen(false)}
-              className="flex-1 py-2 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition">
+            <button
+              onClick={() => setWaOpen(false)}
+              className="flex-1 py-2 rounded-lg border border-gray-200 text-xs text-gray-600
+                hover:bg-gray-50 transition"
+            >
               Cancelar
             </button>
-            <button onClick={handleWaSend}
+            <button
+              onClick={handleWaSend}
               className="flex-1 py-2 rounded-lg bg-[#1E8C3A] hover:bg-green-700
-                active:scale-95 text-white text-xs font-semibold transition-all">
+                active:scale-95 text-white text-xs font-semibold transition-all"
+            >
               Enviar ↗
             </button>
           </div>
