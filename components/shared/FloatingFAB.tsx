@@ -178,20 +178,44 @@ export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
   }, [open, waOpen, printOpen]);
 
   /** Texto para WhatsApp / Copiar lista.
-   *  Prioridad: modal activo > prop getMessage > texto visible de pantalla.
-   *  En el fallback se oculta el FAB para no incluir sus propios botones. */
+   *
+   *  Prioridad:
+   *  1. Modal registrado en ModalShareContext con getMessage propio.
+   *  2. Prop getMessage del dashboard.
+   *  3. Modal DOM abierto: backdrop con patrón 'inset-0 bg-black' → innerText
+   *     del panel interior (primer hijo directo del backdrop).
+   *  4. Sin modal: <main> (React renderiza solo el tab activo → no incluye
+   *     header, barra de tabs ni otros tabs).
+   *  5. Último recurso: body completo excluyendo el propio FAB.
+   */
   const activeGetMsg = (): string => {
     if (modalOpen && fnsRef.current?.getMessage) return fnsRef.current.getMessage();
     if (getMessage) return getMessage();
-    // Ocultar el FAB momentáneamente para excluirlo del innerText
+
+    // ── Modal DOM abierto ────────────────────────────────────────────────────
+    // Patrón consistente en esta app: backdrop = div.fixed.inset-0.bg-black/N
+    // React no renderiza los modales cuando están cerrados → si está en el DOM, está abierto.
+    const backdrop = document.querySelector<HTMLElement>(
+      '[class*="inset-0"][class*="bg-black"]'
+    );
+    if (backdrop && !ref.current?.contains(backdrop)) {
+      const panel = backdrop.querySelector<HTMLElement>(":scope > div") ?? backdrop;
+      const text  = panel.innerText?.trim();
+      if (text && text.length > 10) return text.slice(0, 3500);
+    }
+
+    // ── Tab activo: <main> contiene solo el panel visible ────────────────────
+    const mainEl = document.querySelector<HTMLElement>("main");
+    if (mainEl) {
+      return `${document.title}\n\n${mainEl.innerText?.trim() ?? ""}`.slice(0, 3500);
+    }
+
+    // ── Último recurso: body sin el FAB ───────���──────────────────────────────
     const fabEl = ref.current;
     const prev  = fabEl?.style.display ?? "";
     if (fabEl) fabEl.style.display = "none";
     const raw = document.body.innerText
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0)
-      .join("\n");
+      .split("\n").map((l) => l.trim()).filter((l) => l.length > 0).join("\n");
     if (fabEl) fabEl.style.display = prev;
     return `${document.title}\n\n${raw}`.slice(0, 3500);
   };
