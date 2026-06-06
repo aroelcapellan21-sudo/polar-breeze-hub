@@ -177,11 +177,23 @@ export default function FloatingFAB({ getMessage, getPrintHtml }: Props) {
     return () => document.removeEventListener("mousedown", handler);
   }, [open, waOpen, printOpen]);
 
-  /** Texto para WhatsApp / Copiar lista. */
+  /** Texto para WhatsApp / Copiar lista.
+   *  Prioridad: modal activo > prop getMessage > texto visible de pantalla.
+   *  En el fallback se oculta el FAB para no incluir sus propios botones. */
   const activeGetMsg = (): string => {
     if (modalOpen && fnsRef.current?.getMessage) return fnsRef.current.getMessage();
     if (getMessage) return getMessage();
-    return `${document.title}\n${window.location.href}`;
+    // Ocultar el FAB momentáneamente para excluirlo del innerText
+    const fabEl = ref.current;
+    const prev  = fabEl?.style.display ?? "";
+    if (fabEl) fabEl.style.display = "none";
+    const raw = document.body.innerText
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0)
+      .join("\n");
+    if (fabEl) fabEl.style.display = prev;
+    return `${document.title}\n\n${raw}`.slice(0, 3500);
   };
 
   /** HTML para imprimir en ventana nueva (solo modales). */
