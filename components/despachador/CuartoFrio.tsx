@@ -6,7 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { ProductoItem, PuntoProducto, toProductoId } from "@/lib/types";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
-import { pbPrintDoc, openPrint, pbTable } from "@/lib/print-template";
+import { pbPrintDoc, pbTable } from "@/lib/print-template";
 import {
   ImageUploader, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
