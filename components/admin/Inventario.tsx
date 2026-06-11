@@ -394,6 +394,8 @@ export default function Inventario() {
       chofersTotal,
       chofersReportados,
       pendientes: chofersTotal - chofersReportados,
+      // Total de alertas activas = productos sin stock + choferes sin reportar
+      totalAlertas: productosAlerta + (chofersTotal - chofersReportados),
     };
   }, [saldoConDetalle, resumenChoferes, talonarioHoy]);
 
@@ -647,14 +649,15 @@ export default function Inventario() {
                 <h2 className="text-white font-bold text-sm">📊 Dashboard del día</h2>
                 <p className="text-gray-300 text-xs capitalize mt-0.5">{hoyLabel}</p>
               </div>
-              {dashboard.productosAlerta > 0 && (
+              {dashboard.totalAlertas > 0 && (
                 <button
                   onClick={() => setAlertasPanel(true)}
+                  title="Ver alertas activas del sistema"
                   className="flex-shrink-0 text-xs bg-red-500 text-white
                     px-2.5 py-1 rounded-full font-bold animate-pulse
                     active:scale-95 transition-all duration-100 hover:bg-red-600"
                 >
-                  🚨 {dashboard.productosAlerta} en alerta
+                  🚨 {dashboard.totalAlertas} en alerta
                 </button>
               )}
             </div>
@@ -1903,7 +1906,7 @@ export default function Inventario() {
           >
             <div className="flex items-center gap-2 px-5 py-4 border-b flex-shrink-0">
               <h3 className="font-bold text-red-700 flex-1">
-                🚨 Alertas activas — stock en cero o negativo
+                🚨 Alertas activas del sistema
               </h3>
               <button
                 onClick={() => setAlertasPanel(false)}
@@ -1912,44 +1915,85 @@ export default function Inventario() {
                 ×
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {saldoConDetalle.filter((p) => p.saldo <= 0).length === 0 ? (
-                <div className="text-center py-10">
-                  <p className="text-2xl mb-2">✅</p>
-                  <p className="text-sm text-gray-400">Sin productos en alerta en este momento.</p>
-                </div>
-              ) : (
-                <>
-                  <p className="text-xs text-gray-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-1">
-                    Estos productos tienen stock en cero o negativo. Registra una entrada para reponer.
-                  </p>
-                  {saldoConDetalle
-                    .filter((p) => p.saldo <= 0)
-                    .map((p) => (
-                      <div
-                        key={p.pid}
-                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm ${
-                          p.saldo < 0
-                            ? "bg-red-50 border-red-200"
-                            : "bg-amber-50 border-amber-200"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-base flex-shrink-0">{p.saldo < 0 ? "🚨" : "⚠️"}</span>
-                          <span className="font-medium text-gray-800 truncate">{p.nombre}</span>
-                        </div>
-                        <div className="text-right flex-shrink-0 ml-2 space-y-0.5">
-                          <p className={`font-bold text-sm ${p.saldo < 0 ? "text-red-700" : "text-amber-600"}`}>
-                            {p.saldo} uds
-                          </p>
-                          {p.despachHoy > 0 && (
-                            <p className="text-xs text-orange-500">{p.despachHoy} despachado hoy</p>
-                          )}
-                        </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {(() => {
+                const enAlerta    = saldoConDetalle.filter((p) => p.saldo <= 0);
+                const sinReportar = resumenChoferes.filter((c) => !c.reportado);
+
+                if (enAlerta.length === 0 && sinReportar.length === 0) {
+                  return (
+                    <div className="text-center py-10">
+                      <p className="text-2xl mb-2">✅</p>
+                      <p className="text-sm text-gray-400">Sin alertas activas en este momento.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <>
+                    {/* Inventario — productos en cero o negativo */}
+                    {enAlerta.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
+                          📦 Inventario · {enAlerta.length} producto{enAlerta.length !== 1 ? "s" : ""} sin stock
+                        </p>
+                        <p className="text-xs text-gray-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                          Estos productos tienen stock en cero o negativo. Registra una entrada para reponer.
+                        </p>
+                        {enAlerta.map((p) => (
+                          <div
+                            key={p.pid}
+                            className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm ${
+                              p.saldo < 0
+                                ? "bg-red-50 border-red-200"
+                                : "bg-amber-50 border-amber-200"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-base flex-shrink-0">{p.saldo < 0 ? "🚨" : "⚠️"}</span>
+                              <span className="font-medium text-gray-800 truncate">{p.nombre}</span>
+                            </div>
+                            <div className="text-right flex-shrink-0 ml-2 space-y-0.5">
+                              <p className={`font-bold text-sm ${p.saldo < 0 ? "text-red-700" : "text-amber-600"}`}>
+                                {p.saldo} uds
+                              </p>
+                              {p.despachHoy > 0 && (
+                                <p className="text-xs text-orange-500">{p.despachHoy} despachado hoy</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                </>
-              )}
+                    )}
+
+                    {/* Choferes con reportes de sobrantes pendientes */}
+                    {sinReportar.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
+                          🚛 Reportes pendientes · {sinReportar.length} chofer{sinReportar.length !== 1 ? "es" : ""}
+                        </p>
+                        <p className="text-xs text-gray-500 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                          Estos choferes aún no han reportado sus sobrantes del día.
+                        </p>
+                        {sinReportar.map((ch) => (
+                          <button
+                            key={ch.choferId}
+                            type="button"
+                            onClick={() => { setAlertasPanel(false); setInvModal({ type: "chofer", ch }); }}
+                            className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-sm text-left active:scale-[0.98] transition-all duration-100"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-base flex-shrink-0">⏳</span>
+                              <span className="font-medium text-gray-800 truncate">{ch.choferNombre}</span>
+                            </div>
+                            <span className="font-bold text-amber-600 flex-shrink-0">sin reportar ›</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
