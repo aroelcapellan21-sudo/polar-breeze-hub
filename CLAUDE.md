@@ -57,13 +57,13 @@ Sistema de gestión de distribución de helados para **Polar Breeze, S.R.L.**, S
 
 ## 🐛 BUGS / MEJORAS PENDIENTES
 
-| # | Descripción | Prioridad |
-|---|-------------|-----------|
-| 1 | WhatsApp Web en FAB 📤 — separar código de país del número local, selector rápido (+1 RD/US, +52 MX, +34 ES, +57 CO) | Alta |
-| 2 | Campana de alertas no funciona en Dashboard del día | Alta |
-| 3 | Modo claro/oscuro roto en app inventario | Media |
-| 4 | Botón 👥 — nueva función: ver inventarios guardados | Media |
-| 5 | Verificar flujo completo del Despachador de inicio a fin | Media |
+| # | Descripción | Prioridad | Estado |
+|---|-------------|-----------|--------|
+| 1 | WhatsApp Web en FAB 📤 — separar código de país del número local, selector rápido (+1 RD/US, +52 MX, +34 ES, +57 CO) | Alta | ✅ Hecho — `FloatingFAB.tsx` (CC_OPTIONS) |
+| 2 | Campana de alertas no funciona en Dashboard del día | Alta | ✅ Hecho — `admin/Inventario.tsx` (panel alertasPanel) |
+| 3 | Modo claro/oscuro roto en app inventario | Media | ✅ Hecho — `polar-breeze-final.html` (toggleTheme + overrides .dark). Pendiente menor: persistir tema |
+| 4 | Botón 👥 — nueva función: ver inventarios guardados | Media | ✅ Hecho — `polar-breeze-final.html` (abrirInvReg desde lista 👥) |
+| 5 | Verificar flujo completo del Despachador de inicio a fin | Media | 🟡 Cableado correcto; falta prueba en vivo (Firebase + Node 20) |
 
 ## 📋 ORDEN DE EJECUCIÓN
 
