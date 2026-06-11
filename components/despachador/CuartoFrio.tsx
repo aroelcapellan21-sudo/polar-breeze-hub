@@ -8,7 +8,7 @@ import { ProductoItem, PuntoProducto, toProductoId } from "@/lib/types";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, openPrint, pbTable } from "@/lib/print-template";
 import {
-  ImageUploader, ProductTable, ModeToggle, AiButton,
+  ImageUploader, ModeToggle, AiButton,
   WhatsAppPrint, ProgressSteps,
 } from "./shared";
 import ScannerBar from "./ScannerBar";
@@ -49,12 +49,13 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
   const [manualCajas,   setManualCajas]   = useState(0);
   const [manualUnids,   setManualUnids]   = useState(0);
 
-  // Estado de recepción por producto (solo modo manual)
+  // Estado de recepción por producto (todos los modos: foto IA, escáner y manual)
   type EstadoRecepcion = { estado: "pendiente" | "recibido" | "no_recibido"; motivo: string };
   const [estados,       setEstados]       = useState<Record<string, EstadoRecepcion>>({});
   const [motivoAbierto, setMotivoAbierto] = useState<string | null>(null);
   const [motivoTemp,    setMotivoTemp]    = useState("");
   const [editando,      setEditando]      = useState<string | null>(null);
+  const [editNombre,    setEditNombre]    = useState("");
   const [editCajas,     setEditCajas]     = useState(0);
   const [editUnids,     setEditUnids]     = useState(0);
 
@@ -265,10 +266,33 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
     setMotivoTemp(estados[nombre]?.motivo ?? "");
   };
 
-  const confirmarEdicion = (nombre: string) => {
+  const confirmarEdicion = (nombreOriginal: string) => {
+    const nuevoNombre = editNombre.trim() || nombreOriginal;
+    // Evitar fusionar accidentalmente con otro producto ya existente en la lista
+    const colision = nuevoNombre !== nombreOriginal &&
+      productos.some((p) => p.nombre === nuevoNombre);
+    const nombreFinal = colision ? nombreOriginal : nuevoNombre;
+
     setProductos((prev) =>
-      prev.map((p) => p.nombre === nombre ? { ...p, cajas: editCajas, cantidad: editUnids } : p)
+      prev.map((p) =>
+        p.nombre === nombreOriginal
+          ? { ...p, nombre: nombreFinal, cajas: editCajas, cantidad: editUnids }
+          : p
+      )
     );
+
+    // Si cambió el nombre, mover el estado de recepción a la nueva clave
+    if (nombreFinal !== nombreOriginal) {
+      setEstados((prev) => {
+        if (!(nombreOriginal in prev)) return prev;
+        const n = { ...prev };
+        n[nombreFinal] = n[nombreOriginal];
+        delete n[nombreOriginal];
+        return n;
+      });
+    }
+
+    if (colision) flash("err", `Ya existe "${nuevoNombre}" en la lista — se conservó el nombre original`);
     setEditando(null);
   };
 
@@ -453,8 +477,8 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                 <p>Selecciona productos y toca<br/><strong>+ Agregar a lista</strong></p>
               )}
             </div>
-          ) : mode === "manual" ? (
-            /* Vista especial para modo manual: sombreado + check/X */
+          ) : (
+            /* Lista de despacho editable — para foto IA, escáner y manual */
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {productos.map((p, i) => {
                 const est = estados[p.nombre] ?? { estado: "pendiente", motivo: "" };
@@ -490,6 +514,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                             onClick={() => {
                               if (editando === p.nombre) { setEditando(null); return; }
                               setMotivoAbierto(null);
+                              setEditNombre(p.nombre);
                               setEditCajas(p.cajas ?? 0);
                               setEditUnids(p.cantidad ?? 0);
                               setEditando(p.nombre);
@@ -560,9 +585,21 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                       </div>
                     )}
 
-                    {/* Edición inline de cajas/unidades */}
+                    {/* Edición inline de nombre, cajas y unidades */}
                     {editando === p.nombre && (
                       <div className="mt-1 mb-1 pl-8 pr-1 space-y-1.5">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-0.5">🏷️ Producto</label>
+                          <input
+                            type="text"
+                            value={editNombre}
+                            onChange={(e) => setEditNombre(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && confirmarEdicion(p.nombre)}
+                            placeholder="Nombre del producto"
+                            autoFocus
+                            className="w-full px-2 py-1.5 border border-[#F5C800]/50 rounded-lg text-xs text-gray-700 outline-none focus:ring-2 focus:ring-[#F5C800]"
+                          />
+                        </div>
                         <div className="flex gap-2">
                           <div className="flex-1">
                             <label className="block text-xs text-gray-500 mb-0.5">📦 Cajas</label>
@@ -571,7 +608,6 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                               value={editCajas || ""}
                               onChange={(e) => setEditCajas(Math.max(0, Number(e.target.value)))}
                               placeholder="0"
-                              autoFocus
                               className="w-full px-2 py-1.5 border border-[#F5C800]/50 rounded-lg text-xs text-gray-700 outline-none focus:ring-2 focus:ring-[#F5C800] text-center"
                             />
                           </div>
@@ -599,35 +635,18 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
                 );
               })}
             </div>
-          ) : (
-            <>
-              <ProductTable productos={productos} onChange={setProductos} showPrecio={false} />
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  📝 Observaciones — sobrantes y faltantes
-                </label>
-                <textarea
-                  value={observaciones}
-                  onChange={(e) => setObservaciones(e.target.value)}
-                  placeholder="Ej: 3 cajas de leche sobrantes, falta queso fresco..."
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800
-                    focus:ring-2 focus:ring-[#F5C800] outline-none resize-none"
-                />
-              </div>
-            </>
           )}
 
-          {/* Observaciones para modo manual también */}
-          {mode === "manual" && productos.length > 0 && (
+          {/* Observaciones — todos los modos (foto IA, escáner y manual) */}
+          {productos.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                📝 Observaciones
+                📝 Observaciones — sobrantes y faltantes
               </label>
               <textarea
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
-                placeholder="Ej: 3 cajas sobrantes de leche..."
+                placeholder="Ej: 3 cajas de leche sobrantes, falta queso fresco..."
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800
                   focus:ring-2 focus:ring-[#F5C800] outline-none resize-none"
