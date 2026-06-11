@@ -678,7 +678,9 @@ function actualizarBtn(){
 }
 
 function buscarChofer(f){
-  choferActual=CHOFERES[f]||null;fichaActual=f;valores={};
+  choferActual=CHOFERES[f]||null;fichaActual=f;
+  // Rehidratar el inventario ya guardado para poder consultarlo y editarlo
+  valores=inventariosGuardados[f]?{...inventariosGuardados[f]}:{};
   guardado=completados.has(f);bloqueado=completados.has(f);
   const el=document.getElementById('choferInfo'),inp=document.getElementById('fichaInput');
   if(choferActual){
