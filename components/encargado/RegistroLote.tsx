@@ -6,8 +6,9 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { PuntoProducto, LoteLoker, toProductoId } from "@/lib/types";
+import { PuntoProducto, LoteLoker, ProductoItem, toProductoId } from "@/lib/types";
 import CameraScanner from "@/components/shared/CameraScanner";
+import { ImageUploader, AiButton } from "@/components/despachador/shared";
 
 interface ProductoLote {
   nombre:          string;
@@ -32,6 +33,7 @@ export default function RegistroLote() {
   const [costoStr,    setCostoStr]    = useState("");
   // Mapa producto_id → unidadesPorCaja, leído de codigos_cajas (tabla de conversión)
   const [convMap,     setConvMap]     = useState<Record<string, number>>({});
+  const [catalogoErr, setCatalogoErr] = useState<string | null>(null);
   const [items,       setItems]       = useState<ProductoLote[]>([]);
   const [proveedor,   setProveedor]   = useState("");
   const [factNum,     setFactNum]     = useState("");
@@ -42,12 +44,18 @@ export default function RegistroLote() {
   const [guardado,    setGuardado]    = useState<LoteLoker | null>(null);
   const [waNum,       setWaNum]       = useState("");
 
-  // Escáner de factura
+  // Escáner del Nº de factura (código de barras)
   const [showScanner,  setShowScanner]  = useState(false);
   const [scanFocused,  setScanFocused]  = useState(false);
   const [scanValue,    setScanValue]    = useState("");
   const [showCamera,   setShowCamera]   = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
+
+  // Escaneo de factura BON por foto (IA) — igual al picking del Despachador
+  const [showFactScan,  setShowFactScan]  = useState(false);
+  const [imgFactura,    setImgFactura]    = useState<{ base64: string; mimeType: string } | null>(null);
+  const [previewFact,   setPreviewFact]   = useState<string | null>(null);
+  const [analizandoFac, setAnalizandoFac] = useState(false);
 
   // Dropdown de búsqueda de productos
   const dropRef = useRef<HTMLDivElement>(null);
@@ -61,6 +69,17 @@ export default function RegistroLote() {
       toProductoId(p.nombre).includes(q.replace(/\s+/g, "_"))
     );
   });
+
+  // Producto "efectivo": el seleccionado, o el que coincide exacto con lo escrito,
+  // o el único resultado del filtro. Permite agregar sin tener que tocar el dropdown.
+  const prodEfectivo = selProd || (() => {
+    const q = toProductoId(busqueda);
+    if (!q) return "";
+    const exacto = catalogo.find(p => toProductoId(p.nombre) === q);
+    if (exacto) return exacto.nombre;
+    if (catalogoFiltrado.length === 1) return catalogoFiltrado[0].nombre;
+    return "";
+  })();
 
   useEffect(() => {
     // Tabla de conversión cajas→unidades (compartida con SPIKINSCAN/Weight).
@@ -87,11 +106,20 @@ export default function RegistroLote() {
         const d = snap.data();
         const prods: PuntoProducto[] = d.productos ?? [];
         setCatalogo(prods);
+        setCatalogoErr(prods.length === 0 ? "El catálogo está vacío. Pide al Admin que agregue productos." : null);
         if (prods.length > 0) {
           setSelProd(prods[0].nombre);
           setBusqueda(prods[0].nombre);
         }
+      } else {
+        setCatalogoErr("No existe el catálogo (config/puntos). Pide al Admin que lo configure.");
       }
+    }).catch((e) => {
+      setCatalogoErr(
+        e?.code === "permission-denied"
+          ? "Sin permiso para leer el catálogo. Despliega las reglas Firestore (config/*)."
+          : "No se pudo cargar el catálogo de productos."
+      );
     });
     getDoc(doc(db, "config", "main")).then((snap) => {
       if (snap.exists()) {
@@ -155,7 +183,8 @@ export default function RegistroLote() {
   }
 
   function agregar() {
-    if (!selProd) return;
+    const prod = prodEfectivo;
+    if (!prod) return;
     const cajas = Math.max(0, parseInt(cajasStr) || 0);
     const unids = Math.max(0, parseInt(unidsStr) || 0);
     if (cajas === 0 && unids === 0) {
@@ -164,8 +193,9 @@ export default function RegistroLote() {
     }
     setMsg(null);
     const costo  = parseFloat(costoStr) || null;
-    const pid    = toProductoId(selProd);
-    const udsCaja = Math.max(1, parseInt(udsCajaStr) || 1);
+    const pid    = toProductoId(prod);
+    // Si el campo uds/caja quedó vacío, usa la conversión conocida del producto
+    const udsCaja = Math.max(1, parseInt(udsCajaStr) || convMap[pid] || 1);
     const total  = cajas * udsCaja + unids;
     setItems(prev => {
       const idx = prev.findIndex(i => i.producto_id === pid);
@@ -177,7 +207,7 @@ export default function RegistroLote() {
           : it
         );
       }
-      return [...prev, { nombre: selProd, producto_id: pid, cajas, unidades: unids,
+      return [...prev, { nombre: prod, producto_id: pid, cajas, unidades: unids,
         unidadesPorCaja: udsCaja, total,
         ...(costo != null ? { costoUnitario: costo } : {}) }];
     });
@@ -186,6 +216,92 @@ export default function RegistroLote() {
 
   function quitarItem(idx: number) {
     setItems(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  // Edición inline de un item ya en la lista (cajas / uds-caja / unidades / costo)
+  function editarItem(idx: number, campo: "cajas" | "unidadesPorCaja" | "unidades" | "costoUnitario", valor: string) {
+    setItems(prev => prev.map((it, i) => {
+      if (i !== idx) return it;
+      if (campo === "costoUnitario") {
+        const c = parseFloat(valor);
+        const next = { ...it };
+        if (isNaN(c) || c <= 0) delete next.costoUnitario; else next.costoUnitario = c;
+        return next;
+      }
+      const n = Math.max(campo === "unidadesPorCaja" ? 1 : 0, parseInt(valor) || 0);
+      const merged = { ...it, [campo]: campo === "unidadesPorCaja" ? Math.max(1, n) : n };
+      merged.total = merged.cajas * merged.unidadesPorCaja + merged.unidades;
+      return merged;
+    }));
+  }
+
+  // Casa un nombre detectado por IA con un producto del catálogo (o lo deja tal cual)
+  function matchCatalogo(nombre: string): string {
+    const q = toProductoId(nombre);
+    const exacto = catalogo.find(p => toProductoId(p.nombre) === q);
+    if (exacto) return exacto.nombre;
+    const parcial = catalogo.find(p =>
+      toProductoId(p.nombre).includes(q) || q.includes(toProductoId(p.nombre))
+    );
+    return parcial ? parcial.nombre : nombre.trim();
+  }
+
+  // Vuelca los productos detectados en la factura a la lista del lote (editable)
+  function aplicarDetectados(detectados: ProductoItem[]) {
+    let agregados = 0;
+    setItems(prev => {
+      const next = [...prev];
+      for (const d of detectados) {
+        if (!d?.nombre) continue;
+        const nombre  = matchCatalogo(d.nombre);
+        const pid     = toProductoId(nombre);
+        const cajas   = Math.max(0, Math.round(Number(d.cantidad) || 0));
+        if (cajas === 0) continue;
+        const udsCaja = Math.max(1, convMap[pid] || 1);
+        const costo   = d.precio != null && Number(d.precio) > 0 ? Number(d.precio) : undefined;
+        const idx = next.findIndex(i => i.producto_id === pid);
+        if (idx >= 0) {
+          next[idx] = { ...next[idx], cajas: next[idx].cajas + cajas,
+            total: next[idx].total + cajas * udsCaja,
+            costoUnitario: costo ?? next[idx].costoUnitario };
+        } else {
+          next.push({ nombre, producto_id: pid, cajas, unidades: 0,
+            unidadesPorCaja: udsCaja, total: cajas * udsCaja,
+            ...(costo != null ? { costoUnitario: costo } : {}) });
+        }
+        agregados++;
+      }
+      return next;
+    });
+    return agregados;
+  }
+
+  async function analizarFactura() {
+    if (!imgFactura) return;
+    setAnalizandoFac(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: "factura", imageBase64: imgFactura.base64, mimeType: imgFactura.mimeType }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const dets: ProductoItem[] = Array.isArray(data.productos) ? data.productos : [];
+      if (dets.length === 0) {
+        setMsg({ type: "err", text: "No se detectaron productos. Agrégalos manualmente." });
+        return;
+      }
+      const n = aplicarDetectados(dets);
+      if (data.cliente && typeof data.cliente === "string" && !proveedor.trim()) setProveedor(data.cliente);
+      setImgFactura(null); setPreviewFact(null); setShowFactScan(false);
+      setMsg({ type: "ok", text: `Factura analizada: ${n} producto${n !== 1 ? "s" : ""} agregado${n !== 1 ? "s" : ""}. Revisa cantidades y guarda.` });
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Error al analizar la factura." });
+    } finally {
+      setAnalizandoFac(false);
+    }
   }
 
   async function guardar() {
@@ -427,9 +543,47 @@ export default function RegistroLote() {
             )}
           </button>
 
+          {/* ── Escanear factura BON con IA (igual al picking del Despachador) ── */}
+          <div className="border border-emerald-200 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowFactScan(v => !v)}
+              className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-emerald-50
+                text-emerald-800 active:scale-[0.99] transition-all"
+            >
+              <span className="text-sm font-semibold">📄 Escanear factura BON (IA)</span>
+              <span className="text-emerald-500 text-xs">{showFactScan ? "▲ Ocultar" : "▼ Abrir"}</span>
+            </button>
+            {showFactScan && (
+              <div className="p-3 space-y-3 border-t border-emerald-100">
+                <p className="text-xs text-gray-500">
+                  Toma o sube una foto de la factura. La IA extrae los productos y los agrega a la lista;
+                  luego puedes <strong>ajustar las cantidades manualmente</strong> antes de guardar.
+                </p>
+                <ImageUploader
+                  preview={previewFact}
+                  onFile={(b, m, p) => { setImgFactura({ base64: b, mimeType: m }); setPreviewFact(p); }}
+                  onClear={() => { setImgFactura(null); setPreviewFact(null); }}
+                />
+                <AiButton
+                  onClick={analizarFactura}
+                  loading={analizandoFac}
+                  disabled={!imgFactura}
+                  label="Analizar factura"
+                />
+              </div>
+            )}
+          </div>
+
           {/* ── Agregar producto con buscador inteligente ── */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">Agregar producto</label>
+
+            {catalogoErr && (
+              <div className="mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                ⚠️ {catalogoErr}
+              </div>
+            )}
 
             {/* Buscador tipo "configuración del celular" */}
             <div className="relative mb-2" ref={dropRef}>
@@ -552,7 +706,7 @@ export default function RegistroLote() {
               </div>
               <button
                 type="button" onClick={agregar}
-                disabled={!selProd || catalogo.length === 0}
+                disabled={!prodEfectivo || catalogo.length === 0}
                 className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-lg font-bold
                   active:scale-95 transition-all duration-100 self-start disabled:opacity-50"
               >
@@ -574,40 +728,78 @@ export default function RegistroLote() {
             )}
           </div>
 
-          {/* ── Lista de productos del lote ── */}
+          {/* ── Lista de productos del lote (editable inline) ── */}
           {items.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold text-gray-600">
-                Productos en este lote ({items.length}):
+                Productos en este lote ({items.length}) · toca los campos para editar:
               </p>
               {items.map((it, idx) => (
                 <div key={it.producto_id}
-                  className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5"
+                  className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5"
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-emerald-900 truncate">{it.nombre}</p>
-                    <div className="flex flex-wrap gap-2 mt-0.5 text-xs text-emerald-600">
-                      {it.cajas    > 0 && (
-                        <span>{it.cajas} caj <span className="text-emerald-400">× {it.unidadesPorCaja} uds/caja</span></span>
-                      )}
-                      {it.cajas    > 0 && it.unidades > 0 && <span>+</span>}
-                      {it.unidades > 0 && <span>{it.unidades} uds</span>}
-                      <span className="text-emerald-400">· {it.total} total</span>
-                      {it.costoUnitario != null && (
-                        <span className="text-amber-600 font-semibold">
-                          · ${it.costoUnitario.toFixed(2)}/ud
-                          {" "}(${(it.costoUnitario * it.total).toFixed(2)})
-                        </span>
-                      )}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-emerald-900 truncate flex-1 min-w-0">{it.nombre}</p>
+                    <span className="text-xs font-bold text-emerald-700 tabular-nums flex-shrink-0">
+                      {it.total} uds
+                    </span>
+                    <button
+                      onClick={() => quitarItem(idx)}
+                      title="Quitar"
+                      className="text-red-400 hover:text-red-600 active:scale-95 transition-all
+                        text-xl leading-none flex-shrink-0 w-7 h-7 flex items-center justify-center"
+                    >
+                      ×
+                    </button>
                   </div>
-                  <button
-                    onClick={() => quitarItem(idx)}
-                    className="text-red-400 hover:text-red-600 active:scale-95 transition-all
-                      text-xl leading-none flex-shrink-0 w-7 h-7 flex items-center justify-center"
-                  >
-                    ×
-                  </button>
+                  <div className="flex flex-wrap items-end gap-1.5 mt-2">
+                    <label className="flex flex-col">
+                      <span className="text-[10px] text-gray-400 mb-0.5">cajas</span>
+                      <input
+                        type="number" min="0" value={it.cajas}
+                        onChange={(e) => editarItem(idx, "cajas", e.target.value)}
+                        className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                      />
+                    </label>
+                    <span className="text-gray-400 font-bold pb-1.5">×</span>
+                    <label className="flex flex-col">
+                      <span className="text-[10px] text-gray-400 mb-0.5">uds/caja</span>
+                      <input
+                        type="number" min="1" value={it.unidadesPorCaja}
+                        onChange={(e) => editarItem(idx, "unidadesPorCaja", e.target.value)}
+                        className="w-16 border border-emerald-300 bg-emerald-50/40 rounded-lg px-2 py-1.5 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </label>
+                    <span className="text-gray-400 font-bold pb-1.5">+</span>
+                    <label className="flex flex-col">
+                      <span className="text-[10px] text-gray-400 mb-0.5">unidades</span>
+                      <input
+                        type="number" min="0" value={it.unidades}
+                        onChange={(e) => editarItem(idx, "unidades", e.target.value)}
+                        className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                      />
+                    </label>
+                    <span className="text-gray-300 font-bold pb-1.5">·</span>
+                    <label className="flex flex-col">
+                      <span className="text-[10px] text-gray-400 mb-0.5">$/ud</span>
+                      <input
+                        type="number" min="0" step="0.01"
+                        value={it.costoUnitario ?? ""}
+                        placeholder="—"
+                        onChange={(e) => editarItem(idx, "costoUnitario", e.target.value)}
+                        className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                      />
+                    </label>
+                  </div>
+                  {it.costoUnitario != null && (
+                    <p className="text-xs text-amber-600 font-semibold mt-1">
+                      ${it.costoUnitario.toFixed(2)}/ud · ${(it.costoUnitario * it.total).toFixed(2)} total
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
