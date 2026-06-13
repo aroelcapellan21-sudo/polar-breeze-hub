@@ -17,6 +17,14 @@ service cloud.firestore {
       allow read, write: if esAdmin();
     }
 
+    // ── config: catálogo de productos, precios y ajustes ─────────────────────
+    // Datos de referencia que necesitan las apps de todos los roles (catálogo,
+    // tabla de puntos, número de WhatsApp). Lectura para cualquier autenticado;
+    // la escritura sigue restringida a admin vía el catch-all de arriba.
+    match /config/{doc} {
+      allow read: if request.auth != null;
+    }
+
     // ── usuarios ─────────────────────────────────────────────────────────────
     // Cada usuario lee su propio doc (auth-context necesita leer el rol al iniciar).
     // Encargado lee todos (BuscadorGlobal busca choferes por nombre/ficha).
