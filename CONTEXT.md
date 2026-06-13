@@ -49,6 +49,8 @@ Cuatro roles:
 | 13 | Telegram webhook sin secret token | pendiente | ✅ (5 Jun 2026) — verifica X-Telegram-Bot-Api-Secret-Token contra TELEGRAM_WEBHOOK_SECRET; fail-safe si no está configurada |
 | 14 | GOOGLE_PRIVATE_KEY truncada en Vercel (305 chars) | — | ✅ (5 Jun 2026) — clave RSA completa pegada manualmente en Vercel |
 | 15 | Registro de Lotes sumaba cajas + unidades 1:1 (sin conversión) → subconteo de stock | `f3bd8cd` | ✅ (12 Jun 2026) — conversión automática cajas→unidades desde `codigos_cajas` (mapa por `producto_id`) + factor `uds/caja` editable y persistido en `codigos_cajas/prod_*` |
+| 16 | Buscador "Agregar producto" del Registro de Lotes deshabilitado — el endurecimiento de reglas (bug #10) dejó `config/*` sin lectura para roles no-admin → catálogo vacío | `c646b7e` | ✅ (12 Jun 2026) — regla aditiva solo-lectura `config/{doc}` para autenticados; `.catch` que muestra el motivo si el catálogo no carga. Requiere desplegar reglas |
+| 17 | Stock del Loker vacío en Hub Admin ("0 productos", barras desaparecidas) mientras el Encargado sí las mostraba | `3b0b762`, `ee5fd89` | ✅ (12 Jun 2026) — el Admin dependía solo del catch-all: se dio `esAdmin()` explícito a las colecciones del Loker en `firestore.rules` + se quitó el `orderBy("timestamp")` del listener (saldo por `producto_id`, orden en cliente). Requiere desplegar reglas. Listeners endurecidos (`67638a9`) muestran error en vez de quedar en blanco |
 
 ---
 
@@ -92,9 +94,13 @@ Cuatro roles:
 ### App Encargado / Supervisor
 
 - Tabs: Registro de lotes, Choferes, Stock, Vista, Weight.
-- Registro de lotes con escáner HID y buscador inteligente de productos.
+- Registro de lotes con escáner HID y buscador inteligente de productos (`components/encargado/RegistroLote.tsx`).
+  - **Conversión cajas→unidades** automática desde `codigos_cajas` (mapa por `producto_id`; entradas propias `prod_<producto_id>` ganan sobre las de código de barras). `total = cajas × uds/caja + unidades`; factor `uds/caja` editable y persistido.
+  - **Escaneo de factura BON (IA)**: reutiliza `ImageUploader`/`AiButton` del Despachador y `POST /api/analyze` tipo `"factura"`; precarga los productos detectados en la lista (casándolos con el catálogo) y rellena proveedor si detecta cliente.
+  - **Lista de productos editable inline** (cajas × uds/caja + unidades · $/ud) con total recalculado en vivo.
+  - El buscador resuelve "producto efectivo": permite agregar escribiendo el nombre exacto o con un único resultado, sin tocar el dropdown.
 - Tab Choferes → cierre del día, puntos quincena, inventario despachado.
-- Tab Stock → barras de progreso con semáforo de colores.
+- Tab Stock → barras de progreso con semáforo de colores. Listener de `movimientos_loker` con callback de error (muestra aviso en vez de quedar en blanco).
 - Tab Vista → contiene embebida la app `public/polar-breeze-final.html` (App Inventario Choferes).
 - Tab Weight → escáner HID + báscula Bluetooth.
 - **Buscador global** (`components/encargado/BuscadorGlobal.tsx`): busca en `lotes_loker`, `movimientos_loker` (stock), `usuarios` (choferes) e `inventarios/{fecha}/choferes` (últimos 14 días). Sin `orderBy` en la consulta de lotes (evita requisito de índice Firestore compuesto); cada fetch tiene `.catch()` propio.
@@ -227,6 +233,8 @@ El acento del Chofer es negro intencionalmente (color de header). No es color de
 - `usuarios` ≠ `drivers`: `usuarios` es la cuenta de login (Firebase Auth + rol). `drivers` guarda datos operativos del chofer (zona, ruta, estado del día). Un chofer tiene un documento en cada una; el vínculo es la `ficha`.
 - **Productos del catálogo**: no existe colección `productos` en Firestore — el catálogo (paletas, helados, precios, puntos) vive en código (constantes TypeScript en `lib/` o similar). Si esto cambia, actualizar este archivo.
 - **`lotes_loker` vs `movimientos_loker`**: lotes = entrada masiva al almacén (recepción de mercancía); movimientos = transacciones unitarias (entradas/salidas individuales). El stock actual se calcula a partir de movimientos.
+- **Catálogo de productos (`config/puntos`)**: el doc `config/puntos` (campo `productos`) es el catálogo que leen las apps (Registro de Lotes, Cuarto Frío, etc.). Las reglas conceden **lectura de `config/{doc}` a cualquier autenticado** (escritura solo admin) — sin esto el catálogo llega vacío a los roles no-admin (ver bug #16).
+- **Reglas Firestore — acceso del Admin al Loker**: el Hub Admin lee `movimientos_loker` y demás colecciones del Loker con `esAdmin()` **explícito** en cada regla (no solo vía el catch-all), porque el catch-all no autorizaba de forma fiable las consultas `list` (ver bug #17). Toda relajación de reglas sigue siendo solo-lectura y acotada; las escrituras conservan su restricción por rol.
 
 ### Next.js App Router
 
