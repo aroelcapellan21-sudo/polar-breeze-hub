@@ -2,10 +2,12 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "Polar Breeze Hub",
     short_name: "PB Hub",
     description: "Hub Central — Polar Breeze, S.R.L.",
     start_url: "/",
+    scope: "/",
     display: "standalone",
     background_color: "#1A1A1A",
     theme_color: "#F5C800",
