@@ -51,6 +51,7 @@ Cuatro roles:
 | 15 | Registro de Lotes sumaba cajas + unidades 1:1 (sin conversión) → subconteo de stock | `f3bd8cd` | ✅ (12 Jun 2026) — conversión automática cajas→unidades desde `codigos_cajas` (mapa por `producto_id`) + factor `uds/caja` editable y persistido en `codigos_cajas/prod_*` |
 | 16 | Buscador "Agregar producto" del Registro de Lotes deshabilitado — el endurecimiento de reglas (bug #10) dejó `config/*` sin lectura para roles no-admin → catálogo vacío | `c646b7e` | ✅ (12 Jun 2026) — regla aditiva solo-lectura `config/{doc}` para autenticados; `.catch` que muestra el motivo si el catálogo no carga. Requiere desplegar reglas |
 | 17 | Stock del Loker vacío en Hub Admin ("0 productos", barras desaparecidas) mientras el Encargado sí las mostraba | `3b0b762`, `ee5fd89` | ✅ (12 Jun 2026) — el Admin dependía solo del catch-all: se dio `esAdmin()` explícito a las colecciones del Loker en `firestore.rules` + se quitó el `orderBy("timestamp")` del listener (saldo por `producto_id`, orden en cliente). Requiere desplegar reglas. Listeners endurecidos (`67638a9`) muestran error en vez de quedar en blanco |
+| 18 | Stock del Loker **seguía** vacío sin error rojo tras los fixes del #17 — el navegador corría un bundle JS viejo | `b8424fc` | ✅ (13 Jun 2026) — **causa raíz real**: `public/sw.js` cacheaba JS/CSS con *cache-first* y `CACHE_NAME` fijo (`pb-hub-v1`), así que `activate` nunca purgaba y el cliente ejecutaba el listener antiguo aunque el deploy estuviera actualizado. Fix: JS/CSS a *network-first* (fallback a caché solo offline) + bump a `pb-hub-v2`. Verificado: `movimientos_loker` tenía 378 docs bien formados (la colección nunca estuvo vacía). Tras el deploy, el SW se auto-actualiza en la siguiente carga (no requiere "Clear site data" manual) |
 
 ---
 
@@ -265,8 +266,28 @@ lib/
 next.config.ts                 → Redirects /despachador→/app-despachador, etc.
 public/
 ├── polar-breeze-final.html    → App Inventario Choferes (HTML embebida)
+├── sw.js                      → Service Worker (ver nota abajo)
 └── icon-*.svg                 → Íconos PWA por rol
+
+scripts/                       → Scripts .mjs de seed/recuperación (REST Firestore, login admin)
+└── backfill-movimientos-loker.mjs → Reconstruye movimientos_loker faltantes desde lotes_loker
 ```
+
+### Service Worker (`public/sw.js`) — estrategia de caché
+
+Registrado por `components/shared/PWAServiceWorker.tsx`. Estrategia por recurso:
+
+- **API / Firebase / googleapis** → siempre red, sin caché.
+- **Navegación (HTML)** → network-first, fallback a caché (página offline).
+- **JS / CSS** → **network-first**, fallback a caché solo sin conexión. **Crítico:** nunca cache-first — con cache-first el navegador sirve bundles viejos tras un deploy (fue la causa del bug #18, "stock vacío sin error").
+- **Imágenes / fonts** → cache-first (contenido estable).
+- **`CACHE_NAME`** debe **incrementarse** (`pb-hub-vN`) en cada cambio de estrategia para que el handler `activate` purgue el caché anterior.
+
+### Scripts de mantenimiento (`scripts/*.mjs`)
+
+Patrón común: API key pública hardcodeada, login como `admin@polarbreeze.com`, REST de Firestore (sin Admin SDK). Se ejecutan con `node scripts/<nombre>.mjs`.
+
+- **`backfill-movimientos-loker.mjs`** — crea un movimiento `entrada_interior` por producto de cada lote en `lotes_loker` que no tenga su movimiento (idéntico al que escribe `RegistroLote.tsx`). Idempotente: omite lotes que ya tienen movimientos con ese `loteId`. Herramienta de recuperación si un lote queda sin sus movimientos.
 
 ---
 
