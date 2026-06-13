@@ -125,8 +125,11 @@ export default function Inventario() {
   const todayTs    = useMemo(() => Timestamp.fromDate(todayStart), [todayStart]);
 
   // ── Listener 1: movimientos_loker (tiempo real completo) ──────────────────
+  // Sin orderBy en el servidor: el saldo se calcula por producto_id (no depende
+  // del orden) y la lista se ordena en cliente más abajo. Evita excluir docs sin
+  // campo timestamp y simplifica la autorización de la consulta (list).
   useEffect(() => {
-    const q = query(collection(db, "movimientos_loker"), orderBy("timestamp", "desc"));
+    const q = query(collection(db, "movimientos_loker"));
     return onSnapshot(q, (snap) => {
       setMovimientos(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MovimientoLoker)));
       setStockError(null);
