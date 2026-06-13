@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  collection, addDoc, getDocs, Timestamp, getDoc, doc,
+  collection, addDoc, getDocs, Timestamp, getDoc, doc, setDoc, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
@@ -10,12 +10,13 @@ import { PuntoProducto, LoteLoker, toProductoId } from "@/lib/types";
 import CameraScanner from "@/components/shared/CameraScanner";
 
 interface ProductoLote {
-  nombre:        string;
-  producto_id:   string;
-  cajas:         number;
-  unidades:      number;
-  total:         number;
-  costoUnitario?: number;
+  nombre:          string;
+  producto_id:     string;
+  cajas:           number;
+  unidades:        number;
+  unidadesPorCaja: number;
+  total:           number;
+  costoUnitario?:  number;
 }
 
 export default function RegistroLote() {
@@ -27,7 +28,10 @@ export default function RegistroLote() {
   const [showDrop,    setShowDrop]    = useState(false);
   const [cajasStr,    setCajasStr]    = useState("");
   const [unidsStr,    setUnidsStr]    = useState("");
+  const [udsCajaStr,  setUdsCajaStr]  = useState("1");
   const [costoStr,    setCostoStr]    = useState("");
+  // Mapa producto_id → unidadesPorCaja, leído de codigos_cajas (tabla de conversión)
+  const [convMap,     setConvMap]     = useState<Record<string, number>>({});
   const [items,       setItems]       = useState<ProductoLote[]>([]);
   const [proveedor,   setProveedor]   = useState("");
   const [factNum,     setFactNum]     = useState("");
@@ -59,6 +63,25 @@ export default function RegistroLote() {
   });
 
   useEffect(() => {
+    // Tabla de conversión cajas→unidades (compartida con SPIKINSCAN/Weight).
+    // Indexada por código de barras: derivamos un mapa por producto_id (nombre normalizado).
+    // Las entradas propias "prod_<producto_id>" (override del Encargado) ganan sobre las de barras.
+    getDocs(collection(db, "codigos_cajas")).then((snap) => {
+      const base: Record<string, number> = {};
+      const overrides: Record<string, number> = {};
+      snap.forEach((docu) => {
+        const d = docu.data();
+        const uds = Number(d.unidadesPorCaja);
+        if (!uds || uds < 1) return;
+        if (docu.id.startsWith("prod_")) {
+          overrides[docu.id.slice(5)] = uds;
+        } else if (d.producto) {
+          base[toProductoId(String(d.producto))] = uds;
+        }
+      });
+      setConvMap({ ...base, ...overrides });
+    }).catch(() => { /* sin conversión → default 1 */ });
+
     getDoc(doc(db, "config", "puntos")).then((snap) => {
       if (snap.exists()) {
         const d = snap.data();
@@ -78,6 +101,13 @@ export default function RegistroLote() {
       }
     });
   }, []);
+
+  // Autocompletar uds/caja desde la tabla de conversión al elegir producto
+  useEffect(() => {
+    if (!selProd) return;
+    const uds = convMap[toProductoId(selProd)];
+    setUdsCajaStr(uds && uds > 1 ? String(uds) : "1");
+  }, [selProd, convMap]);
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
@@ -133,19 +163,22 @@ export default function RegistroLote() {
       return;
     }
     setMsg(null);
-    const costo = parseFloat(costoStr) || null;
-    const pid   = toProductoId(selProd);
-    const total = cajas + unids;
+    const costo  = parseFloat(costoStr) || null;
+    const pid    = toProductoId(selProd);
+    const udsCaja = Math.max(1, parseInt(udsCajaStr) || 1);
+    const total  = cajas * udsCaja + unids;
     setItems(prev => {
       const idx = prev.findIndex(i => i.producto_id === pid);
       if (idx >= 0) {
         return prev.map((it, i) => i === idx
-          ? { ...it, cajas: it.cajas + cajas, unidades: it.unidades + unids, total: it.total + total,
+          ? { ...it, cajas: it.cajas + cajas, unidades: it.unidades + unids,
+              unidadesPorCaja: udsCaja, total: it.total + total,
               costoUnitario: costo ?? it.costoUnitario }
           : it
         );
       }
-      return [...prev, { nombre: selProd, producto_id: pid, cajas, unidades: unids, total,
+      return [...prev, { nombre: selProd, producto_id: pid, cajas, unidades: unids,
+        unidadesPorCaja: udsCaja, total,
         ...(costo != null ? { costoUnitario: costo } : {}) }];
     });
     setCajasStr(""); setUnidsStr(""); setCostoStr("");
@@ -174,9 +207,15 @@ export default function RegistroLote() {
         ...(proveedor.trim() ? { proveedor: proveedor.trim() } : {}),
         ...(factNum.trim()   ? { facturaNumero: factNum.trim() } : {}),
         facturaEntregada: factOk,
-        productos: items.map(({ costoUnitario, ...rest }) =>
-          costoUnitario != null ? { ...rest, costoUnitario } : rest
-        ),
+        // unidadesPorCaja no se guarda en el lote (LoteLoker estable); el total ya viene convertido
+        productos: items.map((it) => ({
+          nombre:      it.nombre,
+          producto_id: it.producto_id,
+          cajas:       it.cajas,
+          unidades:    it.unidades,
+          total:       it.total,
+          ...(it.costoUnitario != null ? { costoUnitario: it.costoUnitario } : {}),
+        })),
         registradoPor:   nombre,
         registradoPorId: uid,
         timestamp:       ts,
@@ -198,6 +237,27 @@ export default function RegistroLote() {
           loteId:      loteRef.id,
         })
       ));
+
+      // Persistir las conversiones editadas en codigos_cajas (key prod_<producto_id>),
+      // solo cuando el factor es > 1 y difiere del valor leído. Falla en silencio: nunca
+      // debe tumbar el guardado del lote ya confirmado.
+      try {
+        const nuevos: Record<string, number> = {};
+        await Promise.all(items
+          .filter(it => it.unidadesPorCaja > 1 && convMap[it.producto_id] !== it.unidadesPorCaja)
+          .map(it => {
+            nuevos[it.producto_id] = it.unidadesPorCaja;
+            return setDoc(doc(db, "codigos_cajas", `prod_${it.producto_id}`), {
+              codigo:          `prod_${it.producto_id}`,
+              producto:        it.nombre,
+              unidadesPorCaja: it.unidadesPorCaja,
+              creadoPor:       nombre,
+              creadoEn:        serverTimestamp(),
+            }, { merge: true });
+          })
+        );
+        if (Object.keys(nuevos).length > 0) setConvMap(prev => ({ ...prev, ...nuevos }));
+      } catch { /* permisos u otro fallo: la conversión no se persiste, el lote ya se guardó */ }
 
       setGuardado({ ...loteData, id: loteRef.id });
       setItems([]); setProveedor(""); setFactNum(""); setFactOk(false); setNotas("");
@@ -444,9 +504,9 @@ export default function RegistroLote() {
               )}
             </div>
 
-            {/* Cantidad: cajas + unidades + costo */}
-            <div className="flex gap-2">
-              <div className="flex-1">
+            {/* Cantidad: cajas × uds/caja + unidades · costo */}
+            <div className="flex flex-wrap gap-2 items-start">
+              <div className="flex-1 min-w-[64px]">
                 <input
                   type="number" value={cajasStr}
                   onChange={(e) => setCajasStr(e.target.value)}
@@ -456,8 +516,19 @@ export default function RegistroLote() {
                 />
                 <p className="text-xs text-gray-400 mt-0.5 text-center">cajas</p>
               </div>
+              <div className="flex items-start pt-2.5 text-gray-400 font-bold">×</div>
+              <div className="flex-1 min-w-[64px]">
+                <input
+                  type="number" value={udsCajaStr}
+                  onChange={(e) => setUdsCajaStr(e.target.value)}
+                  placeholder="Uds/caja" min="1"
+                  className="w-full border border-emerald-300 bg-emerald-50/40 rounded-lg px-3 py-2 text-sm
+                    focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+                <p className="text-xs text-gray-400 mt-0.5 text-center">uds/caja</p>
+              </div>
               <div className="flex items-start pt-2.5 text-gray-400 font-bold">+</div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-[64px]">
                 <input
                   type="number" value={unidsStr}
                   onChange={(e) => setUnidsStr(e.target.value)}
@@ -468,7 +539,7 @@ export default function RegistroLote() {
                 <p className="text-xs text-gray-400 mt-0.5 text-center">unidades</p>
               </div>
               <div className="flex items-start pt-2.5 text-gray-300 font-bold">·</div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-[64px]">
                 <input
                   type="number" value={costoStr}
                   onChange={(e) => setCostoStr(e.target.value)}
@@ -488,6 +559,19 @@ export default function RegistroLote() {
                 +
               </button>
             </div>
+
+            {/* Preview en vivo del total convertido */}
+            {((parseInt(cajasStr) || 0) > 0 || (parseInt(unidsStr) || 0) > 0) && (
+              <p className="text-xs text-emerald-700 mt-1.5 font-medium">
+                = {(parseInt(cajasStr) || 0) * Math.max(1, parseInt(udsCajaStr) || 1) + (parseInt(unidsStr) || 0)} unidades
+                {(parseInt(cajasStr) || 0) > 0 && (
+                  <span className="text-gray-400 font-normal">
+                    {" "}({parseInt(cajasStr) || 0} × {Math.max(1, parseInt(udsCajaStr) || 1)}
+                    {(parseInt(unidsStr) || 0) > 0 ? ` + ${parseInt(unidsStr) || 0}` : ""})
+                  </span>
+                )}
+              </p>
+            )}
           </div>
 
           {/* ── Lista de productos del lote ── */}
@@ -503,7 +587,9 @@ export default function RegistroLote() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-emerald-900 truncate">{it.nombre}</p>
                     <div className="flex flex-wrap gap-2 mt-0.5 text-xs text-emerald-600">
-                      {it.cajas    > 0 && <span>{it.cajas} caj</span>}
+                      {it.cajas    > 0 && (
+                        <span>{it.cajas} caj <span className="text-emerald-400">× {it.unidadesPorCaja} uds/caja</span></span>
+                      )}
                       {it.cajas    > 0 && it.unidades > 0 && <span>+</span>}
                       {it.unidades > 0 && <span>{it.unidades} uds</span>}
                       <span className="text-emerald-400">· {it.total} total</span>
