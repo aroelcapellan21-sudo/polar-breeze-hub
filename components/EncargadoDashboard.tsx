@@ -31,6 +31,7 @@ export default function EncargadoDashboard() {
   const [showTablas,     setShowTablas]     = useState(false);
   const [showBuscador,   setShowBuscador]   = useState(false);
   const [stockCargado, setStockCargado] = useState(false);
+  const [stockError,   setStockError]   = useState<string | null>(null);
 
   // Badge del tab Choferes — recibe el conteo de ConsultaChoferes
   const [pendientesBadge, setPendientesBadge] = useState(0);
@@ -39,10 +40,20 @@ export default function EncargadoDashboard() {
   useEffect(() => {
     if (tab !== "stock") return;
     setStockCargado(false);
+    setStockError(null);
     const unsub = onSnapshot(
       query(collection(db, "movimientos_loker"), orderBy("timestamp", "desc")),
       (snap) => {
         setMovimientos(snap.docs.map(d => ({ id: d.id, ...d.data() } as MovimientoLoker)));
+        setStockError(null);
+        setStockCargado(true);
+      },
+      (err) => {
+        setStockError(
+          err?.code === "permission-denied"
+            ? "No se pudo leer el stock: sin permiso sobre movimientos_loker. Revisa/despliega las reglas Firestore."
+            : "No se pudo leer el stock del loker."
+        );
         setStockCargado(true);
       }
     );
@@ -280,6 +291,11 @@ export default function EncargadoDashboard() {
             {!stockCargado ? (
               <div className="px-4 py-12 text-center">
                 <p className="text-sm text-gray-400 animate-pulse">Cargando stock…</p>
+              </div>
+            ) : stockError ? (
+              <div className="px-4 py-10 text-center">
+                <p className="text-3xl mb-2">⚠️</p>
+                <p className="text-sm font-semibold text-red-600">{stockError}</p>
               </div>
             ) : saldo.length === 0 ? (
               <div className="px-4 py-12 text-center">

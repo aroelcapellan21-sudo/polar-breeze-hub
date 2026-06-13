@@ -72,6 +72,7 @@ export default function Inventario() {
   const [movimientos,  setMovimientos]  = useState<MovimientoLoker[]>([]);
   const [talonarioHoy, setTalonarioHoy] = useState<TalonarioDoc[]>([]);
   const [cargando,     setCargando]     = useState(true);
+  const [stockError,   setStockError]   = useState<string | null>(null);
 
   // Form state
   const [tipo,      setTipo]      = useState<TipoLoker>("entrada_interior");
@@ -128,6 +129,14 @@ export default function Inventario() {
     const q = query(collection(db, "movimientos_loker"), orderBy("timestamp", "desc"));
     return onSnapshot(q, (snap) => {
       setMovimientos(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MovimientoLoker)));
+      setStockError(null);
+      setCargando(false);
+    }, (err) => {
+      setStockError(
+        err?.code === "permission-denied"
+          ? "No se pudo leer el stock: sin permiso sobre movimientos_loker. Revisa/despliega las reglas Firestore."
+          : "No se pudo leer el stock del loker."
+      );
       setCargando(false);
     });
   }, []);
@@ -798,6 +807,11 @@ export default function Inventario() {
             {cargando ? (
               <div className="px-4 py-6 text-center">
                 <p className="text-sm text-gray-400 animate-pulse">Cargando stock…</p>
+              </div>
+            ) : stockError ? (
+              <div className="px-4 py-6 text-center">
+                <p className="text-2xl mb-2">⚠️</p>
+                <p className="text-sm font-semibold text-red-600">{stockError}</p>
               </div>
             ) : saldoConDetalle.length === 0 ? (
               <div className="px-4 py-6 text-center">
