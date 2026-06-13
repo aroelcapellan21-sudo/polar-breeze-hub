@@ -48,6 +48,7 @@ Cuatro roles:
 | 12 | /api/admin-setup sin rate limit ni deshabilitación | pendiente | ✅ (5 Jun 2026) — 410 si ADMIN_SETUP_DISABLED=true; rate limit 5/60 s por IP |
 | 13 | Telegram webhook sin secret token | pendiente | ✅ (5 Jun 2026) — verifica X-Telegram-Bot-Api-Secret-Token contra TELEGRAM_WEBHOOK_SECRET; fail-safe si no está configurada |
 | 14 | GOOGLE_PRIVATE_KEY truncada en Vercel (305 chars) | — | ✅ (5 Jun 2026) — clave RSA completa pegada manualmente en Vercel |
+| 15 | Registro de Lotes sumaba cajas + unidades 1:1 (sin conversión) → subconteo de stock | `f3bd8cd` | ✅ (12 Jun 2026) — conversión automática cajas→unidades desde `codigos_cajas` (mapa por `producto_id`) + factor `uds/caja` editable y persistido en `codigos_cajas/prod_*` |
 
 ---
 
