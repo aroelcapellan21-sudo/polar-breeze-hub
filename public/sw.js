@@ -1,9 +1,14 @@
 /**
  * Service Worker — Polar Breeze Hub
- * Caching strategy: Network-first para API/Firebase, Cache-first para assets estáticos
+ * Caching strategy:
+ *   - API/Firebase  → siempre red, sin caché
+ *   - Navegación    → network-first, fallback a caché (offline)
+ *   - JS / CSS      → network-first, fallback a caché — evita servir bundles
+ *                     viejos tras un deploy (ver "stock vacío" por SW cacheado)
+ *   - Imágenes/fonts → cache-first (contenido estable, gana velocidad)
  */
 
-const CACHE_NAME = "pb-hub-v1";
+const CACHE_NAME = "pb-hub-v2";
 const STATIC_ASSETS = [
   "/",
   "/app-despachador",
@@ -85,10 +90,27 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Assets estáticos (JS, CSS, imágenes) → Cache-first
+  // JS / CSS → Network-first, fallback a caché.
+  // Evita servir un bundle viejo tras un deploy: siempre intenta la red y solo
+  // usa la copia cacheada si no hay conexión.
   if (
     event.request.destination === "script" ||
-    event.request.destination === "style" ||
+    event.request.destination === "style"
+  ) {
+    event.respondWith(
+      fetch(event.request)
+        .then((res) => {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Imágenes y fonts → Cache-first (contenido estable, prioriza velocidad)
+  if (
     event.request.destination === "image" ||
     event.request.destination === "font"
   ) {
