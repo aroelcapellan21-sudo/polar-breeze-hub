@@ -43,18 +43,24 @@ service cloud.firestore {
     }
 
     // ── Despachador: history · talonario · drivers · movimientos_loker ───────
-    match /history/{id}          { allow read, write: if esDespacha(); }
-    match /talonario/{id}        { allow read, write: if esDespacha(); }
-    match /drivers/{id}          { allow read, write: if esDespacha(); }
+    // Se incluye esAdmin() explícito para que el Hub Admin no dependa solo del
+    // catch-all al hacer consultas (list) sobre estas colecciones.
+    match /history/{id}          { allow read, write: if esAdmin() || esDespacha(); }
+    match /talonario/{id}        { allow read, write: if esAdmin() || esDespacha(); }
+    match /drivers/{id}          { allow read, write: if esAdmin() || esDespacha(); }
     match /movimientos_loker/{id} {
-      // Despachador registra salidas del día; Encargado gestiona stock del Loker
-      allow read, write: if esDespacha() || esEncargado();
+      // Despachador registra salidas del día; Encargado gestiona stock del Loker;
+      // Admin lee el stock en el Hub.
+      allow read, write: if esAdmin() || esDespacha() || esEncargado();
     }
 
-    // ── Encargado exclusivo: lotes_loker · codigos_cajas · weight_alerts ─────
-    match /lotes_loker/{id}       { allow read, write: if esEncargado(); }
-    match /codigos_cajas/{codigo} { allow read, write: if esEncargado(); }
-    match /weight_alerts/{id}     { allow read, write: if esEncargado(); }
+    // ── Encargado + Admin: lotes_loker · codigos_cajas · weight_alerts ───────
+    match /lotes_loker/{id}       { allow read, write: if esAdmin() || esEncargado(); }
+    match /codigos_cajas/{codigo} { allow read, write: if esAdmin() || esEncargado(); }
+    match /weight_alerts/{id}     { allow read, write: if esAdmin() || esEncargado(); }
+
+    // ── notas_credito: gestionadas desde el Hub Admin (Inventario) ───────────
+    match /notas_credito/{id}     { allow read, write: if esAdmin(); }
 
     // Colecciones no listadas (alertas, logs, etc.) → solo Admin vía catch-all
   }
