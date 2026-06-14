@@ -60,7 +60,7 @@ Sistema de gestión de distribución de helados para **Polar Breeze, S.R.L.**, S
 |---|-------------|-----------|--------|
 | 1 | WhatsApp Web en FAB 📤 — separar código de país del número local, selector rápido (+1 RD/US, +52 MX, +34 ES, +57 CO) | Alta | ✅ Hecho — `FloatingFAB.tsx` (CC_OPTIONS) |
 | 2 | Campana de alertas no funciona en Dashboard del día | Alta | ✅ Hecho — `admin/Inventario.tsx` (panel alertasPanel) |
-| 3 | Modo claro/oscuro roto en app inventario | Media | ✅ Hecho — `polar-breeze-final.html` (toggleTheme + overrides .dark). Pendiente menor: persistir tema |
+| 3 | Modo claro/oscuro roto en app inventario | Media | ✅ Hecho — `polar-breeze-final.html` (toggleTheme + overrides .dark). Tema persistido en `localStorage` (clave `pb_theme`), se restaura al cargar |
 | 4 | Botón 👥 — nueva función: ver inventarios guardados | Media | ✅ Hecho — `polar-breeze-final.html` (abrirInvReg desde lista 👥) |
 | 5 | Verificar flujo completo del Despachador de inicio a fin | Media | 🟡 Cableado correcto; falta prueba en vivo (Firebase + Node 20) |
 
