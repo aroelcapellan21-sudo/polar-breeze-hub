@@ -101,12 +101,13 @@ function buildPagePrintCSS(mode: PrintMode): string {
       .no-print, .pb-fab-root { display: none !important; }
 
       /* Solo contenido relevante (§5): fuera los controles de acción y los
-         adornos de tarjeta. Convención reutilizable:
-           .no-print       → controles de acción (botones Compartir, toggles…)
+         adornos de tarjeta. Convención reutilizable y NO invasiva — solo
+         afecta a elementos marcados, nunca a toda la app:
+           .no-print       → controles de acción (botones Compartir, toggles,
+                             barras de filtro, inputs/selects de acción…)
            .pb-print-band  → bandas tricolor decorativas (no aportan al papel)
            .pb-print-flat  → encabezados oscuros → fondo blanco + texto negro
                              (deja el título en texto simple, ahorra tinta) */
-      input, select, textarea { display: none !important; }
       .pb-print-band { display: none !important; }
       .pb-print-flat { background: #fff !important; box-shadow: none !important; }
       .pb-print-flat, .pb-print-flat * {
