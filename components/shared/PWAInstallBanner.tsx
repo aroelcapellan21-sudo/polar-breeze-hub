@@ -74,7 +74,7 @@ export default function PWAInstallBanner({ appName, appIcon }: Props) {
 
   return (
     <div
-      className="fixed bottom-24 left-4 right-4 z-[9000] max-w-sm mx-auto
+      className="no-print fixed bottom-24 left-4 right-4 z-[9000] max-w-sm mx-auto
         bg-[#1A1A1A] rounded-2xl shadow-2xl border border-white/10 overflow-hidden
         animate-in slide-in-from-bottom-4 duration-300"
     >

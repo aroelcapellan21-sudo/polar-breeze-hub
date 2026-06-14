@@ -214,7 +214,7 @@ export default function AsistenteAI({ rol = "encargado", nombre, contexto }: Pro
         onPointerUp={handlePointerUp}
         title="Asistente Polar Breeze — arrastra para mover"
         style={{ left: pos.x, top: pos.y, zIndex: 9040, touchAction: "none" }}
-        className={`fixed w-12 h-12 rounded-full shadow-lg select-none
+        className={`no-print fixed w-12 h-12 rounded-full shadow-lg select-none
           flex items-center justify-center transition-transform duration-150
           cursor-grab active:cursor-grabbing
           ${open ? "bg-gray-700 hover:bg-gray-800 scale-90" : "bg-[#1A1A1A] hover:bg-gray-800"}`}
@@ -235,7 +235,7 @@ export default function AsistenteAI({ rol = "encargado", nombre, contexto }: Pro
       {/* ── Panel de chat ── */}
       {open && (
         <div
-          className="fixed bg-white rounded-2xl shadow-2xl border border-gray-200
+          className="no-print fixed bg-white rounded-2xl shadow-2xl border border-gray-200
             flex flex-col overflow-hidden"
           style={{ ...getPanelStyle(), zIndex: 9050 }}
         >

@@ -23,7 +23,7 @@ export default function WelcomeBanner({ nombre, area, acento = "#F5C800" }: Prop
   }) ?? "";
 
   return (
-    <div className="bg-white border-b border-gray-100 px-4 py-2.5">
+    <div className="no-print bg-white border-b border-gray-100 px-4 py-2.5">
       <div className="flex items-center justify-between gap-4">
 
         {/* ── Izquierda: saludo + área ── */}

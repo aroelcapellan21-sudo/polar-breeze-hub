@@ -56,6 +56,12 @@ input, textarea, select {
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* ── Impresión: ocultar UI chrome, mostrar solo el contenido ──────────── */
+/* Aplica a CUALQUIER impresión (FAB o Ctrl+P nativo). El FAB inyecta además
+   estilos por modo (factura/tabla/normal) encima de estas reglas base.
+   <header> es exclusivo del chrome de los dashboards (logo + botones + nav +
+   banda tricolor); los flotantes/banners se marcan con .no-print. */
 @media print {
+  header,
+  .no-print,
   .pb-fab-root { display: none !important; }
 }

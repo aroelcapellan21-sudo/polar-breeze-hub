@@ -93,7 +93,12 @@ function buildPagePrintCSS(mode: PrintMode): string {
   // Ocultar chrome de UI: FAB, elementos fixed/sticky que no son contenido
   const base = `
     @media print {
-      .pb-fab-root { display: none !important; }
+      /* Chrome de la app: header (logo + botones + nav tabs + banda tricolor),
+         banner de bienvenida, asistente, banner PWA y el propio FAB.
+         <header> es exclusivo del chrome de los dashboards (no se usa en
+         módulos de contenido), por eso se puede ocultar de forma estructural. */
+      header { display: none !important; }
+      .no-print, .pb-fab-root { display: none !important; }
       @page { margin: 12mm; }
       body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
