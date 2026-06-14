@@ -118,7 +118,10 @@ marcar ✅ con el commit al terminar cada una.
 
 ### App Encargado / Supervisor
 
-- Tabs: Lote (registro), Guardados, Weight, Stock, Urgente, Choferes, Vista.
+- Tabs: Lote (Entrada/Salida), Guardados, Weight, Stock, Urgente, Choferes, Vista.
+- **Tab Lote — sub-toggle Entrada / Salida (Picking)** (en `EncargadoDashboard.tsx`, estado `loteVista`):
+  - **📥 Entrada** → `RegistroLote.tsx` (sin cambios): registra lotes recibidos de BON (suma a `movimientos_loker` con `tipo: entrada_interior`, cantidad positiva).
+  - **📤 Salida (Picking)** → `SalidaPicking.tsx`: registra lo que sale al despacho. Lee el stock en vivo (saldo > 0), arma una lista producto+cantidad y al confirmar escribe un movimiento por producto con `tipo: salida_despacho`, `categoria: retiro_despacho`, `motivo: "picking"` y `cantidad` **negativa** → descuenta del stock. Avisa en rojo si una cantidad excede lo disponible (quedaría negativo y dispara la alarma). Reusa tipos existentes para no tocar `lib/types.ts`. Compartir por WhatsApp opcional.
 - Registro de lotes con escáner HID y buscador inteligente de productos (`components/encargado/RegistroLote.tsx`).
   - **Conversión cajas→unidades** automática desde `codigos_cajas` (mapa por `producto_id`; entradas propias `prod_<producto_id>` ganan sobre las de código de barras). `total = cajas × uds/caja + unidades`; factor `uds/caja` editable y persistido.
   - **Escaneo de factura BON (IA)**: reutiliza `ImageUploader`/`AiButton` del Despachador y `POST /api/analyze` tipo `"factura"`; precarga los productos detectados en la lista (casándolos con el catálogo) y rellena proveedor si detecta cliente.

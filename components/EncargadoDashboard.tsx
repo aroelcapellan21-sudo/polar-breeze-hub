@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { MovimientoLoker } from "@/lib/types";
 import RegistroLote       from "@/components/encargado/RegistroLote";
+import SalidaPicking      from "@/components/encargado/SalidaPicking";
 import LotesGuardados     from "@/components/encargado/LotesGuardados";
 import ConsultaChoferes   from "@/components/encargado/ConsultaChoferes";
 import PolarBreezeWeight  from "@/components/encargado/PolarBreezeWeight";
@@ -89,6 +90,7 @@ export default function EncargadoDashboard() {
   const { profile, logout } = useAuth();
 
   const [tab,          setTab]          = useState<Tab>("lote");
+  const [loteVista,    setLoteVista]    = useState<"entrada" | "salida">("entrada");
   const [movimientos,  setMovimientos]  = useState<MovimientoLoker[]>([]);
   const [showTablas,     setShowTablas]     = useState(false);
   const [showBuscador,   setShowBuscador]   = useState(false);
@@ -332,7 +334,11 @@ export default function EncargadoDashboard() {
         <div className="bg-black/20 border-t border-white/10">
           <div className="max-w-2xl mx-auto px-4 py-1.5 flex items-center justify-between">
             <span className="text-xs text-[#F5C800] font-medium truncate">
-              {BREADCRUMB[tab]}
+              {tab === "lote"
+                ? (loteVista === "entrada"
+                    ? "📥 Entrada — registrar lotes recibidos de BON"
+                    : "📤 Salida (Picking) — descuenta del stock del loker")
+                : BREADCRUMB[tab]}
             </span>
             <span className="flex items-center gap-1 text-gray-400 text-[10px] flex-shrink-0 ml-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[#1E8C3A] animate-pulse" />
@@ -349,7 +355,36 @@ export default function EncargadoDashboard() {
       ══════════════════════════════════════════ */}
       <main className="max-w-2xl mx-auto px-4 py-5">
 
-        {tab === "lote"      && <RegistroLote />}
+        {tab === "lote" && (
+          <div className="space-y-4">
+            {/* Sub-toggle Entrada / Salida (Picking) */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 flex gap-1">
+              <button
+                type="button"
+                onClick={() => setLoteVista("entrada")}
+                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
+                  loteVista === "entrada"
+                    ? "bg-[#1E8C3A] text-white shadow-sm"
+                    : "text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                📥 Entrada
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoteVista("salida")}
+                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
+                  loteVista === "salida"
+                    ? "bg-[#D42B2B] text-white shadow-sm"
+                    : "text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                📤 Salida (Picking)
+              </button>
+            </div>
+            {loteVista === "entrada" ? <RegistroLote /> : <SalidaPicking />}
+          </div>
+        )}
         {tab === "guardados" && <LotesGuardados />}
         {tab === "weight" && (
           <div className="space-y-4">
