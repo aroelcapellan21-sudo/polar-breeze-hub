@@ -709,6 +709,7 @@ export default function RegistroLote() {
                 <input
                   type="number" value={cajasStr}
                   onChange={(e) => setCajasStr(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && agregar()}
                   placeholder="Cajas" min="0"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
                     focus:outline-none focus:ring-2 focus:ring-emerald-400"
@@ -720,6 +721,7 @@ export default function RegistroLote() {
                 <input
                   type="number" value={udsCajaStr}
                   onChange={(e) => setUdsCajaStr(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && agregar()}
                   placeholder="Uds/caja" min="1"
                   className="w-full border border-emerald-300 bg-emerald-50/40 rounded-lg px-3 py-2 text-sm
                     focus:outline-none focus:ring-2 focus:ring-emerald-400"
@@ -731,6 +733,7 @@ export default function RegistroLote() {
                 <input
                   type="number" value={unidsStr}
                   onChange={(e) => setUnidsStr(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && agregar()}
                   placeholder="Unidades" min="0"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
                     focus:outline-none focus:ring-2 focus:ring-emerald-400"
