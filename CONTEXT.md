@@ -67,7 +67,7 @@ marcar ✅ con el commit al terminar cada una.
 | 3 | Lotes guardados con búsqueda por fecha (tab 🗂️ Guardados, `LotesGuardados.tsx`) | ✅ `66b6fa2` |
 | 4 | Impresión solo contenido relevante (oculta controles + adornos; convención `.no-print`/`.pb-print-band`/`.pb-print-flat`) | ✅ `a528c88` |
 | 5 | Sincronización/revisión manual por chofer con indicador azul (localStorage `pb_revisados_<fecha>`) | ✅ `d5f6767` |
-| 6 | Salidas por picking en Encargado | ⏳ Pendiente |
+| 6 | Salidas por picking en Encargado (tab Lote → Entrada/Salida, `SalidaPicking.tsx`) | ✅ `2ba2bea` |
 | 7 | Despacho directo Encargado → choferes | ⏳ Pendiente |
 | 8 | Lista manual del Encargado visible en Hub Admin | ⏳ Pendiente |
 | 9 | Módulo de reposición inteligente | ⏳ Pendiente |
