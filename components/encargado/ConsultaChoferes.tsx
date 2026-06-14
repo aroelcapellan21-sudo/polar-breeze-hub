@@ -18,6 +18,7 @@ import {
   PuntoProducto, InventarioBaseItem, toDate,
 } from "@/lib/types";
 import RegistrarInventario from "@/components/encargado/RegistrarInventario";
+import DespachoChofer      from "@/components/encargado/DespachoChofer";
 
 // ─── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -119,6 +120,9 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
 
   // Modal de registro/detalle
   const [modalChofer, setModalChofer] = useState<{ uid: string; nombre: string; ficha: string } | null>(null);
+
+  // Modal de despacho directo Encargado → chofer (Mejora #7)
+  const [despachoChofer, setDespachoChofer] = useState<{ uid: string; nombre: string; ficha?: string } | null>(null);
 
   const rankingRef  = useRef<HTMLDivElement>(null);
   const quincena    = useMemo(() => getQuincena(), []);
@@ -533,6 +537,17 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
                         </div>
                       </button>
 
+                      {/* Botón de despacho directo a este chofer (Mejora #7) */}
+                      <button
+                        onClick={() => setDespachoChofer({ uid: c.uid, nombre: c.nombre, ficha: c.ficha })}
+                        title={`Despachar mercancía a ${c.nombre}`}
+                        className="flex-shrink-0 w-12 flex items-center justify-center text-base
+                          border-l border-gray-100 bg-white text-gray-400
+                          hover:bg-green-50 hover:text-[#1E8C3A] active:scale-95 transition-colors"
+                      >
+                        🚚
+                      </button>
+
                       {/* Botón de revisión manual — azul cuando está marcado */}
                       {c.ficha && (
                         <button
@@ -788,6 +803,15 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
           nombre={modalChofer.nombre}
           ficha={modalChofer.ficha}
           onClose={() => setModalChofer(null)}
+        />
+      )}
+
+      {despachoChofer && (
+        <DespachoChofer
+          uid={despachoChofer.uid}
+          nombre={despachoChofer.nombre}
+          ficha={despachoChofer.ficha}
+          onClose={() => setDespachoChofer(null)}
         />
       )}
     </div>
