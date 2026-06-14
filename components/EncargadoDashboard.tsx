@@ -75,6 +75,25 @@ export default function EncargadoDashboard() {
       });
   }, [movimientos]);
 
+  // Filtro del tab Stock: todos vs solo críticos (agotado o negativo)
+  const [stockFiltro, setStockFiltro] = useState<"todos" | "urgente">("todos");
+  const criticos = useMemo(() => saldo.filter(p => p.saldo <= 0), [saldo]);
+
+  // Mensaje de WhatsApp con la lista de stock crítico (URL sin número → el
+  // Encargado elige a quién enviarlo: proveedor, admin, grupo…).
+  function buildStockUrgenteWa(): string {
+    const fecha = new Date().toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric" });
+    const lines = [
+      "🚨 *STOCK URGENTE — POLAR BREEZE*",
+      `📅 ${fecha}`,
+      "",
+      ...criticos.map(p => `• ${p.nombre}: *${p.saldo} uds* ${p.saldo < 0 ? "(negativo)" : "(agotado)"}`),
+      "",
+      `Total crítico: ${criticos.length} producto${criticos.length !== 1 ? "s" : ""}`,
+    ].join("\n");
+    return `https://wa.me/?text=${encodeURIComponent(lines)}`;
+  }
+
   // ── Definición de tabs ────────────────────────────────────────────────────
   const TABS: { key: Tab; icon: string; label: string }[] = [
     { key: "lote",     icon: "📦", label: "Lote"     },
@@ -288,6 +307,47 @@ export default function EncargadoDashboard() {
               <div className="flex-1 bg-[#1E8C3A]" />
             </div>
 
+            {/* Sub-toggle Todos / Urgente + compartir */}
+            {stockCargado && !stockError && saldo.length > 0 && (
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50/60">
+                <div className="flex bg-gray-100 rounded-lg p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setStockFiltro("todos")}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                      stockFiltro === "todos" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStockFiltro("urgente")}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                      stockFiltro === "urgente" ? "bg-white text-[#D42B2B] shadow-sm" : "text-gray-500"
+                    }`}
+                  >
+                    🚨 Urgente
+                    {criticos.length > 0 && (
+                      <span className="bg-[#D42B2B] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                        {criticos.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+                {stockFiltro === "urgente" && criticos.length > 0 && (
+                  <a
+                    href={buildStockUrgenteWa()}
+                    target="_blank" rel="noopener noreferrer"
+                    className="ml-auto flex items-center gap-1.5 bg-green-500 hover:bg-green-600
+                      active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                  >
+                    📱 Compartir
+                  </a>
+                )}
+              </div>
+            )}
+
             {!stockCargado ? (
               <div className="px-4 py-12 text-center">
                 <p className="text-sm text-gray-400 animate-pulse">Cargando stock…</p>
@@ -304,10 +364,20 @@ export default function EncargadoDashboard() {
                 <p className="text-xs text-gray-400 mt-1">Registra el primer lote para ver el stock.</p>
               </div>
             ) : (() => {
+              const visibles = stockFiltro === "urgente" ? criticos : saldo;
               const maxSaldo = Math.max(...saldo.map(p => p.saldo), 1);
+              if (visibles.length === 0) {
+                return (
+                  <div className="px-4 py-12 text-center">
+                    <p className="text-3xl mb-2">🎉</p>
+                    <p className="text-sm font-semibold text-gray-600">Sin productos críticos</p>
+                    <p className="text-xs text-gray-400 mt-1">Ningún producto está agotado o en negativo.</p>
+                  </div>
+                );
+              }
               return (
                 <div className="divide-y divide-gray-100">
-                  {saldo.map(p => {
+                  {visibles.map(p => {
                     const pct   = p.saldo <= 0 ? 0 : Math.min((p.saldo / maxSaldo) * 100, 100);
                     const color = p.saldo <= 0  ? "#D42B2B"
                                 : pct >= 60     ? "#1E8C3A"
