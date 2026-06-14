@@ -82,7 +82,7 @@ export default function LotesGuardados() {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Header del card */}
-      <div className="px-4 py-3 bg-[#1A1A1A] flex items-center justify-between gap-3">
+      <div className="px-4 py-3 bg-[#1A1A1A] pb-print-flat flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-white font-bold text-sm flex items-center gap-1.5">
             🗂️ Lotes guardados
@@ -96,7 +96,7 @@ export default function LotesGuardados() {
         </div>
       </div>
       {/* Banda tricolor */}
-      <div className="h-[3px] flex">
+      <div className="h-[3px] flex pb-print-band">
         <div className="flex-1 bg-[#F5C800]" />
         <div className="flex-1 bg-[#D42B2B]" />
         <div className="flex-1 bg-[#1E8C3A]" />
@@ -104,7 +104,7 @@ export default function LotesGuardados() {
 
       {/* Barra de búsqueda por fecha */}
       {cargado && !error && lotes.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50/60">
+        <div className="no-print flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50/60">
           <label className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
             📅 Fecha:
             <input
@@ -192,7 +192,7 @@ export default function LotesGuardados() {
                         border border-green-200 px-2.5 py-0.5 rounded-full">
                         {totalUds(lote)} uds
                       </span>
-                      <span className={`text-gray-400 text-xs transition-transform ${expandido ? "rotate-90" : ""}`}>
+                      <span className={`no-print text-gray-400 text-xs transition-transform ${expandido ? "rotate-90" : ""}`}>
                         ▶
                       </span>
                     </div>
@@ -245,7 +245,7 @@ export default function LotesGuardados() {
                     <a
                       href={buildLoteWa(lote)}
                       target="_blank" rel="noopener noreferrer"
-                      className="mt-2.5 inline-flex items-center gap-1.5 bg-green-500 hover:bg-green-600
+                      className="no-print mt-2.5 inline-flex items-center gap-1.5 bg-green-500 hover:bg-green-600
                         active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
                     >
                       📱 Compartir

@@ -367,12 +367,12 @@ export default function EncargadoDashboard() {
         {tab === "stock" && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             {/* Header del card */}
-            <div className="px-4 py-3 bg-[#1A1A1A]">
+            <div className="px-4 py-3 bg-[#1A1A1A] pb-print-flat">
               <h2 className="text-white font-bold text-sm">📊 Stock actual del loker</h2>
               <p className="text-gray-400 text-xs mt-0.5">Saldo acumulado de entradas menos salidas</p>
             </div>
             {/* Banda tricolor */}
-            <div className="h-[3px] flex">
+            <div className="h-[3px] flex pb-print-band">
               <div className="flex-1 bg-[#F5C800]" />
               <div className="flex-1 bg-[#D42B2B]" />
               <div className="flex-1 bg-[#1E8C3A]" />
@@ -403,7 +403,7 @@ export default function EncargadoDashboard() {
         {tab === "urgente" && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             {/* Header del card */}
-            <div className="px-4 py-3 bg-[#1A1A1A] flex items-center justify-between gap-3">
+            <div className="px-4 py-3 bg-[#1A1A1A] pb-print-flat flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-white font-bold text-sm flex items-center gap-1.5">
                   🚨 Stock urgente
@@ -419,7 +419,7 @@ export default function EncargadoDashboard() {
                 <a
                   href={buildStockUrgenteWa()}
                   target="_blank" rel="noopener noreferrer"
-                  className="flex-shrink-0 flex items-center gap-1.5 bg-green-500 hover:bg-green-600
+                  className="no-print flex-shrink-0 flex items-center gap-1.5 bg-green-500 hover:bg-green-600
                     active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
                 >
                   📱 Compartir
@@ -427,7 +427,7 @@ export default function EncargadoDashboard() {
               )}
             </div>
             {/* Banda tricolor */}
-            <div className="h-[3px] flex">
+            <div className="h-[3px] flex pb-print-band">
               <div className="flex-1 bg-[#F5C800]" />
               <div className="flex-1 bg-[#D42B2B]" />
               <div className="flex-1 bg-[#1E8C3A]" />

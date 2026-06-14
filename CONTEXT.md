@@ -186,6 +186,11 @@ El acento del Chofer es negro intencionalmente (color de header). No es color de
 - Presente en TODOS los dashboards.
 - **NO DUPLICAR** — un solo FAB por pantalla.
 - **Impresión**: usa `window.print()` en la página actual (estilos Tailwind intactos). Inyecta `<style id="pb-print-style">` temporal con `@media print` según el modo (factura/tabla/normal); se elimina al cerrar el diálogo (evento `afterprint` + timeout fallback de 8s). El FAB se oculta en impresión vía `.pb-fab-root { display:none }` en `globals.css`.
+- **Solo contenido relevante** (al imprimir): el chrome de la app ya se oculta (`header` estructural + `.no-print` en WelcomeBanner, Asistente, banner PWA, FAB). Para depurar el contenido en sí hay 3 clases-convención que el CSS de impresión del FAB interpreta:
+  - `.no-print` → controles de acción (botones Compartir, toggles, barras de filtro) y todo `input/select/textarea` se ocultan.
+  - `.pb-print-band` → bandas tricolor decorativas → ocultas.
+  - `.pb-print-flat` → encabezados oscuros (`bg-[#1A1A1A]`) → fondo blanco + texto negro (el título queda en texto simple, ahorra tinta).
+  - Aplicadas en las tarjetas del Encargado (Stock, Urgente, Guardados). **Convención a reutilizar** en cualquier tarjeta nueva que se imprima.
 - **Invariante**: antes de inyectar un nuevo `<style id="pb-print-style">`, hacer `document.getElementById("pb-print-style")?.remove()` para evitar duplicados huérfanos.
 - **Excepción**: si hay un modal activo con `getPrintHtml`, abre ventana nueva con HTML propio del modal (comportamiento anterior — solo para modales).
 - **Copiar lista**: copia `document.body.innerText` filtrado (texto visible real).

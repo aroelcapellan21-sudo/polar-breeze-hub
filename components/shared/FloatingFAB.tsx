@@ -99,6 +99,20 @@ function buildPagePrintCSS(mode: PrintMode): string {
          módulos de contenido), por eso se puede ocultar de forma estructural. */
       header { display: none !important; }
       .no-print, .pb-fab-root { display: none !important; }
+
+      /* Solo contenido relevante (§5): fuera los controles de acción y los
+         adornos de tarjeta. Convención reutilizable:
+           .no-print       → controles de acción (botones Compartir, toggles…)
+           .pb-print-band  → bandas tricolor decorativas (no aportan al papel)
+           .pb-print-flat  → encabezados oscuros → fondo blanco + texto negro
+                             (deja el título en texto simple, ahorra tinta) */
+      input, select, textarea { display: none !important; }
+      .pb-print-band { display: none !important; }
+      .pb-print-flat { background: #fff !important; box-shadow: none !important; }
+      .pb-print-flat, .pb-print-flat * {
+        color: #000 !important; -webkit-text-fill-color: #000 !important;
+      }
+
       @page { margin: 12mm; }
       body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
