@@ -20,7 +20,7 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
 .progreso-general{background:#fff;border-radius:18px;padding:16px;margin-bottom:20px;border:1.5px solid #f0ede4;box-shadow:0 2px 10px rgba(0,0,0,0.05)}
 .prog-titulo{font-size:12px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
 .prog-track{height:10px;background:#f1f5f9;border-radius:5px;overflow:hidden;margin-bottom:6px}
-.prog-fill{height:100%;background:linear-gradient(90deg,#F5C800,#D42B2B,#1E8C3A);border-radius:5px;width:80%}
+.prog-fill{height:100%;background:linear-gradient(90deg,#F5C800,#D42B2B,#1E8C3A);border-radius:5px;width:90%}
 .prog-stats{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:#6b7280}
 .prog-stat span{color:#1a1a1a;font-weight:900}
 
@@ -79,9 +79,9 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
     <div class="prog-titulo">Progreso general del sistema</div>
     <div class="prog-track"><div class="prog-fill"></div></div>
     <div class="prog-stats">
-      <div>Completado: <span>35%</span></div>
-      <div>En progreso: <span>20%</span></div>
-      <div>Pendiente: <span>45%</span></div>
+      <div>Completado: <span>90%</span></div>
+      <div>En progreso: <span>5%</span></div>
+      <div>Pendiente: <span>5%</span></div>
     </div>
   </div>
 
@@ -238,15 +238,6 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
     </div>
 
     <div class="paso">
-      <div class="paso-check check-pendiente">○</div>
-      <div class="paso-info">
-        <div class="paso-titulo">Bot WhatsApp para choferes</div>
-        <div class="paso-desc">El chofer manda nota de voz con sus sobrantes — el bot los registra automáticamente en Firestore.</div>
-        <span class="paso-tag tag-bot">Bot</span> <span class="paso-tag tag-ia">IA</span>
-      </div>
-    </div>
-
-    <div class="paso">
       <div class="paso-check check-hecho">✓</div>
       <div class="paso-info">
         <div class="paso-titulo">Asistente Gemini para el personal</div>
@@ -304,7 +295,7 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
       <div class="paso-check check-hecho">✓</div>
       <div class="paso-info">
         <div class="paso-titulo">Apps PWA instalables por rol</div>
-        <div class="paso-desc">App Despachador y App Encargado instalables desde Android e iOS como apps nativas.</div>
+        <div class="paso-desc">Las 4 apps (Hub, Despachador, Encargado y Chofer) instalables desde Android e iOS como apps nativas: íconos PNG propios y apertura en ventana standalone.</div>
         <span class="paso-tag tag-pwa">PWA</span>
       </div>
     </div>
@@ -328,10 +319,10 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
     </div>
 
     <div class="paso">
-      <div class="paso-check check-pendiente">○</div>
+      <div class="paso-check check-hecho">✓</div>
       <div class="paso-info">
         <div class="paso-titulo">Reglas de seguridad Firestore</div>
-        <div class="paso-desc">Cada rol solo puede leer y escribir sus propios datos. Nadie accede a lo que no le corresponde.</div>
+        <div class="paso-desc">Reglas por rol desplegadas en firestore.rules: admin, despachador, encargado y chofer solo acceden a sus colecciones. Escrituras restringidas por rol; el Admin lee el Loker con permiso explícito.</div>
         <span class="paso-tag tag-firebase">Firebase Rules</span>
       </div>
     </div>
@@ -348,7 +339,7 @@ body{font-family:'Nunito',sans-serif;background:#F9F9F7;color:#1a1a1a;padding-bo
 
   <div class="nota">
     <div class="nota-ico">📌</div>
-    <div class="nota-txt">Las fases 2, 3 y 4 se pueden trabajar en paralelo con Code cuando llegue el disco nuevo. El orden de ejecución está optimizado para que cada fase dependa de la anterior.</div>
+    <div class="nota-txt">Fases 1 a 3 completas y Fase 4 casi lista. Solo queda el bot de WhatsApp por voz para choferes y el lanzamiento multiplataforma final. Última sesión: stock del Loker corregido, impresión limpia (solo contenido) y las 4 PWA abriendo en ventana standalone con íconos propios.</div>
   </div>
 
   <!-- RESUMEN -->
