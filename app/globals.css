@@ -55,6 +55,17 @@ input, textarea, select {
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ── Alarma visual: filas de stock crítico (saldo negativo) parpadean ──── */
+@keyframes pb-alarm-blink {
+  0%, 100% { background-color: rgba(212, 43, 43, 0.06); }
+  50%      { background-color: rgba(212, 43, 43, 0.30); }
+}
+.pb-alarm { animation: pb-alarm-blink 1.1s ease-in-out infinite; }
+/* Accesibilidad: sin parpadeo si el usuario pide menos movimiento (queda fijo en rojo). */
+@media (prefers-reduced-motion: reduce) {
+  .pb-alarm { animation: none; background-color: rgba(212, 43, 43, 0.18); }
+}
+
 /* ── Impresión: ocultar UI chrome, mostrar solo el contenido ──────────── */
 /* Aplica a CUALQUIER impresión (FAB o Ctrl+P nativo). El FAB inyecta además
    estilos por modo (factura/tabla/normal) encima de estas reglas base.

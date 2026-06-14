@@ -314,7 +314,7 @@ export default function EncargadoDashboard() {
                                 : pct >= 25     ? "#F5C800"
                                 :                 "#D42B2B";
                     const trackBg = p.saldo < 0 ? "bg-red-100" : "bg-gray-100";
-                    const rowBg   = p.saldo < 0 ? "bg-red-50/30" : "";
+                    const rowBg   = p.saldo < 0 ? "pb-alarm" : "";
                     return (
                       <div key={p.pid} className={`px-4 py-3 ${rowBg}`}>
                         {/* Fila superior: icono + nombre + badge */}

@@ -879,7 +879,7 @@ export default function Inventario() {
                         <button
                           key={p.pid}
                           onClick={() => setInvModal({ type: "producto", pid: p.pid, nombre: p.nombre })}
-                          className={`w-full px-4 py-3 transition-colors text-left active:scale-[0.99] hover:bg-gray-50/80 ${negativo ? "bg-red-50/40" : ""}`}
+                          className={`w-full px-4 py-3 transition-colors text-left active:scale-[0.99] hover:bg-gray-50/80 ${negativo ? "pb-alarm" : ""}`}
                         >
                           {/* Fila superior: nombre + badge */}
                           <div className="flex items-center justify-between gap-3 mb-1.5">
