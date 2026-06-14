@@ -21,6 +21,7 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 | 5 | Revisión/sincronización manual por chofer con indicador azul (localStorage `pb_revisados_<fecha>`) | `d5f6767` |
 | 6 | Salidas por picking en Encargado (tab Lote → Entrada/Salida, `SalidaPicking.tsx`) | `2ba2bea` |
 | 7 | Despacho directo Encargado → chofer (botón 🚚 en tab Choferes, `DespachoChofer.tsx`) | `c467981` |
+| 8 | Lista manual del Encargado visible en Hub Admin (tab Encargados → Salidas manuales: picking + despacho) | `aec0e9f` |
 
 ---
 
@@ -28,7 +29,6 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 
 | # | Mejora | Notas |
 |---|--------|-------|
-| 8 | **Lista manual del Encargado visible en Hub Admin** | Lo que el Encargado registra manualmente (picking / despacho / pedido) se ve en el Hub Admin. Relacionado con #14. |
 | 9 | **Módulo de reposición inteligente** | Sugerir reposición según stock, consumo y mínimos. |
 | 10 | **PWA con comportamiento nativo** | Instalable por área, splash, offline, sensación de app nativa. |
 | 11 | **Cambio de color en la sub-área Entrada** | Ajustar el color/identidad visual de 📥 Entrada en el tab Lote (hoy verde) para diferenciarla mejor de 📤 Salida (rojo). |
