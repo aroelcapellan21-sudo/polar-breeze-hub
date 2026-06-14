@@ -241,6 +241,16 @@ export default function RegistroLote() {
     setItems(prev => prev.filter((_, i) => i !== idx));
   }
 
+  // Descarta el lote en progreso y reinicia el formulario (con confirmación si ya hay productos)
+  function limpiarTodo() {
+    if (items.length > 0 && !window.confirm("¿Limpiar todo el lote en progreso? Se descartarán los productos agregados.")) return;
+    setItems([]);
+    setProveedor(""); setFactNum(""); setFactOk(false); setNotas(""); setFechaStr(hoyISO());
+    setCajasStr(""); setUnidsStr(""); setCostoStr(""); setMsg(null);
+    if (catalogo.length > 0) { setSelProd(catalogo[0].nombre); setBusqueda(catalogo[0].nombre); }
+    else { setSelProd(""); setBusqueda(""); }
+  }
+
   // Edición inline de un item ya en la lista (cajas / uds-caja / unidades / costo)
   function editarItem(idx: number, campo: "cajas" | "unidadesPorCaja" | "unidades" | "costoUnitario", valor: string) {
     setItems(prev => prev.map((it, i) => {
@@ -900,6 +910,18 @@ export default function RegistroLote() {
           >
             {guardando ? "Guardando…" : `Registrar lote (${items.length} producto${items.length !== 1 ? "s" : ""})`}
           </button>
+
+          {(items.length > 0 || proveedor.trim() || factNum.trim() || notas.trim()) && (
+            <button
+              type="button"
+              onClick={limpiarTodo}
+              disabled={guardando}
+              className="w-full py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500
+                hover:bg-gray-50 hover:text-red-600 active:scale-95 transition-all duration-100 disabled:opacity-60"
+            >
+              Limpiar todo
+            </button>
+          )}
         </div>
       </div>
 
