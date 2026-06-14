@@ -1,5 +1,7 @@
 # MEJORAS — Polar Breeze Hub
 
+> ⚠️ **LEE ESTE ARCHIVO AL INICIO DE CADA SESIÓN Y ACTUALÍZALO ANTES DE HACER PUSH. Si agregas una mejora márcala ⏳, si la completas márcala ✅.**
+
 Hoja de ruta de mejoras acordada con Ariel. Numeración oficial.
 Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CHANGELOG.md`.
 

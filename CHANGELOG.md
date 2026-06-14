@@ -1,5 +1,7 @@
 # CHANGELOG — Polar Breeze Hub
 
+> ⚠️ **LEE ESTE ARCHIVO AL INICIO DE CADA SESIÓN Y ACTUALÍZALO ANTES DE HACER PUSH. Si agregas una mejora márcala ⏳, si la completas márcala ✅.**
+
 Historial de cambios. Formato inspirado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
 Orden cronológico inverso (lo más reciente arriba). La hoja de ruta de mejoras está en `MEJORAS.md`.
 
