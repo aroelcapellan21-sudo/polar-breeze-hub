@@ -18,10 +18,71 @@ import AsistenteAI         from "@/components/shared/AsistenteAI";
 import SyncSheetsPanel     from "@/components/shared/SyncSheetsPanel";
 import WelcomeBanner       from "@/components/shared/WelcomeBanner";
 
-type Tab = "lote" | "weight" | "stock" | "choferes" | "vista";
+type Tab = "lote" | "weight" | "stock" | "urgente" | "choferes" | "vista";
 
 // Gradiente tricolor Polar Breeze (aplicado en todos los dashboards)
 const HEADER_BG = "linear-gradient(90deg, rgba(245,200,0,0.55) 0% 33.33%, rgba(212,43,43,0.55) 33.33% 66.66%, rgba(30,140,58,0.55) 66.66% 100%), #1A1A1A";
+
+// ── Fila de stock (reutilizada por los tabs Stock y Urgente) ────────────────
+type StockItem = { pid: string; nombre: string; saldo: number };
+
+function StockRows({ items, maxSaldo }: { items: StockItem[]; maxSaldo: number }) {
+  return (
+    <div className="divide-y divide-gray-100">
+      {items.map(p => {
+        const pct   = p.saldo <= 0 ? 0 : Math.min((p.saldo / maxSaldo) * 100, 100);
+        const color = p.saldo <= 0  ? "#D42B2B"
+                    : pct >= 60     ? "#1E8C3A"
+                    : pct >= 25     ? "#F5C800"
+                    :                 "#D42B2B";
+        const trackBg = p.saldo < 0 ? "bg-red-100" : "bg-gray-100";
+        const rowBg   = p.saldo < 0 ? "pb-alarm" : "";
+        return (
+          <div key={p.pid} className={`px-4 py-3 ${rowBg}`}>
+            {/* Fila superior: icono + nombre + badge */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm flex-shrink-0">
+                  {p.saldo < 0 ? "🚨" : p.saldo === 0 ? "⚠️" : "✅"}
+                </span>
+                <p className="text-sm font-medium text-gray-800 truncate">{p.nombre}</p>
+              </div>
+              <span className={`flex-shrink-0 text-sm font-bold tabular-nums px-2.5 py-0.5 rounded-full border ml-3 ${
+                p.saldo < 0   ? "bg-red-100 text-red-700 border-red-300" :
+                p.saldo === 0 ? "bg-amber-100 text-amber-600 border-amber-200" :
+                                "bg-green-100 text-green-700 border-green-200"
+              }`}>
+                {p.saldo > 0 ? "+" : ""}{p.saldo} uds
+              </span>
+            </div>
+            {/* Barra de progreso */}
+            <div className={`h-2 rounded-full overflow-hidden ${trackBg}`}>
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{
+                  width: `${p.saldo < 0 ? 100 : pct}%`,
+                  background: color,
+                  opacity: p.saldo === 0 ? 0 : 1,
+                }}
+              />
+            </div>
+            {/* Etiqueta de nivel debajo de la barra (solo en casos extremos) */}
+            {p.saldo < 0 && (
+              <p className="text-[10px] text-red-500 font-semibold mt-0.5">
+                Stock negativo — revisar registros
+              </p>
+            )}
+            {p.saldo === 0 && (
+              <p className="text-[10px] text-amber-500 font-semibold mt-0.5">
+                Sin unidades disponibles
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function EncargadoDashboard() {
   const { profile, logout } = useAuth();
@@ -36,11 +97,9 @@ export default function EncargadoDashboard() {
   // Badge del tab Choferes — recibe el conteo de ConsultaChoferes
   const [pendientesBadge, setPendientesBadge] = useState(0);
 
-  // ── Stock (solo carga cuando se abre el tab) ──────────────────────────────
+  // ── Stock (suscripción viva desde que abre el dashboard, para que el badge
+  //    🚨 Urgente y la alarma estén siempre actualizados sin entrar al tab) ──
   useEffect(() => {
-    if (tab !== "stock") return;
-    setStockCargado(false);
-    setStockError(null);
     const unsub = onSnapshot(
       query(collection(db, "movimientos_loker"), orderBy("timestamp", "desc")),
       (snap) => {
@@ -58,7 +117,7 @@ export default function EncargadoDashboard() {
       }
     );
     return unsub;
-  }, [tab]);
+  }, []);
 
   const saldo = useMemo(() => {
     const map = new Map<string, { nombre: string; saldo: number }>();
@@ -75,9 +134,9 @@ export default function EncargadoDashboard() {
       });
   }, [movimientos]);
 
-  // Filtro del tab Stock: todos vs solo críticos (agotado o negativo)
-  const [stockFiltro, setStockFiltro] = useState<"todos" | "urgente">("todos");
+  // Productos críticos (agotado o negativo) — alimentan el tab Urgente
   const criticos = useMemo(() => saldo.filter(p => p.saldo <= 0), [saldo]);
+  const maxSaldo = useMemo(() => Math.max(...saldo.map(p => p.saldo), 1), [saldo]);
 
   // Mensaje de WhatsApp con la lista de stock crítico (URL sin número → el
   // Encargado elige a quién enviarlo: proveedor, admin, grupo…).
@@ -99,6 +158,7 @@ export default function EncargadoDashboard() {
     { key: "lote",     icon: "📦", label: "Lote"     },
     { key: "weight",   icon: "⚖️",  label: "Weight"   },
     { key: "stock",    icon: "📊", label: "Stock"    },
+    { key: "urgente",  icon: "🚨", label: "Urgente"  },
     { key: "choferes", icon: "👥", label: "Choferes" },
     { key: "vista",    icon: "🧊", label: "Vista"    },
   ];
@@ -107,6 +167,7 @@ export default function EncargadoDashboard() {
     lote:     "📦 Registrar lote — entrada de mercancía al loker",
     weight:   "⚖️ Weight — recepción con escáner + báscula BT",
     stock:    "📊 Stock actual — saldo del loker en tiempo real",
+    urgente:  "🚨 Urgente — productos agotados o en negativo · compartir por WhatsApp",
     choferes: "👥 Inventario de Choferes — cierre del día · puntos quincena",
     vista:    "🧊 Vista — polar-breeze-final.html integrado",
   };
@@ -237,6 +298,12 @@ export default function EncargadoDashboard() {
                     {pendientesBadge > 9 ? "9+" : pendientesBadge}
                   </span>
                 )}
+                {t.key === "urgente" && criticos.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 bg-[#D42B2B] rounded-full
+                    flex items-center justify-center text-[9px] font-black text-white border border-white/30 animate-pulse">
+                    {criticos.length > 9 ? "9+" : criticos.length}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -307,47 +374,6 @@ export default function EncargadoDashboard() {
               <div className="flex-1 bg-[#1E8C3A]" />
             </div>
 
-            {/* Sub-toggle Todos / Urgente + compartir */}
-            {stockCargado && !stockError && saldo.length > 0 && (
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50/60">
-                <div className="flex bg-gray-100 rounded-lg p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setStockFiltro("todos")}
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                      stockFiltro === "todos" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500"
-                    }`}
-                  >
-                    Todos
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStockFiltro("urgente")}
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                      stockFiltro === "urgente" ? "bg-white text-[#D42B2B] shadow-sm" : "text-gray-500"
-                    }`}
-                  >
-                    🚨 Urgente
-                    {criticos.length > 0 && (
-                      <span className="bg-[#D42B2B] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                        {criticos.length}
-                      </span>
-                    )}
-                  </button>
-                </div>
-                {stockFiltro === "urgente" && criticos.length > 0 && (
-                  <a
-                    href={buildStockUrgenteWa()}
-                    target="_blank" rel="noopener noreferrer"
-                    className="ml-auto flex items-center gap-1.5 bg-green-500 hover:bg-green-600
-                      active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
-                  >
-                    📱 Compartir
-                  </a>
-                )}
-              </div>
-            )}
-
             {!stockCargado ? (
               <div className="px-4 py-12 text-center">
                 <p className="text-sm text-gray-400 animate-pulse">Cargando stock…</p>
@@ -363,74 +389,64 @@ export default function EncargadoDashboard() {
                 <p className="text-sm font-semibold text-gray-600">Sin movimientos registrados</p>
                 <p className="text-xs text-gray-400 mt-1">Registra el primer lote para ver el stock.</p>
               </div>
-            ) : (() => {
-              const visibles = stockFiltro === "urgente" ? criticos : saldo;
-              const maxSaldo = Math.max(...saldo.map(p => p.saldo), 1);
-              if (visibles.length === 0) {
-                return (
-                  <div className="px-4 py-12 text-center">
-                    <p className="text-3xl mb-2">🎉</p>
-                    <p className="text-sm font-semibold text-gray-600">Sin productos críticos</p>
-                    <p className="text-xs text-gray-400 mt-1">Ningún producto está agotado o en negativo.</p>
-                  </div>
-                );
-              }
-              return (
-                <div className="divide-y divide-gray-100">
-                  {visibles.map(p => {
-                    const pct   = p.saldo <= 0 ? 0 : Math.min((p.saldo / maxSaldo) * 100, 100);
-                    const color = p.saldo <= 0  ? "#D42B2B"
-                                : pct >= 60     ? "#1E8C3A"
-                                : pct >= 25     ? "#F5C800"
-                                :                 "#D42B2B";
-                    const trackBg = p.saldo < 0 ? "bg-red-100" : "bg-gray-100";
-                    const rowBg   = p.saldo < 0 ? "pb-alarm" : "";
-                    return (
-                      <div key={p.pid} className={`px-4 py-3 ${rowBg}`}>
-                        {/* Fila superior: icono + nombre + badge */}
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-sm flex-shrink-0">
-                              {p.saldo < 0 ? "🚨" : p.saldo === 0 ? "⚠️" : "✅"}
-                            </span>
-                            <p className="text-sm font-medium text-gray-800 truncate">{p.nombre}</p>
-                          </div>
-                          <span className={`flex-shrink-0 text-sm font-bold tabular-nums px-2.5 py-0.5 rounded-full border ml-3 ${
-                            p.saldo < 0   ? "bg-red-100 text-red-700 border-red-300" :
-                            p.saldo === 0 ? "bg-amber-100 text-amber-600 border-amber-200" :
-                                            "bg-green-100 text-green-700 border-green-200"
-                          }`}>
-                            {p.saldo > 0 ? "+" : ""}{p.saldo} uds
-                          </span>
-                        </div>
-                        {/* Barra de progreso */}
-                        <div className={`h-2 rounded-full overflow-hidden ${trackBg}`}>
-                          <div
-                            className="h-full rounded-full transition-all duration-700 ease-out"
-                            style={{
-                              width: `${p.saldo < 0 ? 100 : pct}%`,
-                              background: color,
-                              opacity: p.saldo === 0 ? 0 : 1,
-                            }}
-                          />
-                        </div>
-                        {/* Etiqueta de nivel debajo de la barra (solo en casos extremos) */}
-                        {p.saldo < 0 && (
-                          <p className="text-[10px] text-red-500 font-semibold mt-0.5">
-                            Stock negativo — revisar registros
-                          </p>
-                        )}
-                        {p.saldo === 0 && (
-                          <p className="text-[10px] text-amber-500 font-semibold mt-0.5">
-                            Sin unidades disponibles
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
+            ) : (
+              <StockRows items={saldo} maxSaldo={maxSaldo} />
+            )}
+          </div>
+        )}
+
+        {/* Tab Urgente — productos críticos + compartir por WhatsApp */}
+        {tab === "urgente" && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* Header del card */}
+            <div className="px-4 py-3 bg-[#1A1A1A] flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-white font-bold text-sm flex items-center gap-1.5">
+                  🚨 Stock urgente
+                  {stockCargado && !stockError && criticos.length > 0 && (
+                    <span className="bg-[#D42B2B] text-white text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                      {criticos.length}
+                    </span>
+                  )}
+                </h2>
+                <p className="text-gray-400 text-xs mt-0.5">Productos agotados o en negativo</p>
+              </div>
+              {stockCargado && !stockError && criticos.length > 0 && (
+                <a
+                  href={buildStockUrgenteWa()}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex-shrink-0 flex items-center gap-1.5 bg-green-500 hover:bg-green-600
+                    active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                >
+                  📱 Compartir
+                </a>
+              )}
+            </div>
+            {/* Banda tricolor */}
+            <div className="h-[3px] flex">
+              <div className="flex-1 bg-[#F5C800]" />
+              <div className="flex-1 bg-[#D42B2B]" />
+              <div className="flex-1 bg-[#1E8C3A]" />
+            </div>
+
+            {!stockCargado ? (
+              <div className="px-4 py-12 text-center">
+                <p className="text-sm text-gray-400 animate-pulse">Cargando stock…</p>
+              </div>
+            ) : stockError ? (
+              <div className="px-4 py-10 text-center">
+                <p className="text-3xl mb-2">⚠️</p>
+                <p className="text-sm font-semibold text-red-600">{stockError}</p>
+              </div>
+            ) : criticos.length === 0 ? (
+              <div className="px-4 py-12 text-center">
+                <p className="text-3xl mb-2">🎉</p>
+                <p className="text-sm font-semibold text-gray-600">Sin productos críticos</p>
+                <p className="text-xs text-gray-400 mt-1">Ningún producto está agotado o en negativo.</p>
+              </div>
+            ) : (
+              <StockRows items={criticos} maxSaldo={maxSaldo} />
+            )}
           </div>
         )}
 
