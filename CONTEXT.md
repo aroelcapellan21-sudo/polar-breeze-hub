@@ -57,25 +57,12 @@ Cuatro roles:
 
 ## 🚀 MEJORAS — HOJA DE RUTA
 
-Lista de mejoras acordada con Ariel (numeración oficial). Mantener al día:
-marcar ✅ con el commit al terminar cada una.
+La hoja de ruta de mejoras (✅ completadas y ⏳ pendientes, numeración oficial)
+vive ahora en **`MEJORAS.md`** (fuente única). El historial de cambios con
+commits y fechas está en **`CHANGELOG.md`**. Mantener ambos al día.
 
-| # | Mejora | Estado |
-|---|--------|--------|
-| 1 | Alarma visual — filas de stock negativo parpadean en rojo (Encargado + Hub Admin) | ✅ `c50ee3b` |
-| 2 | Tab Urgente dedicado en Stock del Encargado (críticos + badge en vivo + Compartir WhatsApp) | ✅ `cdca4e6` |
-| 3 | Lotes guardados con búsqueda por fecha (tab 🗂️ Guardados, `LotesGuardados.tsx`) | ✅ `66b6fa2` |
-| 4 | Impresión solo contenido relevante (oculta controles + adornos; convención `.no-print`/`.pb-print-band`/`.pb-print-flat`) | ✅ `a528c88` |
-| 5 | Sincronización/revisión manual por chofer con indicador azul (localStorage `pb_revisados_<fecha>`) | ✅ `d5f6767` |
-| 6 | Salidas por picking en Encargado (tab Lote → Entrada/Salida, `SalidaPicking.tsx`) | ✅ `2ba2bea` |
-| 7 | Despacho directo Encargado → choferes | ⏳ Pendiente |
-| 8 | Lista manual del Encargado visible en Hub Admin | ⏳ Pendiente |
-| 9 | Módulo de reposición inteligente | ⏳ Pendiente |
-| 10 | PWA con comportamiento nativo | ⏳ Pendiente |
-
-> Nota: esta numeración es la lista de mejoras de Ariel y es independiente de la
-> tabla "BUGS ACTIVOS / DEUDA TÉCNICA" de arriba y de la "ORDEN DE EJECUCIÓN" de
-> CLAUDE.md.
+> Esta lista es independiente de la tabla "BUGS ACTIVOS / DEUDA TÉCNICA" de
+> arriba y de la "ORDEN DE EJECUCIÓN" de CLAUDE.md.
 
 ---
 
