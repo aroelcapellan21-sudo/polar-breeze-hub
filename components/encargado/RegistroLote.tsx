@@ -6,7 +6,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { PuntoProducto, LoteLoker, ProductoItem, toProductoId } from "@/lib/types";
+import { PuntoProducto, LoteLoker, ProductoItem, toProductoId, toDate } from "@/lib/types";
 import CameraScanner from "@/components/shared/CameraScanner";
 import { ImageUploader, AiButton } from "@/components/despachador/shared";
 
@@ -18,6 +18,25 @@ interface ProductoLote {
   unidadesPorCaja: number;
   total:           number;
   costoUnitario?:  number;
+}
+
+// Fecha de hoy en formato YYYY-MM-DD (hora local del dispositivo, RD = UTC-4)
+function hoyISO(): string {
+  const n = new Date();
+  const p = (x: number) => String(x).padStart(2, "0");
+  return `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}`;
+}
+
+// Convierte la fecha elegida (YYYY-MM-DD) en Timestamp. Si es hoy, conserva la
+// hora actual (para que los filtros de "hoy" funcionen); si es una fecha pasada,
+// usa el mediodía local para evitar saltos de día por zona horaria.
+function fechaAStamp(fechaISO: string): Timestamp {
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  const n = new Date();
+  if (y === n.getFullYear() && m === n.getMonth() + 1 && d === n.getDate()) {
+    return Timestamp.now();
+  }
+  return Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0));
 }
 
 export default function RegistroLote() {
@@ -39,6 +58,7 @@ export default function RegistroLote() {
   const [factNum,     setFactNum]     = useState("");
   const [factOk,      setFactOk]      = useState(false);
   const [notas,       setNotas]       = useState("");
+  const [fechaStr,    setFechaStr]    = useState(hoyISO());
   const [guardando,   setGuardando]   = useState(false);
   const [msg,         setMsg]         = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [guardado,    setGuardado]    = useState<LoteLoker | null>(null);
@@ -317,7 +337,7 @@ export default function RegistroLote() {
     try {
       const lotesSnap = await getDocs(collection(db, "lotes_loker"));
       const numero    = `#${String(lotesSnap.size + 1).padStart(3, "0")}`;
-      const ts        = Timestamp.now();
+      const ts        = fechaAStamp(fechaStr);
       const nombre    = profile?.nombre ?? "Encargado";
       const uid       = profile?.uid    ?? "";
 
@@ -379,7 +399,7 @@ export default function RegistroLote() {
       } catch { /* permisos u otro fallo: la conversión no se persiste, el lote ya se guardó */ }
 
       setGuardado({ ...loteData, id: loteRef.id });
-      setItems([]); setProveedor(""); setFactNum(""); setFactOk(false); setNotas("");
+      setItems([]); setProveedor(""); setFactNum(""); setFactOk(false); setNotas(""); setFechaStr(hoyISO());
       setMsg({ type: "ok", text: `Lote ${numero} guardado correctamente.` });
     } catch (e) {
       setMsg({ type: "err", text: e instanceof Error ? e.message : "Error al guardar." });
@@ -389,7 +409,7 @@ export default function RegistroLote() {
   }
 
   function buildWa(lote: LoteLoker) {
-    const fecha = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+    const fecha = toDate(lote.timestamp).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
     const lines = [
       `📦 *LOTE ${lote.numero} — POLAR BREEZE*`,
       `📅 ${fecha}`,
@@ -495,6 +515,21 @@ export default function RegistroLote() {
         )}
 
         <div className="p-4 space-y-4">
+
+          {/* ── Fecha de recepción ── */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Fecha de recepción
+            </label>
+            <input
+              type="date"
+              value={fechaStr}
+              max={hoyISO()}
+              onChange={(e) => setFechaStr(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            />
+          </div>
 
           {/* ── Proveedor y factura ── */}
           <div className="grid grid-cols-2 gap-3">
