@@ -8,6 +8,7 @@ Orden cronológico inverso (lo más reciente arriba). La hoja de ruta de mejoras
 ## 2026-06-14
 
 ### Añadido
+- **Despacho directo Encargado → chofer**: botón 🚚 por chofer en el tab Choferes que abre un modal (`DespachoChofer.tsx`) para entregar productos del stock; escribe `salida_despacho` con `choferId`/`choferNombre` y cantidad negativa → descuenta del loker y queda atribuido al chofer. (Mejora #7 · `c467981`)
 - **Tab Urgente dedicado** en Stock del Encargado: productos críticos (saldo ≤ 0) con badge rojo en vivo (activo desde que abre el dashboard) y Compartir por WhatsApp. (Mejora #2 · `cdca4e6`)
 - **Tab 🗂️ Guardados**: historial de lotes (`lotes_loker`) con búsqueda por fecha, filas expandibles (productos, factura, registrado por, notas) y Compartir por WhatsApp. Componente nuevo `LotesGuardados.tsx`. (Mejora #3 · `66b6fa2`)
 - **Persistencia del tema** claro/oscuro en la App Inventario (`polar-breeze-final.html`): se guarda en `localStorage` (`pb_theme`) y se restaura al cargar. (`ec986fb`)
