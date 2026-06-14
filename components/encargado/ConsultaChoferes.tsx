@@ -96,6 +96,27 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
   // Inventarios guardados del día seleccionado
   const [invGuardados, setInvGuardados] = useState<Record<string, InvGuardadoResumen>>({});
 
+  // Choferes que el Encargado marcó como revisados/sincronizados manualmente
+  // ese día (indicador azul). No conecta con Sheets; se persiste por fecha en
+  // localStorage (clave pb_revisados_<fecha>) — marcador local del Encargado.
+  const [revisados, setRevisados] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`pb_revisados_${fechaKey}`);
+      setRevisados(new Set(raw ? (JSON.parse(raw) as string[]) : []));
+    } catch { setRevisados(new Set()); }
+  }, [fechaKey]);
+
+  function toggleRevisado(ficha: string) {
+    setRevisados((prev) => {
+      const next = new Set(prev);
+      if (next.has(ficha)) next.delete(ficha); else next.add(ficha);
+      try { localStorage.setItem(`pb_revisados_${fechaKey}`, JSON.stringify([...next])); } catch {/* almacenamiento bloqueado */}
+      return next;
+    });
+  }
+
   // Modal de registro/detalle
   const [modalChofer, setModalChofer] = useState<{ uid: string; nombre: string; ficha: string } | null>(null);
 
@@ -227,8 +248,9 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
   const rankingVista  = selChofer === "todos" ? ranking : ranking.filter((r) => r.uid === selChofer);
   const choferesVista = selChofer === "todos" ? choferes : choferes.filter((c) => c.uid === selChofer);
   // ── Contadores para el cierre ─────────────────────────────────────────────
-  const cerrados   = Object.keys(invGuardados).length;
-  const pendientes = choferes.length - cerrados;
+  const cerrados      = Object.keys(invGuardados).length;
+  const pendientes    = choferes.length - cerrados;
+  const revisadosCount = choferes.filter((c) => c.ficha && revisados.has(c.ficha)).length;
 
   // Reportar badge al padre (EncargadoDashboard)
   useEffect(() => {
@@ -290,6 +312,11 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
               <span className="bg-amber-500/20 text-amber-300 text-xs font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
                 ⏳ {pendientes}
               </span>
+              {revisadosCount > 0 && (
+                <span className="bg-blue-500/20 text-blue-300 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-500/30">
+                  🔵 {revisadosCount}
+                </span>
+              )}
             </div>
           </div>
 
@@ -333,6 +360,12 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
                   <span className="w-2 h-2 rounded-full bg-amber-400" />
                   {pendientes} Pendientes
                 </span>
+                {revisadosCount > 0 && (
+                  <span className="flex items-center gap-1 text-blue-600">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    {revisadosCount} Revisados
+                  </span>
+                )}
                 {esTarde && esDiaHoy && pendientes > 0 && (
                   <span className="flex items-center gap-1 text-[#D42B2B] animate-pulse">
                     <span className="w-2 h-2 rounded-full bg-[#D42B2B]" />
@@ -388,6 +421,7 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
                   {choferes.map((c) => {
                     const guardado = !!(c.ficha && invGuardados[c.ficha]);
                     const tarde    = esTarde && esDiaHoy && !guardado && !!c.ficha;
+                    const revisado = !!c.ficha && revisados.has(c.ficha);
                     return (
                       <button
                         key={c.uid}
@@ -397,7 +431,8 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
                           hover:bg-white active:scale-[0.98] transition-all border-b border-gray-100"
                       >
                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          guardado ? "bg-[#1E8C3A]"
+                          revisado ? "bg-blue-500"
+                            : guardado ? "bg-[#1E8C3A]"
                             : tarde ? "bg-[#D42B2B] animate-pulse"
                             : "bg-amber-400"
                         }`} />
@@ -420,69 +455,103 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
                   const guardado = !!inv;
                   const tarde    = esTarde && esDiaHoy && !guardado && !!c.ficha;
                   const tot      = inv?.totales;
+                  const revisado = !!c.ficha && revisados.has(c.ficha);
 
                   return (
-                    <button
+                    <div
                       key={c.uid}
-                      onClick={() => {
-                        if (!c.ficha) return;
-                        setModalChofer({ uid: c.uid, nombre: c.nombre, ficha: c.ficha });
-                      }}
-                      disabled={!c.ficha}
-                      className={`w-full px-4 py-3 flex items-center gap-3 text-left
-                        hover:bg-gray-50 active:scale-[0.99] transition-all ${
-                          guardado ? "bg-green-50/40" : tarde ? "bg-red-50/30" : ""
-                        }`}
+                      className={`flex items-stretch transition-colors ${
+                        revisado ? "bg-blue-50/50"
+                          : guardado ? "bg-green-50/40"
+                          : tarde ? "bg-red-50/30"
+                          : ""
+                      }`}
                     >
-                      {/* Chip de estado — §24: ⏳ amarillo · ✅ verde · 🚨 rojo parpadeante */}
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center
-                        text-white text-xs font-bold flex-shrink-0 shadow-sm ${
-                          guardado ? "bg-[#1E8C3A]"
-                            : tarde  ? "bg-[#D42B2B] animate-pulse"
-                            : "bg-[#F5C800]"
-                        }`}>
-                        <span className={guardado ? "" : tarde ? "" : "text-[#1A1A1A]"}>
-                          {guardado ? "✅" : tarde ? "🚨" : "⏳"}
-                        </span>
-                      </div>
+                      {/* Botón principal → abre el modal de registro/detalle */}
+                      <button
+                        onClick={() => {
+                          if (!c.ficha) return;
+                          setModalChofer({ uid: c.uid, nombre: c.nombre, ficha: c.ficha });
+                        }}
+                        disabled={!c.ficha}
+                        className="flex-1 min-w-0 px-4 py-3 flex items-center gap-3 text-left
+                          hover:bg-black/[0.02] active:scale-[0.99] transition-all"
+                      >
+                        {/* Chip de estado — azul si revisado · ✅ verde · 🚨 rojo · ⏳ amarillo */}
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center
+                          text-white text-xs font-bold flex-shrink-0 shadow-sm ${
+                            revisado ? "bg-blue-500"
+                              : guardado ? "bg-[#1E8C3A]"
+                              : tarde  ? "bg-[#D42B2B] animate-pulse"
+                              : "bg-[#F5C800]"
+                          }`}>
+                          <span className={revisado || guardado || tarde ? "" : "text-[#1A1A1A]"}>
+                            {revisado ? "✓" : guardado ? "✅" : tarde ? "🚨" : "⏳"}
+                          </span>
+                        </div>
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 truncate">{c.nombre}</p>
-                        <p className="text-xs text-gray-400">
-                          {c.ficha ? `Ficha #${c.ficha}` : "Sin ficha"}
-                        </p>
-                        {guardado && tot && (
-                          <p className="text-xs text-[#1E8C3A] font-medium mt-0.5">
-                            {tot.vendido} vendidos · RD${tot.total_rd.toLocaleString("es-DO", { maximumFractionDigits: 0 })}
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 truncate">{c.nombre}</p>
+                          <p className="text-xs text-gray-400">
+                            {c.ficha ? `Ficha #${c.ficha}` : "Sin ficha"}
                           </p>
-                        )}
-                        {tarde && (
-                          <p className="text-xs text-[#D42B2B] font-bold mt-0.5 animate-pulse">
-                            ⚠ Sin reportar — más de 10 pm
-                          </p>
-                        )}
-                      </div>
+                          {guardado && tot && (
+                            <p className="text-xs text-[#1E8C3A] font-medium mt-0.5">
+                              {tot.vendido} vendidos · RD${tot.total_rd.toLocaleString("es-DO", { maximumFractionDigits: 0 })}
+                            </p>
+                          )}
+                          {revisado && (
+                            <p className="text-xs text-blue-600 font-semibold mt-0.5">
+                              🔵 Revisado por el Encargado
+                            </p>
+                          )}
+                          {tarde && !revisado && (
+                            <p className="text-xs text-[#D42B2B] font-bold mt-0.5 animate-pulse">
+                              ⚠ Sin reportar — más de 10 pm
+                            </p>
+                          )}
+                        </div>
 
-                      {/* Badge */}
-                      <div className="flex-shrink-0">
-                        {guardado ? (
-                          <span className="text-xs bg-green-100 text-[#1E8C3A] font-bold px-2 py-0.5 rounded-full border border-green-200">
-                            Ver ›
-                          </span>
-                        ) : tarde ? (
-                          <span className="text-xs bg-red-100 text-[#D42B2B] font-bold px-2 py-0.5 rounded-full border border-red-200 animate-pulse">
-                            🚨 Tarde
-                          </span>
-                        ) : c.ficha ? (
-                          <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full border border-amber-200">
-                            ⏳ Registrar
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-300">Sin ficha</span>
-                        )}
-                      </div>
-                    </button>
+                        {/* Badge de estado */}
+                        <div className="flex-shrink-0">
+                          {guardado ? (
+                            <span className="text-xs bg-green-100 text-[#1E8C3A] font-bold px-2 py-0.5 rounded-full border border-green-200">
+                              Ver ›
+                            </span>
+                          ) : tarde ? (
+                            <span className="text-xs bg-red-100 text-[#D42B2B] font-bold px-2 py-0.5 rounded-full border border-red-200 animate-pulse">
+                              🚨 Tarde
+                            </span>
+                          ) : c.ficha ? (
+                            <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                              ⏳ Registrar
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-300">Sin ficha</span>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Botón de revisión manual — azul cuando está marcado */}
+                      {c.ficha && (
+                        <button
+                          onClick={() => toggleRevisado(c.ficha!)}
+                          title={revisado
+                            ? "Revisado/sincronizado manualmente — toca para desmarcar"
+                            : "Marcar como revisado/sincronizado"}
+                          aria-pressed={revisado}
+                          className={`flex-shrink-0 w-12 flex items-center justify-center text-base
+                            border-l transition-colors active:scale-95 ${
+                              revisado
+                                ? "bg-blue-500 text-white border-blue-500 hover:bg-blue-600"
+                                : "bg-white text-gray-400 border-gray-100 hover:bg-blue-50 hover:text-blue-500"
+                            }`}
+                        >
+                          {revisado ? "✓" : "🔄"}
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
