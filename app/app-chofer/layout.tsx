@@ -35,7 +35,7 @@ export default function ChoferPWALayout({ children }: { children: React.ReactNod
   return (
     <html lang="es" className={nunito.className}>
       <head>
-        <link rel="apple-touch-icon" href="/icon-chofer.svg" />
+        <link rel="apple-touch-icon" href="/icon-chofer-maskable-512.png" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body>

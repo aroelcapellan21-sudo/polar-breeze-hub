@@ -13,8 +13,9 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#F5C800",
     orientation: "portrait-primary",
     icons: [
-      { src: "/icon-hub.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-      { src: "/icon-hub.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" },
+      { src: "/icon-hub-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icon-hub-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icon-hub-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     categories: ["business", "productivity"],
     lang: "es-DO",

@@ -35,7 +35,7 @@ export default function DespachadorPWALayout({ children }: { children: React.Rea
   return (
     <html lang="es" className={nunito.className}>
       <head>
-        <link rel="apple-touch-icon" href="/icon-despachador.svg" />
+        <link rel="apple-touch-icon" href="/icon-despachador-maskable-512.png" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body>

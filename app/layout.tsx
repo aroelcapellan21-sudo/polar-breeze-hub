@@ -15,6 +15,8 @@ const nunito = Nunito({
 export const metadata: Metadata = {
   title: "Polar Breeze Hub",
   description: "Portal Central del Ecosistema Polar Breeze",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "PB Hub" },
+  icons: { apple: "/icon-hub-maskable-512.png" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

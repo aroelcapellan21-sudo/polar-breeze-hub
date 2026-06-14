@@ -35,7 +35,7 @@ export default function EncargadoPWALayout({ children }: { children: React.React
   return (
     <html lang="es" className={nunito.className}>
       <head>
-        <link rel="apple-touch-icon" href="/icon-encargado.svg" />
+        <link rel="apple-touch-icon" href="/icon-encargado-maskable-512.png" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body>
