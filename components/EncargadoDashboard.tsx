@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { MovimientoLoker } from "@/lib/types";
 import RegistroLote       from "@/components/encargado/RegistroLote";
+import LotesGuardados     from "@/components/encargado/LotesGuardados";
 import ConsultaChoferes   from "@/components/encargado/ConsultaChoferes";
 import PolarBreezeWeight  from "@/components/encargado/PolarBreezeWeight";
 import FloatingFAB        from "@/components/shared/FloatingFAB";
@@ -18,7 +19,7 @@ import AsistenteAI         from "@/components/shared/AsistenteAI";
 import SyncSheetsPanel     from "@/components/shared/SyncSheetsPanel";
 import WelcomeBanner       from "@/components/shared/WelcomeBanner";
 
-type Tab = "lote" | "weight" | "stock" | "urgente" | "choferes" | "vista";
+type Tab = "lote" | "guardados" | "weight" | "stock" | "urgente" | "choferes" | "vista";
 
 // Gradiente tricolor Polar Breeze (aplicado en todos los dashboards)
 const HEADER_BG = "linear-gradient(90deg, rgba(245,200,0,0.55) 0% 33.33%, rgba(212,43,43,0.55) 33.33% 66.66%, rgba(30,140,58,0.55) 66.66% 100%), #1A1A1A";
@@ -155,8 +156,9 @@ export default function EncargadoDashboard() {
 
   // ── Definición de tabs ────────────────────────────────────────────────────
   const TABS: { key: Tab; icon: string; label: string }[] = [
-    { key: "lote",     icon: "📦", label: "Lote"     },
-    { key: "weight",   icon: "⚖️",  label: "Weight"   },
+    { key: "lote",      icon: "📦", label: "Lote"      },
+    { key: "guardados", icon: "🗂️",  label: "Guardados" },
+    { key: "weight",    icon: "⚖️",  label: "Weight"    },
     { key: "stock",    icon: "📊", label: "Stock"    },
     { key: "urgente",  icon: "🚨", label: "Urgente"  },
     { key: "choferes", icon: "👥", label: "Choferes" },
@@ -164,8 +166,9 @@ export default function EncargadoDashboard() {
   ];
 
   const BREADCRUMB: Record<Tab, string> = {
-    lote:     "📦 Registrar lote — entrada de mercancía al loker",
-    weight:   "⚖️ Weight — recepción con escáner + báscula BT",
+    lote:      "📦 Registrar lote — entrada de mercancía al loker",
+    guardados: "🗂️ Lotes guardados — historial con búsqueda por fecha",
+    weight:    "⚖️ Weight — recepción con escáner + báscula BT",
     stock:    "📊 Stock actual — saldo del loker en tiempo real",
     urgente:  "🚨 Urgente — productos agotados o en negativo · compartir por WhatsApp",
     choferes: "👥 Inventario de Choferes — cierre del día · puntos quincena",
@@ -346,7 +349,8 @@ export default function EncargadoDashboard() {
       ══════════════════════════════════════════ */}
       <main className="max-w-2xl mx-auto px-4 py-5">
 
-        {tab === "lote"   && <RegistroLote />}
+        {tab === "lote"      && <RegistroLote />}
+        {tab === "guardados" && <LotesGuardados />}
         {tab === "weight" && (
           <div className="space-y-4">
             <PolarBreezeWeight />
