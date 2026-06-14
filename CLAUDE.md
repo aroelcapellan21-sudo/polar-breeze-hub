@@ -28,8 +28,7 @@ Sistema de gestión de distribución de helados para **Polar Breeze, S.R.L.**, S
 - **No dar código al usuario** salvo que lo pida explícitamente
 - **Corregir bugs primero**, agregar funciones después
 - Commits en español con prefijos: `fix:` `feat:` `refactor:` `style:` `docs:`
-- Una rama por área: `feat/dashboard-encargado`, `feat/polar-breeze-weight`, etc.
-- Pull request a `main` solo cuando el área esté completa y probada
+- **Push directo a `main`** — sin PR, sin CI automatizado. Los únicos gates son `npx tsc --noEmit` + `npm run build`, ambos en 0 errores antes de pushear
 
 ## 🎨 IDENTIDAD VISUAL OFICIAL
 
