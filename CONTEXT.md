@@ -142,6 +142,7 @@ commits y fechas está en **`CHANGELOG.md`**. Mantener ambos al día.
 - Módulo gestión de usuarios (crear, editar, desactivar).
 - En móvil el texto del logo ("Polar Breeze / Admin") está oculto (`hidden sm:block`) para liberar espacio en el header; el botón Salir tiene `flex-shrink-0`.
 - **Stock del Loker mejorado**: estado general (chip ✅/⚠️/🚨 + contadores verde/amarillo/rojo) y barras de progreso con semáforo tricolor por producto, idéntico al Encargado. Sección en `components/admin/Inventario.tsx`.
+- **Tab Encargados** (`components/admin/GestionEncargados.tsx`): gestiona usuarios encargado y, al abrir el detalle de uno, muestra sus **Lotes registrados** y sus **Salidas manuales** (picking + despacho directo). Las salidas se atribuyen por `responsableId == enc.uid` (campo agregado a los writes de `SalidaPicking`/`DespachoChofer`; el Despachador no usa ese campo, así que no colisiona). Queries con equality simple (sin `orderBy`) + orden en cliente. (Mejora #8)
 - **NO TOCAR SIN AUTORIZACIÓN**: `components/AdminDashboard.tsx`
 
 ### Bot Telegram

@@ -7,7 +7,10 @@ import {
   doc, setDoc, updateDoc, Timestamp, getDocs,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { UserProfile, LoteLoker, toDate, fmtDate } from "@/lib/types";
+import { UserProfile, LoteLoker, MovimientoLoker, toDate, fmtDate } from "@/lib/types";
+
+// Salida manual del Encargado (picking / despacho directo) con su atribución
+type SalidaManual = MovimientoLoker & { responsableId?: string };
 import { ShareBar }           from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
@@ -28,6 +31,7 @@ async function authSignUp(email: string, password: string) {
 interface Detalle {
   enc:      UserProfile;
   lotes:    LoteLoker[];
+  salidas:  SalidaManual[];
   cargando: boolean;
 }
 
@@ -57,16 +61,24 @@ export default function GestionEncargados() {
   };
 
   async function abrirDetalle(enc: UserProfile) {
-    setDetalle({ enc, lotes: [], cargando: true });
+    setDetalle({ enc, lotes: [], salidas: [], cargando: true });
     setEditTel({ show: false, val: enc.telefono ?? "" });
     try {
-      const snap = await getDocs(
-        query(collection(db, "lotes_loker"), where("registradoPorId", "==", enc.uid))
-      );
-      const lotes = snap.docs
+      // Lotes registrados + salidas manuales (picking / despacho) del encargado.
+      // Cada query con equality simple (sin orderBy) → sin índice compuesto;
+      // se ordena en cliente. Cada una con su propio fallback.
+      const [lotesSnap, salidasSnap] = await Promise.all([
+        getDocs(query(collection(db, "lotes_loker"), where("registradoPorId", "==", enc.uid))).catch(() => null),
+        getDocs(query(collection(db, "movimientos_loker"), where("responsableId", "==", enc.uid))).catch(() => null),
+      ]);
+      const lotes = (lotesSnap?.docs ?? [])
         .map(d => ({ id: d.id, ...d.data() } as LoteLoker))
         .sort((a, b) => toDate(b.timestamp).getTime() - toDate(a.timestamp).getTime());
-      setDetalle({ enc, lotes, cargando: false });
+      const salidas = (salidasSnap?.docs ?? [])
+        .map(d => ({ id: d.id, ...d.data() } as SalidaManual))
+        .filter(m => m.tipo === "salida_despacho")
+        .sort((a, b) => toDate(b.timestamp).getTime() - toDate(a.timestamp).getTime());
+      setDetalle({ enc, lotes, salidas, cargando: false });
     } catch {
       setDetalle(prev => prev ? { ...prev, cargando: false } : null);
     }
@@ -534,6 +546,56 @@ export default function GestionEncargados() {
                                 {p.unidades > 0 ? ` ${p.unidades}uds` : ""}
                               </span>
                             ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Salidas manuales (picking + despacho directo) — Mejora #8 */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1.5">
+                  📤 Salidas manuales
+                  {!detalle.cargando && (
+                    <span className="text-xs bg-red-100 text-red-700 border border-red-200
+                      px-1.5 py-0.5 rounded-full font-medium">
+                      {detalle.salidas.length}
+                    </span>
+                  )}
+                </p>
+
+                {detalle.cargando ? (
+                  <div className="py-6 text-center">
+                    <p className="text-xs text-gray-400 animate-pulse">Cargando salidas…</p>
+                  </div>
+                ) : detalle.salidas.length === 0 ? (
+                  <div className="py-6 text-center bg-gray-50 rounded-xl">
+                    <p className="text-2xl mb-1">📭</p>
+                    <p className="text-xs text-gray-400">Sin salidas manuales aún.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {detalle.salidas.map(s => {
+                      const esDespacho = !!s.choferNombre;
+                      const uds = Math.abs(s.cantidad);
+                      return (
+                        <div key={s.id} className="border border-gray-100 rounded-xl px-3 py-2.5 text-sm bg-white">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span>{esDespacho ? "🚚" : "📤"}</span>
+                              <div className="min-w-0">
+                                <p className="font-medium text-gray-800 truncate">{s.nombre}</p>
+                                <p className="text-[11px] text-gray-400 truncate">
+                                  {esDespacho ? `Despacho → ${s.choferNombre}` : "Picking → despacho"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-xs text-gray-400">{fmtDate(s.timestamp)}</p>
+                              <p className="text-xs font-semibold text-red-600 mt-0.5">−{uds} uds</p>
+                            </div>
                           </div>
                         </div>
                       );

@@ -119,6 +119,7 @@ export default function DespachoChofer({ uid, nombre, ficha, onClose }: Props) {
             nombre:       it.nombre,
             cantidad:     -Math.abs(it.cantidad),
             responsable:  resp,
+            responsableId: profile?.uid ?? "",
             choferId:     uid,
             choferNombre: nombre,
             timestamp:    ts,

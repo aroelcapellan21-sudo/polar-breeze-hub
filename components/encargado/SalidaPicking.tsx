@@ -126,6 +126,7 @@ export default function SalidaPicking() {
             nombre:      it.nombre,
             cantidad:    -Math.abs(it.cantidad),
             responsable: nombre,
+            responsableId: profile?.uid ?? "",
             timestamp:   ts,
             notas:       nota,
           })
