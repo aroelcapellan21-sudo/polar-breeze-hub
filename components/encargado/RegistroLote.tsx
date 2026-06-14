@@ -130,12 +130,15 @@ export default function RegistroLote() {
     });
   }, []);
 
-  // Autocompletar uds/caja desde la tabla de conversión al elegir producto
+  // Autocompletar uds/caja desde la tabla de conversión al fijar el producto.
+  // Usa prodEfectivo (no solo selProd) para que también funcione cuando el
+  // producto se resuelve al escribir el nombre exacto sin tocar el dropdown;
+  // antes quedaba en "1" y el total subcontaba el stock (mismo tipo que bug #15).
   useEffect(() => {
-    if (!selProd) return;
-    const uds = convMap[toProductoId(selProd)];
+    if (!prodEfectivo) return;
+    const uds = convMap[toProductoId(prodEfectivo)];
     setUdsCajaStr(uds && uds > 1 ? String(uds) : "1");
-  }, [selProd, convMap]);
+  }, [prodEfectivo, convMap]);
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
