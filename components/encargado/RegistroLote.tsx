@@ -336,7 +336,14 @@ export default function RegistroLote() {
     setMsg(null);
     try {
       const lotesSnap = await getDocs(collection(db, "lotes_loker"));
-      const numero    = `#${String(lotesSnap.size + 1).padStart(3, "0")}`;
+      // Correlativo robusto: max(numero existente) + 1, no size + 1.
+      // Con size+1, borrar un lote reutiliza un número y choca con uno existente.
+      let maxNum = 0;
+      lotesSnap.forEach((d) => {
+        const n = parseInt(String(d.data().numero ?? "").replace(/\D/g, ""), 10);
+        if (!isNaN(n) && n > maxNum) maxNum = n;
+      });
+      const numero    = `#${String(maxNum + 1).padStart(3, "0")}`;
       const ts        = fechaAStamp(fechaStr);
       const nombre    = profile?.nombre ?? "Encargado";
       const uid       = profile?.uid    ?? "";
