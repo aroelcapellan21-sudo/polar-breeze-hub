@@ -94,14 +94,16 @@ Cuatro roles:
 
 ### App Encargado / Supervisor
 
-- Tabs: Registro de lotes, Choferes, Stock, Vista, Weight.
+- Tabs: Lote (registro), Guardados, Weight, Stock, Urgente, Choferes, Vista.
 - Registro de lotes con escáner HID y buscador inteligente de productos (`components/encargado/RegistroLote.tsx`).
   - **Conversión cajas→unidades** automática desde `codigos_cajas` (mapa por `producto_id`; entradas propias `prod_<producto_id>` ganan sobre las de código de barras). `total = cajas × uds/caja + unidades`; factor `uds/caja` editable y persistido.
   - **Escaneo de factura BON (IA)**: reutiliza `ImageUploader`/`AiButton` del Despachador y `POST /api/analyze` tipo `"factura"`; precarga los productos detectados en la lista (casándolos con el catálogo) y rellena proveedor si detecta cliente.
   - **Lista de productos editable inline** (cajas × uds/caja + unidades · $/ud) con total recalculado en vivo.
   - El buscador resuelve "producto efectivo": permite agregar escribiendo el nombre exacto o con un único resultado, sin tocar el dropdown.
+- Tab Guardados → historial de lotes de `lotes_loker` con **búsqueda por fecha** (input date + Hoy + Todos), filas expandibles (productos cajas/unidades=total, factura, registrado por, notas) y Compartir por WhatsApp. Suscripción viva sin `orderBy` (orden en cliente por fecha desc). Componente independiente `components/encargado/LotesGuardados.tsx` — no toca `RegistroLote`.
 - Tab Choferes → cierre del día, puntos quincena, inventario despachado.
-- Tab Stock → barras de progreso con semáforo de colores. Listener de `movimientos_loker` con callback de error (muestra aviso en vez de quedar en blanco).
+- Tab Stock → barras de progreso con semáforo de colores. Listener de `movimientos_loker` (suscripción viva desde el mount) con callback de error (muestra aviso en vez de quedar en blanco).
+- Tab Urgente → productos críticos (saldo ≤ 0) con badge en vivo en el tab (pulso rojo, activo desde que abre el dashboard) y Compartir por WhatsApp. Comparte la fuente de datos del tab Stock.
 - Tab Vista → contiene embebida la app `public/polar-breeze-final.html` (App Inventario Choferes).
 - Tab Weight → escáner HID + báscula Bluetooth.
 - **Buscador global** (`components/encargado/BuscadorGlobal.tsx`): busca en `lotes_loker`, `movimientos_loker` (stock), `usuarios` (choferes) e `inventarios/{fecha}/choferes` (últimos 14 días). Sin `orderBy` en la consulta de lotes (evita requisito de índice Firestore compuesto); cada fetch tiene `.catch()` propio.
