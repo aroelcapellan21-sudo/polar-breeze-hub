@@ -180,6 +180,13 @@ export default function EncargadoDashboard() {
     vista:    "🧊 Vista — polar-breeze-final.html integrado",
   };
 
+  // Deep-link desde los shortcuts del manifest PWA (?tab=...) — comportamiento nativo
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t && TABS.some(x => x.key === t)) setTab(t as Tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Flechas de navegación de tabs ─────────────────────────────────────────
   const navRef  = useRef<HTMLElement>(null);
   const [canScrollLeft,  setCanScrollLeft]  = useState(false);

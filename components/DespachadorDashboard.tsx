@@ -37,6 +37,12 @@ export default function DespachadorDashboard() {
   const [tab,        setTab]        = useState<Tab>("cuartofrio");
   const [selChofer,  setSelChofer]  = useState<UserProfile | null>(null);
 
+  // Deep-link desde los shortcuts del manifest PWA (?tab=...) — comportamiento nativo
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t && TABS.some(x => x.key === t)) setTab(t as Tab);
+  }, []);
+
   // Identidad del despachador activo
   const [despNombre,        setDespNombre]        = useState("");
   const [listaDespachadores, setListaDespachadores] = useState<string[]>([]);

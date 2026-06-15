@@ -306,6 +306,11 @@ Registrado por `components/shared/PWAServiceWorker.tsx`. Estrategia por recurso:
 - **Imágenes / fonts** → cache-first (contenido estable).
 - **`CACHE_NAME`** debe **incrementarse** (`pb-hub-vN`) en cada cambio de estrategia para que el handler `activate` purgue el caché anterior.
 
+**PWA por área (Mejora #10 — comportamiento nativo):**
+- Cada ruta tiene su **manifest estático** en `public/<area>/manifest.webmanifest` (encargado/despachador/chofer) + el raíz `app/manifest.ts` para el Hub Admin. Los `manifest.ts` anidados **no** funcionan en Next (solo en la raíz de `app/`), por eso los de área son estáticos en `public/`. Cada uno con su `name`/`short_name`/`start_url`/`scope`/`theme_color`/íconos y `shortcuts`.
+- El **SW + banner de instalación** se montan en las 4 áreas: las PWA-pages (`app/app-*/page.tsx`) y el **Hub Admin** en `app/page.tsx` (envuelve `AdminDashboard` con `PWAServiceWorker scope="/"` + `PWAInstallBanner`, sin tocar el componente). `PWAInstallBanner` está en los 4 dashboards.
+- **Deep-link de shortcuts**: Encargado y Despachador leen `?tab=` de la URL al montar (vía `window.location.search`, sin `useSearchParams` para evitar Suspense) y abren ese tab → los accesos directos del manifest funcionan de forma nativa.
+
 ### Scripts de mantenimiento (`scripts/*.mjs`)
 
 Patrón común: API key pública hardcodeada, login como `admin@polarbreeze.com`, REST de Firestore (sin Admin SDK). Se ejecutan con `node scripts/<nombre>.mjs`.
@@ -387,7 +392,6 @@ npm run dev                  # Turbopack — http://localhost:3000
 - **Asistente Gemini** — asistente conversacional en lenguaje natural dentro de Encargado y Despachador ("¿Quién falta por reportar?"). Distinto del buscador global, que ya está construido.
 - Hub Admin histórico + Gemini para Oliver (consultas en lenguaje natural).
 - Cierre automático nocturno — Módulo 3.
-- PWA instalable por departamento — cada `/app-*` con su `manifest.json` propio e ícono.
 - Lanzamiento multiplataforma final (Android/iOS/Windows/Linux como PWA).
 
 ---

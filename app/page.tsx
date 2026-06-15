@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import LoginForm from "@/components/LoginForm";
 import AdminDashboard from "@/components/AdminDashboard";
+import PWAServiceWorker from "@/components/shared/PWAServiceWorker";
+import PWAInstallBanner from "@/components/shared/PWAInstallBanner";
 
 /** Cada rol tiene su propia ruta. El Hub Admin (/) es exclusivo del admin. */
 const RUTA_POR_ROL: Partial<Record<string, string>> = {
@@ -48,8 +50,14 @@ export default function Home() {
 
   if (!user || !profile) return <LoginForm modo="admin" />;
 
-  // Admin: Hub Admin en "/"
-  if (profile.role === "admin") return <AdminDashboard />;
+  // Admin: Hub Admin en "/" — PWA completa (SW + banner de instalación)
+  if (profile.role === "admin") return (
+    <>
+      <AdminDashboard />
+      <PWAServiceWorker scope="/" />
+      <PWAInstallBanner appName="Hub Admin" appIcon="🧊" />
+    </>
+  );
 
   // Otros roles: el useEffect ya disparó la redirección; mostrar spinner
   if (RUTA_POR_ROL[profile.role]) return <Spinner mensaje="Redirigiendo..." />;

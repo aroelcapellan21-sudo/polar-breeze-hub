@@ -10,6 +10,7 @@ import {
 } from "@/lib/types";
 import SobrantesChofer       from "@/components/chofer/SobrantesChofer";
 import FloatingFAB           from "@/components/shared/FloatingFAB";
+import PWAInstallBanner       from "@/components/shared/PWAInstallBanner";
 import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 import { ShareBar }          from "@/components/shared/ShareButtons";
 import { useRegisterModal } from "@/components/shared/ModalShareContext";
@@ -690,6 +691,9 @@ export default function ChoferDashboard() {
 
       {/* ── Botón flotante ── */}
       <FloatingFAB getMessage={buildMsg} />
+
+      {/* ── Banner de instalación PWA ── */}
+      <PWAInstallBanner appName="App Chofer" appIcon="🚚" />
     </div>
   );
 }
