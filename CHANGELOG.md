@@ -10,6 +10,9 @@ Historial de cambios. Formato inspirado en [Keep a Changelog](https://keepachang
 ### Corregido
 - **Tab Choferes del Encargado** crasheaba (TypeError) si un talonario "retirada" no tenía el array `productos`; se blindaron las useMemo `ranking`/`invHoy`. (`827ca54`)
 
+### Añadido
+- **Fotos del catálogo** en `assets/fotos/productos/`: `paletas/` (16) y `helados/` (12), con `README.md` y convención de nombres por producto.
+
 ### Cambiado
 - **Tabs del Encargado**: la fila de tabs se separa de la fila de arriba (padding superior + margen + divisor sutil) para que respire. (Mejora #12)
 - **Registro de Lotes**: el sombreado de la sub-área **Entrada** pasa a **azul** (header, paneles y campos de captura) para diferenciarla de la **lista de productos** (verde). El botón 📥 Entrada del sub-toggle también es azul. (Mejora #11)
