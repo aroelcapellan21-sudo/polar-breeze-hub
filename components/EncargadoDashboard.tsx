@@ -9,6 +9,7 @@ import RegistroLote       from "@/components/encargado/RegistroLote";
 import SalidaPicking      from "@/components/encargado/SalidaPicking";
 import LotesGuardados     from "@/components/encargado/LotesGuardados";
 import Reposicion         from "@/components/encargado/Reposicion";
+import BuscadorArea, { coincide } from "@/components/shared/BuscadorArea";
 import ConsultaChoferes   from "@/components/encargado/ConsultaChoferes";
 import PolarBreezeWeight  from "@/components/encargado/PolarBreezeWeight";
 import FloatingFAB        from "@/components/shared/FloatingFAB";
@@ -141,6 +142,11 @@ export default function EncargadoDashboard() {
   // Productos críticos (agotado o negativo) — alimentan el tab Urgente
   const criticos = useMemo(() => saldo.filter(p => p.saldo <= 0), [saldo]);
   const maxSaldo = useMemo(() => Math.max(...saldo.map(p => p.saldo), 1), [saldo]);
+
+  // Buscador contextual por área (#13): filtra la lista del tab activo por nombre
+  const [productoQ, setProductoQ] = useState("");
+  const saldoFiltrado    = useMemo(() => saldo.filter(p => coincide(productoQ, p.nombre)),    [saldo, productoQ]);
+  const criticosFiltrado = useMemo(() => criticos.filter(p => coincide(productoQ, p.nombre)), [criticos, productoQ]);
 
   // Mensaje de WhatsApp con la lista de stock crítico (URL sin número → el
   // Encargado elige a quién enviarlo: proveedor, admin, grupo…).
@@ -440,7 +446,19 @@ export default function EncargadoDashboard() {
                 <p className="text-xs text-gray-400 mt-1">Registra el primer lote para ver el stock.</p>
               </div>
             ) : (
-              <StockRows items={saldo} maxSaldo={maxSaldo} />
+              <>
+                <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/60">
+                  <BuscadorArea value={productoQ} onChange={setProductoQ} placeholder="Buscar producto…" />
+                </div>
+                {saldoFiltrado.length === 0 ? (
+                  <div className="px-4 py-10 text-center">
+                    <p className="text-2xl mb-1">🔍</p>
+                    <p className="text-sm font-semibold text-gray-600">Sin coincidencias</p>
+                  </div>
+                ) : (
+                  <StockRows items={saldoFiltrado} maxSaldo={maxSaldo} />
+                )}
+              </>
             )}
           </div>
         )}
@@ -495,7 +513,19 @@ export default function EncargadoDashboard() {
                 <p className="text-xs text-gray-400 mt-1">Ningún producto está agotado o en negativo.</p>
               </div>
             ) : (
-              <StockRows items={criticos} maxSaldo={maxSaldo} />
+              <>
+                <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/60">
+                  <BuscadorArea value={productoQ} onChange={setProductoQ} placeholder="Buscar producto crítico…" />
+                </div>
+                {criticosFiltrado.length === 0 ? (
+                  <div className="px-4 py-10 text-center">
+                    <p className="text-2xl mb-1">🔍</p>
+                    <p className="text-sm font-semibold text-gray-600">Sin coincidencias</p>
+                  </div>
+                ) : (
+                  <StockRows items={criticosFiltrado} maxSaldo={maxSaldo} />
+                )}
+              </>
             )}
           </div>
         )}

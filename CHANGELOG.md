@@ -11,6 +11,7 @@ Historial de cambios. Formato inspirado en [Keep a Changelog](https://keepachang
 - **Tab Choferes del Encargado** crasheaba (TypeError) si un talonario "retirada" no tenía el array `productos`; se blindaron las useMemo `ranking`/`invHoy`. (`827ca54`)
 
 ### Añadido
+- **Buscador inteligente por área** (Mejora #13): componente reutilizable `BuscadorArea` que filtra en vivo la lista del tab activo del Encargado (Stock, Urgente, Guardados, Reposición, Choferes), insensible a mayúsculas y tildes. Complementa al buscador global.
 - **Fotos del catálogo** en `assets/fotos/productos/`: `paletas/` (16) y `helados/` (12), con `README.md` y convención de nombres por producto. Nombres de archivo **normalizados** (minúsculas, sin tildes ni espacios → guiones) y corregidos typos (bainilla→vainilla, frasa→fresa). `logo.jpg` movido a `assets/fotos/marca/`.
 
 ### Cambiado

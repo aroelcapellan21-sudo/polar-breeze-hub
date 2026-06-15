@@ -16,6 +16,7 @@ import { useState, useEffect, useMemo } from "react";
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { MovimientoLoker, toDate } from "@/lib/types";
+import BuscadorArea, { coincide } from "@/components/shared/BuscadorArea";
 
 const VENTANA_DIAS = 14; // ventana para el consumo diario informativo
 
@@ -35,6 +36,7 @@ export default function Reposicion() {
   const [error,   setError]   = useState<string | null>(null);
   const [minimos, setMinimos] = useState<Record<string, number>>({});
   const [filtro,  setFiltro]  = useState<"reponer" | "todos">("reponer");
+  const [q,       setQ]       = useState("");
 
   // Cargar mínimos guardados
   useEffect(() => {
@@ -107,7 +109,7 @@ export default function Reposicion() {
   );
 
   const porReponer = useMemo(() => ordenadas.filter((f) => f.pedir > 0), [ordenadas]);
-  const visibles   = filtro === "reponer" ? porReponer : ordenadas;
+  const visibles   = (filtro === "reponer" ? porReponer : ordenadas).filter((f) => coincide(q, f.nombre));
   const nCritico   = porReponer.filter((f) => f.estado === "critico").length;
   const nBajo      = porReponer.filter((f) => f.estado === "bajo").length;
   const totalPedir = porReponer.reduce((s, f) => s + f.pedir, 0);
@@ -157,6 +159,13 @@ export default function Reposicion() {
         <div className="flex-1 bg-[#D42B2B]" />
         <div className="flex-1 bg-[#1E8C3A]" />
       </div>
+
+      {/* Buscador contextual por producto */}
+      {cargado && !error && filas.length > 0 && (
+        <div className="no-print px-4 pt-2.5 bg-gray-50/60">
+          <BuscadorArea value={q} onChange={setQ} placeholder="Buscar producto…" />
+        </div>
+      )}
 
       {/* Filtro + resumen */}
       {cargado && !error && filas.length > 0 && (

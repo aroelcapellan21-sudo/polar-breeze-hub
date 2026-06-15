@@ -122,6 +122,7 @@ commits y fechas está en **`CHANGELOG.md`**. Mantener ambos al día.
 - Tab Vista → contiene embebida la app `public/polar-breeze-final.html` (App Inventario Choferes).
 - Tab Weight → escáner HID + báscula Bluetooth.
 - **Buscador global** (`components/encargado/BuscadorGlobal.tsx`): busca en `lotes_loker`, `movimientos_loker` (stock), `usuarios` (choferes) e `inventarios/{fecha}/choferes` (últimos 14 días). Sin `orderBy` en la consulta de lotes (evita requisito de índice Firestore compuesto); cada fetch tiene `.catch()` propio.
+- **Buscador contextual por área** (`components/shared/BuscadorArea.tsx`, Mejora #13): input reutilizable que filtra la lista del tab activo en vivo, insensible a mayúsculas/tildes (`normalizar`/`coincide`). Integrado en Stock, Urgente (por producto), Guardados (número/proveedor/producto), Reposición (producto) y Choferes/cierre (nombre/ficha). Es distinto del buscador global (modal que cruza colecciones).
 - **NO TOCAR SIN AUTORIZACIÓN**: `components/EncargadoDashboard.tsx`
 
 ### App Chofer

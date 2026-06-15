@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { LoteLoker, toDate } from "@/lib/types";
+import BuscadorArea, { coincide } from "@/components/shared/BuscadorArea";
 
 // YYYY-MM-DD en hora local del dispositivo (RD = UTC-4), igual que registra
 // RegistroLote — así el filtro por día coincide con la fecha mostrada.
@@ -46,6 +47,7 @@ export default function LotesGuardados() {
   const [cargado, setCargado] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
   const [fecha,   setFecha]   = useState("");                 // "" = todos los días
+  const [q,       setQ]       = useState("");                 // búsqueda por número/proveedor
   const [abierto, setAbierto] = useState<string | null>(null); // id del lote expandido
 
   // Suscripción viva a lotes_loker. Sin orderBy (evita índice compuesto), se
@@ -73,8 +75,11 @@ export default function LotesGuardados() {
   }, []);
 
   const visibles = useMemo(
-    () => fecha ? lotes.filter(l => localISO(toDate(l.timestamp)) === fecha) : lotes,
-    [lotes, fecha],
+    () => lotes.filter(l =>
+      (!fecha || localISO(toDate(l.timestamp)) === fecha) &&
+      coincide(q, l.numero, l.proveedor, ...l.productos.map(p => p.nombre))
+    ),
+    [lotes, fecha, q],
   );
 
   const hoy = localISO(new Date());
@@ -101,6 +106,13 @@ export default function LotesGuardados() {
         <div className="flex-1 bg-[#D42B2B]" />
         <div className="flex-1 bg-[#1E8C3A]" />
       </div>
+
+      {/* Buscador contextual por número / proveedor / producto */}
+      {cargado && !error && lotes.length > 0 && (
+        <div className="no-print px-4 pt-2.5 border-b border-gray-100 bg-gray-50/60">
+          <BuscadorArea value={q} onChange={setQ} placeholder="Buscar lote por número, proveedor o producto…" />
+        </div>
+      )}
 
       {/* Barra de búsqueda por fecha */}
       {cargado && !error && lotes.length > 0 && (

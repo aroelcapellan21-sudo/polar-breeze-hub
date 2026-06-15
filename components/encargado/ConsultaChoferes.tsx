@@ -19,6 +19,7 @@ import {
 } from "@/lib/types";
 import RegistrarInventario from "@/components/encargado/RegistrarInventario";
 import DespachoChofer      from "@/components/encargado/DespachoChofer";
+import BuscadorArea, { coincide } from "@/components/shared/BuscadorArea";
 
 // ─── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -123,6 +124,13 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
 
   // Modal de despacho directo Encargado → chofer (Mejora #7)
   const [despachoChofer, setDespachoChofer] = useState<{ uid: string; nombre: string; ficha?: string } | null>(null);
+
+  // Buscador contextual del cierre (#13): filtra choferes por nombre o ficha
+  const [choferQ, setChoferQ] = useState("");
+  const choferesCierre = useMemo(
+    () => choferes.filter((c) => coincide(choferQ, c.nombre, c.ficha)),
+    [choferes, choferQ],
+  );
 
   const rankingRef  = useRef<HTMLDivElement>(null);
   const quincena    = useMemo(() => getQuincena(), []);
@@ -410,9 +418,18 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
             )}
           </div>
 
+          {/* Buscador contextual por nombre / ficha */}
+          {choferes.length > 0 && (
+            <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/40">
+              <BuscadorArea value={choferQ} onChange={setChoferQ} placeholder="Buscar chofer por nombre o ficha…" />
+            </div>
+          )}
+
           {/* ── Lista con panel lateral en tablet — §24 ── */}
           {choferes.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">Sin choferes activos</p>
+          ) : choferesCierre.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">Sin coincidencias para “{choferQ}”</p>
           ) : (
             <div className="lg:flex">
 
@@ -423,7 +440,7 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
                   Choferes ({choferes.length})
                 </p>
                 <div className="overflow-y-auto max-h-[420px]">
-                  {choferes.map((c) => {
+                  {choferesCierre.map((c) => {
                     const guardado = !!(c.ficha && invGuardados[c.ficha]);
                     const tarde    = esTarde && esDiaHoy && !guardado && !!c.ficha;
                     const revisado = !!c.ficha && revisados.has(c.ficha);
@@ -455,7 +472,7 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
 
               {/* Lista principal */}
               <div className="flex-1 divide-y divide-gray-50">
-                {choferes.map((c) => {
+                {choferesCierre.map((c) => {
                   const inv      = c.ficha ? invGuardados[c.ficha] : undefined;
                   const guardado = !!inv;
                   const tarde    = esTarde && esDiaHoy && !guardado && !!c.ficha;

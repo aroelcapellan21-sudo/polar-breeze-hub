@@ -33,6 +33,7 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 |---|--------|--------|
 | 11 | Sombreado de la sub-área Entrada (Registro de Lotes) en azul, para diferenciarla de la lista de productos (verde) | `7f20765` |
 | 12 | Separar los tabs del Encargado de la fila de arriba (padding superior + divisor sutil en la fila de tabs) | `6c55b8e` |
+| 13 | Buscador inteligente por área (`BuscadorArea.tsx`): filtro contextual por tab en Stock, Urgente, Guardados, Reposición y Choferes — insensible a tildes/mayúsculas | `PENDIENTE_HASH` |
 | 15 | Estructura `assets/fotos/` (hub · despachador · encargado · chofer) con `README.md` por área explicando qué fotos van | `df76cf7` |
 | 16 | Fotos del catálogo en `assets/fotos/productos/` (paletas: 16 · helados: 12) + `README.md` | `095f9f9` |
 
@@ -42,7 +43,6 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 
 | # | Mejora | Notas |
 |---|--------|-------|
-| 13 | **Buscador inteligente por área** | Además del buscador global, un buscador contextual por área/tab (Lote, Stock, Choferes…) que entienda el contexto en el que está el Encargado. |
 | 14 | **Lista de pedido BON visible en Admin** | El pedido que el Encargado hace a BON (lo que se ordena para reponer) visible en el Hub Admin. Relacionado con #8. |
 
 ---
