@@ -208,6 +208,7 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
       map.set(c.uid, { uid: c.uid, nombre: c.nombre, ficha: c.ficha, puntos: 0, detalle: [] })
     );
     const acumular = (uid: string, nombre: string, ficha: string | undefined, prodNombre: string, cant: number) => {
+      if (!uid || !prodNombre) return;
       if (!map.has(uid)) map.set(uid, { uid, nombre, ficha, puntos: 0, detalle: [] });
       const entry   = map.get(uid)!;
       const ptsUnit = puntosMap[prodNombre.toLowerCase().trim()] ?? 0;
@@ -221,7 +222,7 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
     talonarios.forEach((t) => {
       const d = toDate(t.timestamp);
       if (d < quincena.start || d > quincena.end) return;
-      t.productos.forEach((p) => acumular(t.choferId, t.choferNombre, t.choferFicha, p.nombre, p.cantidad ?? 0));
+      (t.productos ?? []).forEach((p) => acumular(t.choferId, t.choferNombre, t.choferFicha, p.nombre, p.cantidad ?? 0));
     });
     extras.forEach((m) => {
       if (!m.choferId) return;
@@ -240,7 +241,7 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
       .forEach((t) => {
         if (!map.has(t.choferId)) map.set(t.choferId, new Map());
         const pm = map.get(t.choferId)!;
-        t.productos.forEach((p) => {
+        (t.productos ?? []).forEach((p) => {
           const prev = pm.get(p.nombre) ?? { nombre: p.nombre, cantidad: 0 };
           pm.set(p.nombre, { nombre: p.nombre, cantidad: prev.cantidad + (p.cantidad ?? 0) });
         });
