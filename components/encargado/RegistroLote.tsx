@@ -462,10 +462,10 @@ export default function RegistroLote() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
 
         {/* ── Header con botón escáner ── */}
-        <div className="px-4 py-3 bg-gradient-to-r from-emerald-600 to-emerald-800 flex items-center justify-between gap-2">
+        <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-800 flex items-center justify-between gap-2">
           <div>
             <h2 className="text-white font-bold text-sm">📦 Registrar nuevo lote</h2>
-            <p className="text-emerald-200 text-xs mt-0.5">El número se genera automáticamente</p>
+            <p className="text-blue-200 text-xs mt-0.5">El número se genera automáticamente</p>
           </div>
           <button
             type="button"
@@ -473,7 +473,7 @@ export default function RegistroLote() {
             onClick={() => setShowScanner(v => !v)}
             className={`w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0 transition-all active:scale-95 ${
               showScanner
-                ? "bg-white text-emerald-700 shadow-inner"
+                ? "bg-white text-blue-700 shadow-inner"
                 : "bg-white/20 border border-white/30 text-white hover:bg-white/30"
             }`}
           >
@@ -483,12 +483,12 @@ export default function RegistroLote() {
 
         {/* ── Panel escáner de factura ── */}
         {showScanner && (
-          <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-3 space-y-2">
+          <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-emerald-800">📄 Escanear Nº Factura</span>
+                <span className="text-sm font-semibold text-blue-800">📄 Escanear Nº Factura</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  scanFocused ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                  scanFocused ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
                 }`}>
                   {scanFocused ? "Listo ●" : "Sin foco"}
                 </span>
@@ -498,7 +498,7 @@ export default function RegistroLote() {
                   type="button"
                   onClick={() => setShowCamera(true)}
                   title="Escanear con cámara"
-                  className="text-xs bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white
+                  className="text-xs bg-blue-700 hover:bg-blue-800 active:scale-95 text-white
                     px-2.5 py-1 rounded-lg transition-all font-medium"
                 >
                   📷 Cámara
@@ -506,7 +506,7 @@ export default function RegistroLote() {
                 <button
                   type="button"
                   onClick={() => setShowScanner(false)}
-                  className="text-xs text-emerald-600 hover:text-emerald-800 font-semibold px-2 py-1 rounded"
+                  className="text-xs text-blue-600 hover:text-blue-800 font-semibold px-2 py-1 rounded"
                 >
                   ✕
                 </button>
@@ -522,10 +522,10 @@ export default function RegistroLote() {
               placeholder="Apunta el escáner HID o escribe el número…"
               autoComplete="off"
               spellCheck={false}
-              className="w-full border border-emerald-300 rounded-lg px-3 py-2 text-sm
-                focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white font-mono"
+              className="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm
+                focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white font-mono"
             />
-            <p className="text-xs text-emerald-600">
+            <p className="text-xs text-blue-600">
               Escáner HID: apunta y presiona el gatillo · Cámara: toca 📷 para usar la cámara del dispositivo.
             </p>
           </div>
@@ -544,7 +544,7 @@ export default function RegistroLote() {
               max={hoyISO()}
               onChange={(e) => setFechaStr(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
 
@@ -558,7 +558,7 @@ export default function RegistroLote() {
                 value={proveedor} onChange={(e) => setProveedor(e.target.value)}
                 placeholder="Nombre del proveedor"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
             <div>
@@ -569,7 +569,7 @@ export default function RegistroLote() {
                 value={factNum} onChange={(e) => setFactNum(e.target.value)}
                 placeholder="Ej. F-2024-001"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
           </div>
@@ -581,12 +581,12 @@ export default function RegistroLote() {
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2
               transition-all duration-100 active:scale-95 ${
               factOk
-                ? "border-emerald-400 bg-emerald-50 text-emerald-800"
+                ? "border-blue-400 bg-blue-50 text-blue-800"
                 : "border-gray-200 bg-gray-50 text-gray-500"
             }`}
           >
             <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-              factOk ? "bg-emerald-500 text-white" : "bg-white border-2 border-gray-300 text-transparent"
+              factOk ? "bg-blue-500 text-white" : "bg-white border-2 border-gray-300 text-transparent"
             }`}>
               ✓
             </span>
@@ -599,18 +599,18 @@ export default function RegistroLote() {
           </button>
 
           {/* ── Escanear factura BON con IA (igual al picking del Despachador) ── */}
-          <div className="border border-emerald-200 rounded-xl overflow-hidden">
+          <div className="border border-blue-200 rounded-xl overflow-hidden">
             <button
               type="button"
               onClick={() => setShowFactScan(v => !v)}
-              className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-emerald-50
-                text-emerald-800 active:scale-[0.99] transition-all"
+              className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-blue-50
+                text-blue-800 active:scale-[0.99] transition-all"
             >
               <span className="text-sm font-semibold">📄 Escanear factura BON (IA)</span>
-              <span className="text-emerald-500 text-xs">{showFactScan ? "▲ Ocultar" : "▼ Abrir"}</span>
+              <span className="text-blue-500 text-xs">{showFactScan ? "▲ Ocultar" : "▼ Abrir"}</span>
             </button>
             {showFactScan && (
-              <div className="p-3 space-y-3 border-t border-emerald-100">
+              <div className="p-3 space-y-3 border-t border-blue-100">
                 <p className="text-xs text-gray-500">
                   Toma o sube una foto de la factura. La IA extrae los productos y los agrega a la lista;
                   luego puedes <strong>ajustar las cantidades manualmente</strong> antes de guardar.
@@ -660,9 +660,9 @@ export default function RegistroLote() {
                 }
                 disabled={catalogo.length === 0}
                 className={`w-full border rounded-lg px-3 py-2 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-emerald-400 pr-8 ${
+                  focus:outline-none focus:ring-2 focus:ring-blue-400 pr-8 ${
                   selProd
-                    ? "border-emerald-400 bg-emerald-50 text-emerald-900 font-medium"
+                    ? "border-blue-400 bg-blue-50 text-blue-900 font-medium"
                     : "border-gray-300 bg-white"
                 }`}
               />
@@ -696,14 +696,14 @@ export default function RegistroLote() {
                         className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-100
                           last:border-0 transition-colors ${
                           selProd === p.nombre
-                            ? "bg-emerald-50 text-emerald-800 font-semibold"
-                            : "text-gray-800 hover:bg-emerald-50 active:bg-emerald-100"
+                            ? "bg-blue-50 text-blue-800 font-semibold"
+                            : "text-gray-800 hover:bg-blue-50 active:bg-blue-100"
                         }`}
                       >
                         <span className="flex items-center justify-between gap-2">
                           <span className="flex-1">{p.nombre}</span>
                           {selProd === p.nombre && (
-                            <span className="text-emerald-500 text-base flex-shrink-0">✓</span>
+                            <span className="text-blue-500 text-base flex-shrink-0">✓</span>
                           )}
                         </span>
                       </button>
@@ -722,7 +722,7 @@ export default function RegistroLote() {
                   onKeyDown={(e) => e.key === "Enter" && agregar()}
                   placeholder="Cajas" min="0"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
                 <p className="text-xs text-gray-400 mt-0.5 text-center">cajas</p>
               </div>
@@ -733,8 +733,8 @@ export default function RegistroLote() {
                   onChange={(e) => setUdsCajaStr(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && agregar()}
                   placeholder="Uds/caja" min="1"
-                  className="w-full border border-emerald-300 bg-emerald-50/40 rounded-lg px-3 py-2 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full border border-blue-300 bg-blue-50/40 rounded-lg px-3 py-2 text-sm
+                    focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
                 <p className="text-xs text-gray-400 mt-0.5 text-center">uds/caja</p>
               </div>
@@ -746,7 +746,7 @@ export default function RegistroLote() {
                   onKeyDown={(e) => e.key === "Enter" && agregar()}
                   placeholder="Unidades" min="0"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
                 <p className="text-xs text-gray-400 mt-0.5 text-center">unidades</p>
               </div>
@@ -758,14 +758,14 @@ export default function RegistroLote() {
                   onKeyDown={(e) => e.key === "Enter" && agregar()}
                   placeholder="Costo" min="0" step="0.01"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
                 <p className="text-xs text-gray-400 mt-0.5 text-center">$/unidad</p>
               </div>
               <button
                 type="button" onClick={agregar}
                 disabled={!prodEfectivo || catalogo.length === 0}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-lg font-bold
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-lg font-bold
                   active:scale-95 transition-all duration-100 self-start disabled:opacity-50"
               >
                 +
@@ -774,7 +774,7 @@ export default function RegistroLote() {
 
             {/* Preview en vivo del total convertido */}
             {((parseInt(cajasStr) || 0) > 0 || (parseInt(unidsStr) || 0) > 0) && (
-              <p className="text-xs text-emerald-700 mt-1.5 font-medium">
+              <p className="text-xs text-blue-700 mt-1.5 font-medium">
                 = {(parseInt(cajasStr) || 0) * Math.max(1, parseInt(udsCajaStr) || 1) + (parseInt(unidsStr) || 0)} unidades
                 {(parseInt(cajasStr) || 0) > 0 && (
                   <span className="text-gray-400 font-normal">

@@ -374,7 +374,7 @@ export default function EncargadoDashboard() {
                 onClick={() => setLoteVista("entrada")}
                 className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
                   loteVista === "entrada"
-                    ? "bg-[#1E8C3A] text-white shadow-sm"
+                    ? "bg-blue-600 text-white shadow-sm"
                     : "text-gray-500 hover:bg-gray-50"
                 }`}
               >

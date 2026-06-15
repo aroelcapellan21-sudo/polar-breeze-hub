@@ -27,11 +27,18 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 
 ---
 
+## ✅ Completadas (cont.)
+
+| # | Mejora | Commit |
+|---|--------|--------|
+| 11 | Sombreado de la sub-área Entrada (Registro de Lotes) en azul, para diferenciarla de la lista de productos (verde) | `PENDIENTE_HASH` |
+
+---
+
 ## ⏳ Pendientes
 
 | # | Mejora | Notas |
 |---|--------|-------|
-| 11 | **Cambio de color en la sub-área Entrada** | Ajustar el color/identidad visual de 📥 Entrada en el tab Lote (hoy verde) para diferenciarla mejor de 📤 Salida (rojo). |
 | 12 | **Separar tabs** | Reorganizar/separar mejor los tabs del Encargado para que cada área quede más clara (continuación de Entrada/Salida y de los tabs Guardados/Urgente). |
 | 13 | **Buscador inteligente por área** | Además del buscador global, un buscador contextual por área/tab (Lote, Stock, Choferes…) que entienda el contexto en el que está el Encargado. |
 | 14 | **Lista de pedido BON visible en Admin** | El pedido que el Encargado hace a BON (lo que se ordena para reponer) visible en el Hub Admin. Relacionado con #8. |
