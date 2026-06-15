@@ -31,7 +31,7 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 
 | # | Mejora | Commit |
 |---|--------|--------|
-| 11 | Sombreado de la sub-área Entrada (Registro de Lotes) en azul, para diferenciarla de la lista de productos (verde) | `PENDIENTE_HASH` |
+| 11 | Sombreado de la sub-área Entrada (Registro de Lotes) en azul, para diferenciarla de la lista de productos (verde) | `7f20765` |
 
 ---
 
