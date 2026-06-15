@@ -2,7 +2,7 @@
 
 > ⚠️ **LEE ESTE ARCHIVO AL INICIO DE CADA SESIÓN Y ACTUALÍZALO ANTES DE HACER PUSH. Si agregas una mejora márcala ⏳, si la completas márcala ✅.**
 
-Historial de cambios.
+Historial de cambios. Formato inspirado en [Keep a Changelog](https://keepachangelog.com/es-ES/). Orden cronológico inverso (lo más reciente arriba). La hoja de ruta de mejoras está en `MEJORAS.md`.
 
 <!-- NUEVAS ENTRADAS ARRIBA -->
 ## Sin publicar
@@ -11,9 +11,8 @@ Historial de cambios.
 - **Tab Choferes del Encargado** crasheaba (TypeError) si un talonario "retirada" no tenía el array `productos`; se blindaron las useMemo `ranking`/`invHoy`. (`827ca54`)
 
 ### Cambiado
+- **Tabs del Encargado**: la fila de tabs se separa de la fila de arriba (padding superior + margen + divisor sutil) para que respire. (Mejora #12)
 - **Registro de Lotes**: el sombreado de la sub-área **Entrada** pasa a **azul** (header, paneles y campos de captura) para diferenciarla de la **lista de productos** (verde). El botón 📥 Entrada del sub-toggle también es azul. (Mejora #11)
- Formato inspirado en [Keep a Changelog](https://keepachangelog.com/es-ES/).
-Orden cronológico inverso (lo más reciente arriba). La hoja de ruta de mejoras está en `MEJORAS.md`.
 
 ---
 

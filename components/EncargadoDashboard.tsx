@@ -278,8 +278,8 @@ export default function EncargadoDashboard() {
           </div>
         </div>
 
-        {/* ── Fila 2: Tabs con flechas ── */}
-        <div className="max-w-2xl mx-auto px-2 pb-2 flex items-center gap-0.5">
+        {/* ── Fila 2: Tabs con flechas (separados de la fila de arriba) ── */}
+        <div className="max-w-2xl mx-auto px-2 pt-2.5 pb-2 mt-1 border-t border-white/10 flex items-center gap-0.5">
           <button
             onClick={() => scrollNav("left")}
             className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
