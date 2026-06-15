@@ -11,7 +11,7 @@ Historial de cambios. Formato inspirado en [Keep a Changelog](https://keepachang
 - **Tab Choferes del Encargado** crasheaba (TypeError) si un talonario "retirada" no tenía el array `productos`; se blindaron las useMemo `ranking`/`invHoy`. (`827ca54`)
 
 ### Añadido
-- **Fotos del catálogo** en `assets/fotos/productos/`: `paletas/` (16) y `helados/` (12), con `README.md` y convención de nombres por producto. Nombres de archivo **normalizados** (minúsculas, sin tildes ni espacios → guiones). `logo.jpg` movido a `assets/fotos/marca/`.
+- **Fotos del catálogo** en `assets/fotos/productos/`: `paletas/` (16) y `helados/` (12), con `README.md` y convención de nombres por producto. Nombres de archivo **normalizados** (minúsculas, sin tildes ni espacios → guiones) y corregidos typos (bainilla→vainilla, frasa→fresa). `logo.jpg` movido a `assets/fotos/marca/`.
 
 ### Cambiado
 - **Tabs del Encargado**: la fila de tabs se separa de la fila de arriba (padding superior + margen + divisor sutil) para que respire. (Mejora #12)
