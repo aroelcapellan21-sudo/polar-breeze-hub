@@ -10,6 +10,7 @@ Orden cronológico inverso (lo más reciente arriba). La hoja de ruta de mejoras
 ## 2026-06-14
 
 ### Añadido
+- **Módulo de reposición inteligente** (tab ♻️ Reposición del Encargado): sugiere reponer por mínimo manual por producto (pedir = mín − stock), con estados crítico/bajo/ok, consumo diario reciente y cobertura como ayuda, y Compartir pedido a BON por WhatsApp. Mínimos en `localStorage` (`pb_minimos`). (Mejora #9 · `ff74e6c`)
 - **Salidas manuales del Encargado en Hub Admin**: el detalle de cada encargado (tab Encargados) muestra sus salidas manuales (picking + despacho directo), atribuidas por `responsableId`. (Mejora #8 · `aec0e9f`)
 - **Despacho directo Encargado → chofer**: botón 🚚 por chofer en el tab Choferes que abre un modal (`DespachoChofer.tsx`) para entregar productos del stock; escribe `salida_despacho` con `choferId`/`choferNombre` y cantidad negativa → descuenta del loker y queda atribuido al chofer. (Mejora #7 · `c467981`)
 - **Tab Urgente dedicado** en Stock del Encargado: productos críticos (saldo ≤ 0) con badge rojo en vivo (activo desde que abre el dashboard) y Compartir por WhatsApp. (Mejora #2 · `cdca4e6`)
