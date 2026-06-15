@@ -8,6 +8,7 @@ import { MovimientoLoker } from "@/lib/types";
 import RegistroLote       from "@/components/encargado/RegistroLote";
 import SalidaPicking      from "@/components/encargado/SalidaPicking";
 import LotesGuardados     from "@/components/encargado/LotesGuardados";
+import Reposicion         from "@/components/encargado/Reposicion";
 import ConsultaChoferes   from "@/components/encargado/ConsultaChoferes";
 import PolarBreezeWeight  from "@/components/encargado/PolarBreezeWeight";
 import FloatingFAB        from "@/components/shared/FloatingFAB";
@@ -20,7 +21,7 @@ import AsistenteAI         from "@/components/shared/AsistenteAI";
 import SyncSheetsPanel     from "@/components/shared/SyncSheetsPanel";
 import WelcomeBanner       from "@/components/shared/WelcomeBanner";
 
-type Tab = "lote" | "guardados" | "weight" | "stock" | "urgente" | "choferes" | "vista";
+type Tab = "lote" | "guardados" | "weight" | "stock" | "urgente" | "reposicion" | "choferes" | "vista";
 
 // Gradiente tricolor Polar Breeze (aplicado en todos los dashboards)
 const HEADER_BG = "linear-gradient(90deg, rgba(245,200,0,0.55) 0% 33.33%, rgba(212,43,43,0.55) 33.33% 66.66%, rgba(30,140,58,0.55) 66.66% 100%), #1A1A1A";
@@ -163,6 +164,7 @@ export default function EncargadoDashboard() {
     { key: "weight",    icon: "⚖️",  label: "Weight"    },
     { key: "stock",    icon: "📊", label: "Stock"    },
     { key: "urgente",  icon: "🚨", label: "Urgente"  },
+    { key: "reposicion", icon: "♻️", label: "Reposición" },
     { key: "choferes", icon: "👥", label: "Choferes" },
     { key: "vista",    icon: "🧊", label: "Vista"    },
   ];
@@ -173,6 +175,7 @@ export default function EncargadoDashboard() {
     weight:    "⚖️ Weight — recepción con escáner + báscula BT",
     stock:    "📊 Stock actual — saldo del loker en tiempo real",
     urgente:  "🚨 Urgente — productos agotados o en negativo · compartir por WhatsApp",
+    reposicion: "♻️ Reposición — sugerencias según stock vs. mínimo · pedido a BON",
     choferes: "👥 Inventario de Choferes — cierre del día · puntos quincena",
     vista:    "🧊 Vista — polar-breeze-final.html integrado",
   };
@@ -385,7 +388,8 @@ export default function EncargadoDashboard() {
             {loteVista === "entrada" ? <RegistroLote /> : <SalidaPicking />}
           </div>
         )}
-        {tab === "guardados" && <LotesGuardados />}
+        {tab === "guardados"  && <LotesGuardados />}
+        {tab === "reposicion" && <Reposicion />}
         {tab === "weight" && (
           <div className="space-y-4">
             <PolarBreezeWeight />

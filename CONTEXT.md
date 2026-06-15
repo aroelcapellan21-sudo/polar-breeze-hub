@@ -105,7 +105,7 @@ commits y fechas está en **`CHANGELOG.md`**. Mantener ambos al día.
 
 ### App Encargado / Supervisor
 
-- Tabs: Lote (Entrada/Salida), Guardados, Weight, Stock, Urgente, Choferes, Vista.
+- Tabs: Lote (Entrada/Salida), Guardados, Weight, Stock, Urgente, Reposición, Choferes, Vista.
 - **Tab Lote — sub-toggle Entrada / Salida (Picking)** (en `EncargadoDashboard.tsx`, estado `loteVista`):
   - **📥 Entrada** → `RegistroLote.tsx` (sin cambios): registra lotes recibidos de BON (suma a `movimientos_loker` con `tipo: entrada_interior`, cantidad positiva).
   - **📤 Salida (Picking)** → `SalidaPicking.tsx`: registra lo que sale al despacho. Lee el stock en vivo (saldo > 0), arma una lista producto+cantidad y al confirmar escribe un movimiento por producto con `tipo: salida_despacho`, `categoria: retiro_despacho`, `motivo: "picking"` y `cantidad` **negativa** → descuenta del stock. Avisa en rojo si una cantidad excede lo disponible (quedaría negativo y dispara la alarma). Reusa tipos existentes para no tocar `lib/types.ts`. Compartir por WhatsApp opcional.
@@ -118,6 +118,7 @@ commits y fechas está en **`CHANGELOG.md`**. Mantener ambos al día.
 - Tab Choferes → cierre del día, puntos quincena, inventario despachado. **Despacho directo Encargado → chofer** (botón 🚚 por fila → modal `DespachoChofer.tsx`): elige productos del stock y escribe `salida_despacho` con `choferId`/`choferNombre` y cantidad negativa (igual que el Despachador) → descuenta del loker y aparece en la vista del chofer. **Revisión manual por chofer** (indicador azul): el Encargado marca con el botón 🔄 que revisó/sincronizó a ese chofer ese día → chip, fila y punto lateral en azul + "🔵 Revisado". No conecta con Sheets; se persiste por fecha en `localStorage` (clave `pb_revisados_<fecha>`), marcador local del Encargado. Contador azul en el header.
 - Tab Stock → barras de progreso con semáforo de colores. Listener de `movimientos_loker` (suscripción viva desde el mount) con callback de error (muestra aviso en vez de quedar en blanco).
 - Tab Urgente → productos críticos (saldo ≤ 0) con badge en vivo en el tab (pulso rojo, activo desde que abre el dashboard) y Compartir por WhatsApp. Comparte la fuente de datos del tab Stock.
+- Tab ♻️ Reposición (`Reposicion.tsx`) → sugerencias de reposición por **mínimo manual por producto**: pedir = máx(0, mínimo − stock); estados 🔴 crítico (stock ≤ 0) / 🟡 bajo / 🟢 ok / ⚪ sin mínimo. Muestra consumo diario reciente (ventana 14 d) y cobertura como ayuda informativa. Filtro "Por reponer" / "Todos (fijar mínimos)" y Compartir pedido por WhatsApp (alimenta el pedido a BON, #14). Los **mínimos se persisten en `localStorage` (`pb_minimos`)** — marcador local del Encargado, sin tocar Firestore (las reglas no permiten al Encargado escribir en `config/*`; `codigos_cajas` sería la alternativa Firestore si se quiere compartido).
 - Tab Vista → contiene embebida la app `public/polar-breeze-final.html` (App Inventario Choferes).
 - Tab Weight → escáner HID + báscula Bluetooth.
 - **Buscador global** (`components/encargado/BuscadorGlobal.tsx`): busca en `lotes_loker`, `movimientos_loker` (stock), `usuarios` (choferes) e `inventarios/{fecha}/choferes` (últimos 14 días). Sin `orderBy` en la consulta de lotes (evita requisito de índice Firestore compuesto); cada fetch tiene `.catch()` propio.
