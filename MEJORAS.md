@@ -55,6 +55,13 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 | C | **Regla general (todos los hubs) — buscador + consulta histórica** | Toda área que tenga buscador debe tener también una sección de consulta histórica relacionada. |
 | D | **Encargado → Chofer — habilitación automática** | Los productos asignados en Salida/Picking se habilitan automáticamente en la app de inventario del chofer. |
 | E | **Subtab Salida/Picking — rediseño completo** | Buscador de productos + lista de choferes (ficha y nombre) + flujo: seleccionar producto → elegir chofer → confirmar cantidad → registrar, con descuento automático del stock en `movimientos_loker` y la salida apareciendo en el subtab Despacho del chofer. |
+| I | **Despachador (Comparar) — color por estado de despacho** | Choferes sin despacho del día con fondo rojo suave; choferes ya despachados con fondo azul. |
+| J | **Despachador (Cierre) — scroll automático** | Al cerrar un informe exitosamente, hacer scroll automático hacia arriba. |
+| K | **Despachador (Consulta histórica) — nuevo tab** | Tab de consulta con secciones por fecha: anomalías, despachos, cierres e historial del Pikin. |
+| L | **Motor de detección de fraudes (Fase 2)** | Motor automático con 4 reglas: Sobreventado, Complementación, Mínimo exacto de puntos, Venta baja histórica. |
+| M | **Admin (Reportes) — reorganización por área** | Separar la información por área: Encargado, Despachador y Admin. El Cuarto Frío pertenece al Encargado. |
+| N | **Monitor Telegram — errores de Firestore** | Capturar errores `permission-denied` de Firestore en los `onSnapshot` y enviarlos al bot. |
+| O | **Despachador (sesión) — restaurar sesión en progreso** | Restaurar automáticamente la sesión en progreso si el usuario sale y vuelve a entrar. |
 
 ---
 
