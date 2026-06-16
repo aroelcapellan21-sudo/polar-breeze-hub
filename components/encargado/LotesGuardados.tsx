@@ -37,7 +37,7 @@ function buildLoteWa(lote: LoteLoker): string {
     "",
     ...(lote.productos ?? []).map(p => `• ${p.nombre}: *${p.total} uds*`),
     "",
-    `Total: ${totalUds(lote)} uds · ${lote.productos.length} producto${lote.productos.length !== 1 ? "s" : ""}`,
+    `Total: ${totalUds(lote)} uds · ${(lote.productos ?? []).length} producto${(lote.productos ?? []).length !== 1 ? "s" : ""}`,
   ].join("\n");
   return `https://wa.me/?text=${encodeURIComponent(lines)}`;
 }
@@ -223,7 +223,7 @@ export default function LotesGuardados() {
                       <span className="text-[10px] text-gray-400">Sin factura</span>
                     )}
                     <span className="text-[10px] text-gray-400">
-                      {lote.productos.length} producto{lote.productos.length !== 1 ? "s" : ""}
+                      {(lote.productos ?? []).length} producto{(lote.productos ?? []).length !== 1 ? "s" : ""}
                     </span>
                   </div>
                 </button>
