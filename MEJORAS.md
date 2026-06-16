@@ -50,6 +50,11 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 | 20 | **Despachador — ícono del botón comparación** | Cambiar el ícono ⚖️ por 🔃 en el botón de comparación. |
 | 21 | **Despachador — renombrar "Cuarto Frío" → "Pikin"** | Cambiar el texto "Cuarto Frío" por "Pikin". |
 | 22 | **Encargado (Reposición) — recálculo automático** | Recalcular automáticamente el tab Reposición cuando se registra un lote nuevo en Entrada. |
+| A | **Encargado (Salida/Picking) — buscador con teclado** | Agregar un buscador con teclado que filtre los productos en tiempo real. |
+| B | **Encargado (Salida/Picking) — historial de salidas** | Agregar una sección de historial de salidas filtrable por fecha. |
+| C | **Regla general (todos los hubs) — buscador + consulta histórica** | Toda área que tenga buscador debe tener también una sección de consulta histórica relacionada. |
+| D | **Encargado → Chofer — habilitación automática** | Los productos asignados en Salida/Picking se habilitan automáticamente en la app de inventario del chofer. |
+| E | **Subtab Salida/Picking — rediseño completo** | Buscador de productos + lista de choferes (ficha y nombre) + flujo: seleccionar producto → elegir chofer → confirmar cantidad → registrar, con descuento automático del stock en `movimientos_loker` y la salida apareciendo en el subtab Despacho del chofer. |
 
 ---
 
