@@ -27,10 +27,11 @@ service cloud.firestore {
 
     // ── usuarios ─────────────────────────────────────────────────────────────
     // Cada usuario lee su propio doc (auth-context necesita leer el rol al iniciar).
-    // Encargado lee todos (BuscadorGlobal busca choferes por nombre/ficha).
+    // Encargado y Despachador leen todos (buscan choferes por nombre/ficha).
+    // Solo lectura — la escritura sigue restringida a admin vía el catch-all.
     match /usuarios/{uid} {
       allow read: if request.auth != null &&
-                     (request.auth.uid == uid || esEncargado());
+                     (request.auth.uid == uid || esEncargado() || esDespacha());
     }
 
     // ── inventarios/{fecha}/choferes/{ficha} ─────────────────────────────────
