@@ -36,6 +36,7 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 | 13 | Buscador inteligente por área (`BuscadorArea.tsx`): filtro contextual por tab en Stock, Urgente, Guardados, Reposición y Choferes — insensible a tildes/mayúsculas | `5e20ce9` |
 | 15 | Estructura `assets/fotos/` (hub · despachador · encargado · chofer) con `README.md` por área explicando qué fotos van | `df76cf7` |
 | 16 | Fotos del catálogo en `assets/fotos/productos/` (paletas: 16 · helados: 12) + `README.md` | `095f9f9` |
+| 17 | El rol chofer puede leer sus propios movimientos en `movimientos_loker` (regla Firestore acotada a `choferId == su uid`, solo lectura) | `7d75ba4` |
 
 ---
 
