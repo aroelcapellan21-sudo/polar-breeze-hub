@@ -23,7 +23,7 @@ function fmtFechaHora(ts: LoteLoker["timestamp"]): string {
 }
 
 function totalUds(lote: LoteLoker): number {
-  return lote.productos.reduce((s, p) => s + (p.total ?? 0), 0);
+  return (lote.productos ?? []).reduce((s, p) => s + (p.total ?? 0), 0);
 }
 
 // Mensaje de WhatsApp con el detalle del lote (wa.me sin número → el Encargado
@@ -35,7 +35,7 @@ function buildLoteWa(lote: LoteLoker): string {
     ...(lote.proveedor ? [`🏷️ Proveedor: ${lote.proveedor}`] : []),
     ...(lote.facturaNumero ? [`🧾 Factura: ${lote.facturaNumero}`] : []),
     "",
-    ...lote.productos.map(p => `• ${p.nombre}: *${p.total} uds*`),
+    ...(lote.productos ?? []).map(p => `• ${p.nombre}: *${p.total} uds*`),
     "",
     `Total: ${totalUds(lote)} uds · ${lote.productos.length} producto${lote.productos.length !== 1 ? "s" : ""}`,
   ].join("\n");
@@ -232,7 +232,7 @@ export default function LotesGuardados() {
                 {expandido && (
                   <div className="px-4 pb-3 pt-1 bg-gray-50/60">
                     <div className="rounded-lg border border-gray-100 bg-white overflow-hidden">
-                      {lote.productos.map((p, i) => (
+                      {(lote.productos ?? []).map((p, i) => (
                         <div
                           key={`${id}-${p.producto_id}-${i}`}
                           className="flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-50 last:border-0"
