@@ -52,6 +52,9 @@ service cloud.firestore {
       // Despachador registra salidas del día; Encargado gestiona stock del Loker;
       // Admin lee el stock en el Hub.
       allow read, write: if esAdmin() || esDespacha() || esEncargado();
+      // Chofer: solo lectura de sus propios movimientos (su Hub consulta
+      // where choferId == su uid). Sin escritura.
+      allow read:        if esChofer() && resource.data.choferId == request.auth.uid;
     }
 
     // ── Encargado + Admin: lotes_loker · codigos_cajas · weight_alerts ───────
