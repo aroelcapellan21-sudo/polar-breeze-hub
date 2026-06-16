@@ -165,7 +165,7 @@ commits y fechas está en **`CHANGELOG.md`**. Mantener ambos al día.
 
 - Archivo: `public/polar-breeze-final.html`
 - Vive dentro del tab Vista del Dashboard del Encargado.
-- PIN 1234 hardcoded (ver Deuda C).
+- PIN 1234 hardcoded.
 - Barra de progreso tricolor, chips de choferes con 3 estados.
 - Modo claro/oscuro funcionando solo dentro de esta app embebida (excepción a la regla global de "siempre modo claro").
 - Badge ⚠ aparece al escribir en producto fuera del inventario base.
@@ -217,7 +217,6 @@ El acento del Chofer es negro intencionalmente (color de header). No es color de
 
 - Sincronización activa con hoja "Polar Breeze Hub".
 - Variables configuradas en Vercel: `GOOGLE_SHEETS_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`.
-- Ver Bug Activo A sobre el estado actual de la clave.
 
 ### Endpoint de bootstrap de roles
 
@@ -225,8 +224,7 @@ El acento del Chofer es negro intencionalmente (color de header). No es color de
 - Protegido con header `x-setup-token: <SETUP_SECRET>`.
 - **GET** → crea/actualiza documento `admin@polarbreeze.com` con `role="admin"` (requiere ADMIN_PASSWORD).
 - **POST** → `{"email":"...","role":"admin","nombre":"..."}` actualiza role de cualquier usuario.
-- Requiere GOOGLE_PRIVATE_KEY completa y ADMIN_PASSWORD configurada (ver Bug Activo A).
-- Ver Deuda D sobre endurecimiento de este endpoint.
+- Requiere GOOGLE_PRIVATE_KEY completa y ADMIN_PASSWORD configurada.
 
 **Para activar el acceso admin (una sola vez):**
 1. Corregir `GOOGLE_PRIVATE_KEY` en Vercel con la clave RSA completa del service account.
@@ -353,7 +351,7 @@ SETUP_SECRET                   # Protege /api/admin-setup
 ADMIN_PASSWORD                 # Contraseña de admin@polarbreeze.com
 GOOGLE_SHEETS_ID
 GOOGLE_SERVICE_ACCOUNT_EMAIL
-GOOGLE_PRIVATE_KEY             # ⚠️ Actualmente truncada — ver Bug Activo A
+GOOGLE_PRIVATE_KEY             # Clave RSA completa (configurada en Vercel)
 TELEGRAM_BOT_TOKEN
 TELEGRAM_CHAT_ID
 ```
@@ -386,7 +384,6 @@ npm run dev                  # Turbopack — http://localhost:3000
 
 ## ❌ PENDIENTE — NO EMPEZAR SIN ORDEN EXPLÍCITA
 
-- **Reglas Firestore por rol** (resolver Deuda B antes que cualquier otra cosa de este bloque).
 - **Módulo Ajuste Post-Cierre** — para mercancía no reportada descubierta después del cierre del chofer. Inicia Encargado o Despachador, requiere autorización de Oliver, log con fecha/quién/por qué, notifica al chofer por WhatsApp.
 - **Ajuste de precios centralizado** — un solo lugar para actualizar precios; refleja en todas las apps.
 - **Picking auto-send** — al cerrar picking del Encargado, enviar la lista automáticamente al Despachador como segunda fuente.
@@ -407,8 +404,8 @@ npm run dev                  # Turbopack — http://localhost:3000
 - Cambiar el formato de datos guardados en Firebase.
 - Instalar librerías nuevas sin consultar.
 - Renombrar archivos clave (como `middleware.ts`).
-- Tocar el PIN 1234 de `polar-breeze-final.html` (Deuda C — sin plan de migración no se toca).
-- Relajar las reglas Firestore (Deuda B — solo se endurecen, nunca se abren más).
+- Tocar el PIN 1234 de `polar-breeze-final.html` (sin plan de migración no se toca).
+- Relajar las reglas Firestore (solo se endurecen, nunca se abren más).
 
 ---
 
