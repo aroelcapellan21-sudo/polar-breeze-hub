@@ -250,6 +250,10 @@ El acento del Chofer es negro intencionalmente (color de header). No es color de
 | `talonario/{id}` | Talonario de facturas / despachos | Despachador escribe aquí |
 | `history/{id}` | Historial de operaciones del Despachador | Despachador escribe aquí |
 | `drivers/{id}` | Datos operativos del chofer (ruta, zona, estado) | Despachador escribe aquí. Cuenta de login vive en `usuarios` |
+| `session/{id}` | Sesión de trabajo en progreso del Despachador | Reglas: admin + despachador (lectura/escritura) |
+| `facturascan/{id}` | Facturas escaneadas por el Despachador (FACTURASCAN) | Reglas: admin + despachador (lectura/escritura) |
+| `informes_cierre/{id}` | Informes de cierre del Despachador | Reglas: admin + despachador (lectura/escritura) |
+| `anomalias_despacho/{id}` | Anomalías detectadas en el despacho | Reglas: admin + despachador (lectura/escritura) |
 | `logs/{...}` | Logs de auditoría (auth, operaciones) | Lectura solo admin |
 
 **Aclaraciones importantes:**
