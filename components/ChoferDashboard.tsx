@@ -66,11 +66,17 @@ export default function ChoferDashboard() {
         setRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ImbentarioRecord)));
         imbLoaded = true; checkLoaded();
       },
+      (err) => {
+        // Sin este callback la pantalla se queda cargando para siempre si la
+        // lectura falla (permiso denegado, red, etc.).
+        console.error("[Chofer] imbentario:", err);
+        imbLoaded = true; checkLoaded();
+      },
     );
 
     getDoc(doc(db, "config", "puntos")).then((snap) => {
       if (snap.exists()) setPuntosConfig(snap.data() as PuntosConfig);
-    });
+    }).catch((err) => console.error("[Chofer] config/puntos:", err));
 
     // Número de WhatsApp del bot — leído de config/main, no se muestra en UI
     getDoc(doc(db, "config", "main")).then((snap) => {
@@ -78,12 +84,16 @@ export default function ChoferDashboard() {
         const num = snap.data()?.whatsappBot as string | undefined;
         setWhatsappNum(num?.replace(/\s/g, "") || null);
       }
-    });
+    }).catch((err) => console.error("[Chofer] config/main:", err));
 
     const unsubMov = onSnapshot(
       query(collection(db, "movimientos_loker"), where("choferId", "==", profile.uid)),
       (snap) => {
         setMovimientos(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MovimientoLoker)));
+        movLoaded = true; checkLoaded();
+      },
+      (err) => {
+        console.error("[Chofer] movimientos_loker:", err);
         movLoaded = true; checkLoaded();
       },
     );
