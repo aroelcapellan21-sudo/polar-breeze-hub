@@ -57,10 +57,11 @@ service cloud.firestore {
       allow read:        if esChofer() && resource.data.choferId == request.auth.uid;
     }
 
-    // ── Encargado + Admin: lotes_loker · codigos_cajas · weight_alerts ───────
+    // ── Encargado + Admin: lotes_loker · codigos_cajas · weight_alerts · pedidos_bon ───────
     match /lotes_loker/{id}       { allow read, write: if esAdmin() || esEncargado(); }
     match /codigos_cajas/{codigo} { allow read, write: if esAdmin() || esEncargado(); }
     match /weight_alerts/{id}     { allow read, write: if esAdmin() || esEncargado(); }
+    match /pedidos_bon/{id}       { allow read, write: if esAdmin() || esEncargado(); }
 
     // ── notas_credito: gestionadas desde el Hub Admin (Inventario) ───────────
     match /notas_credito/{id}     { allow read, write: if esAdmin(); }
