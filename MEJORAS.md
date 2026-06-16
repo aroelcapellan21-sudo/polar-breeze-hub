@@ -45,6 +45,11 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 | # | Mejora | Notas |
 |---|--------|-------|
 | 14 | **Lista de pedido BON visible en Admin** | El pedido que el Encargado hace a BON (lo que se ordena para reponer) visible en el Hub Admin. Relacionado con #8. |
+| 18 | **App Choferes propia** | App dedicada para que cada chofer haga su inventario y lo envíe por WhatsApp a un número específico. |
+| 19 | **App Despachador — captura de facturas por foto** | Capturar facturas por foto, lectura por voz producto a producto, y carga automática a los choferes. |
+| 20 | **Despachador — ícono del botón comparación** | Cambiar el ícono ⚖️ por 🔃 en el botón de comparación. |
+| 21 | **Despachador — renombrar "Cuarto Frío" → "Pikin"** | Cambiar el texto "Cuarto Frío" por "Pikin". |
+| 22 | **Encargado (Reposición) — recálculo automático** | Recalcular automáticamente el tab Reposición cuando se registra un lote nuevo en Entrada. |
 
 ---
 
