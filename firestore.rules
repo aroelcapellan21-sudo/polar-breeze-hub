@@ -43,7 +43,7 @@ service cloud.firestore {
                             request.auth.token.email == ficha + '@chofer.polarbreeze.com';
     }
 
-    // ── Despachador: history · talonario · drivers · session · facturascan · movimientos_loker ───────
+    // ── Despachador: history · talonario · drivers · session · facturascan · informes_cierre · movimientos_loker ───────
     // Se incluye esAdmin() explícito para que el Hub Admin no dependa solo del
     // catch-all al hacer consultas (list) sobre estas colecciones.
     match /history/{id}          { allow read, write: if esAdmin() || esDespacha(); }
@@ -51,6 +51,7 @@ service cloud.firestore {
     match /drivers/{id}          { allow read, write: if esAdmin() || esDespacha(); }
     match /session/{id}          { allow read, write: if esAdmin() || esDespacha(); }
     match /facturascan/{id}      { allow read, write: if esAdmin() || esDespacha(); }
+    match /informes_cierre/{id}  { allow read, write: if esAdmin() || esDespacha(); }
     match /movimientos_loker/{id} {
       // Despachador registra salidas del día; Encargado gestiona stock del Loker;
       // Admin lee el stock en el Hub.
