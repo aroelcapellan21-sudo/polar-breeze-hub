@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { collection, doc, getDoc, onSnapshot, addDoc, Timestamp } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, addDoc, Timestamp, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { ProductoItem, FsSession, FsDriver, MovimientoLoker, toDate } from "@/lib/types";
+import { ProductoItem, FsSession, TalonarioDoc, MovimientoLoker, toDate } from "@/lib/types";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, openPrint, pbTable } from "@/lib/print-template";
 
@@ -49,7 +49,7 @@ export default function InformeCierre() {
 
   const [empresa,  setEmpresa]  = useState<Empresa | null>(null);
   const [session,  setSession]  = useState<FsSession | null>(null);
-  const [drivers,  setDrivers]  = useState<FsDriver[]>([]);
+  const [talonarioHoy, setTalonarioHoy] = useState<TalonarioDoc[]>([]);
   const [movsHoy,  setMovsHoy]  = useState<MovimientoLoker[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -78,16 +78,27 @@ export default function InformeCierre() {
     });
   }, []);
 
+  const todayStart = useMemo(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d;
+  }, []);
+
   // ── Listeners ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const u1 = onSnapshot(doc(db, "session", "despacho"), (s) =>
       setSession(s.exists() ? (s.data() as FsSession) : null)
     );
-    const u2 = onSnapshot(collection(db, "drivers"), (s) => {
-      setDrivers(s.docs.map((d) => ({ id: d.id, ...d.data() } as FsDriver)));
-      setCargando(false);
-    });
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    // Entregas del día desde talonario (acumula por factura; drivers.entregas se sobrescribe)
+    const u2 = onSnapshot(
+      query(collection(db, "talonario"), where("timestamp", ">=", Timestamp.fromDate(todayStart))),
+      (s) => {
+        setTalonarioHoy(
+          s.docs
+            .map((d) => ({ id: d.id, ...d.data() } as TalonarioDoc))
+            .filter((t) => t.tipo === "retirada")
+        );
+        setCargando(false);
+      }
+    );
     const u3 = onSnapshot(collection(db, "movimientos_loker"), (s) => {
       const hoy = s.docs
         .map((d) => ({ id: d.id, ...d.data() } as MovimientoLoker))
@@ -95,12 +106,39 @@ export default function InformeCierre() {
       setMovsHoy(hoy);
     });
     return () => { u1(); u2(); u3(); };
-  }, []);
+  }, [todayStart]);
 
   const cuartoFrio: ProductoItem[] = useMemo(
     () => (Array.isArray(session?.cuartoFrio) ? (session!.cuartoFrio as ProductoItem[]) : []),
     [session],
   );
+
+  // Reconstruye la forma de `drivers` sumando las facturas del día por chofer.
+  // Ventana respeta el "Reset día": desde session.resetAt si es de hoy, si no desde inicio del día.
+  const drivers = useMemo(() => {
+    const resetAt = session?.resetAt ? toDate(session.resetAt as { seconds: number }) : null;
+    const lower   = resetAt && resetAt > todayStart ? resetAt : todayStart;
+    const map = new Map<string, { id: string; nombre: string; ficha: string; entregas: ProductoItem[] }>();
+    talonarioHoy
+      .filter((t) => toDate(t.timestamp) >= lower)
+      .forEach((t) => {
+        if (!map.has(t.choferId)) {
+          map.set(t.choferId, { id: t.choferId, nombre: t.choferNombre, ficha: t.choferFicha ?? "", entregas: [] });
+        }
+        const drv = map.get(t.choferId)!;
+        (Array.isArray(t.productos) ? t.productos : []).forEach((p) => {
+          const key = norm(p.nombre ?? "");
+          const ex  = drv.entregas.find((e) => norm(e.nombre ?? "") === key);
+          if (ex) {
+            ex.cantidad = (ex.cantidad ?? 0) + (p.cantidad ?? 0);
+            if (p.visto === "mal") ex.visto = "mal";
+          } else {
+            drv.entregas.push({ ...p });
+          }
+        });
+      });
+    return Array.from(map.values());
+  }, [talonarioHoy, session, todayStart]);
 
   // ── Mapa entregas por producto ────────────────────────────────────────────
   const entregaMap = useMemo(() => {

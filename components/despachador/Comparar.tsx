@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { collection, doc, onSnapshot } from "firebase/firestore";
+import { useEffect, useState, useMemo } from "react";
+import { collection, doc, onSnapshot, query, where, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ProductoItem, FsSession, FsDriver, calcSemaforo, toDate } from "@/lib/types";
+import { ProductoItem, FsSession, TalonarioDoc, calcSemaforo, toDate } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
@@ -20,18 +20,55 @@ interface ProductRow {
 }
 
 export default function Comparar() {
-  const [session,  setSession]  = useState<FsSession | null>(null);
-  const [drivers,  setDrivers]  = useState<FsDriver[]>([]);
+  const [session,      setSession]      = useState<FsSession | null>(null);
+  const [talonarioHoy, setTalonarioHoy] = useState<TalonarioDoc[]>([]);
+
+  const todayStart = useMemo(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d;
+  }, []);
 
   useEffect(() => {
     const u1 = onSnapshot(doc(db, "session", "despacho"), (snap) => {
       setSession(snap.exists() ? (snap.data() as FsSession) : null);
     });
-    const u2 = onSnapshot(collection(db, "drivers"), (snap) => {
-      setDrivers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as FsDriver)));
-    });
+    // Entregas del día desde talonario (acumula por factura; drivers.entregas se sobrescribe)
+    const u2 = onSnapshot(
+      query(collection(db, "talonario"), where("timestamp", ">=", Timestamp.fromDate(todayStart))),
+      (snap) => setTalonarioHoy(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as TalonarioDoc))
+          .filter((t) => t.tipo === "retirada")
+      )
+    );
     return () => { u1(); u2(); };
-  }, []);
+  }, [todayStart]);
+
+  // Reconstruye la forma de `drivers` sumando las facturas del día por chofer.
+  // Ventana respeta el "Reset día": desde session.resetAt si es de hoy, si no desde inicio del día.
+  const drivers = useMemo(() => {
+    const resetAt = session?.resetAt ? toDate(session.resetAt as { seconds: number }) : null;
+    const lower   = resetAt && resetAt > todayStart ? resetAt : todayStart;
+    const map = new Map<string, { id: string; nombre: string; ficha?: string; entregas: ProductoItem[] }>();
+    talonarioHoy
+      .filter((t) => toDate(t.timestamp) >= lower)
+      .forEach((t) => {
+        if (!map.has(t.choferId)) {
+          map.set(t.choferId, { id: t.choferId, nombre: t.choferNombre, ficha: t.choferFicha, entregas: [] });
+        }
+        const drv = map.get(t.choferId)!;
+        (Array.isArray(t.productos) ? t.productos : []).forEach((p) => {
+          const key = norm(p.nombre ?? "");
+          const ex  = drv.entregas.find((e) => norm(e.nombre ?? "") === key);
+          if (ex) {
+            ex.cantidad = (ex.cantidad ?? 0) + (p.cantidad ?? 0);
+            if (p.visto === "mal") ex.visto = "mal";
+          } else {
+            drv.entregas.push({ ...p });
+          }
+        });
+      });
+    return Array.from(map.values());
+  }, [talonarioHoy, session, todayStart]);
 
   const cuartoFrio: ProductoItem[] = Array.isArray(session?.cuartoFrio)
     ? (session!.cuartoFrio as ProductoItem[])
