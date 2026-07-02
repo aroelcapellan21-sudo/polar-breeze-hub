@@ -13,6 +13,7 @@ import Choferes      from "@/components/despachador/Choferes";
 import Comparar      from "@/components/despachador/Comparar";
 import Historial     from "@/components/despachador/Historial";
 import InformeCierre         from "@/components/despachador/InformeCierre";
+import AvisoBon              from "@/components/despachador/AvisoBon";
 import AnomaliasDespachador  from "@/components/admin/AnomaliasDespachador";
 import FloatingFAB          from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal  from "@/components/shared/ConsultarTablaModal";
@@ -331,7 +332,12 @@ export default function DespachadorDashboard() {
         )}
         {tab === "comparar"   && <Comparar />}
         {tab === "historial"  && <Historial />}
-        {tab === "cierre"     && <InformeCierre />}
+        {tab === "cierre"     && (
+          <div className="space-y-4">
+            <AvisoBon />
+            <InformeCierre />
+          </div>
+        )}
         {tab === "anomalias"  && (
           <AnomaliasDespachador mode="despachador" registradorNombre={despNombre} />
         )}

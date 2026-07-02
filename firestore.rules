@@ -25,6 +25,20 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
 
+    // config/despacho: aviso de Oliver a BON + hora_retraso del semáforo.
+    // Excepción al catch-all admin: el Despachador puede escribir SOLO este doc de
+    // config (los demás config/* siguen admin-only). BON lo lee por service account.
+    match /config/despacho {
+      allow read:  if request.auth != null;
+      allow write: if esAdmin() || esDespacha();
+    }
+
+    // acuses_despacho: BON (service account) escribe el acuse "leído"; el Hub del
+    // Despachador/Admin los lee para mostrar la confirmación del aviso.
+    match /acuses_despacho/{id} {
+      allow read, write: if esAdmin() || esDespacha();
+    }
+
     // ── usuarios ─────────────────────────────────────────────────────────────
     // Cada usuario lee su propio doc (auth-context necesita leer el rol al iniciar).
     // Encargado y Despachador leen todos (buscan choferes por nombre/ficha).
