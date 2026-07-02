@@ -1,81 +1,87 @@
 "use client";
 
-// Avisar a BON (APP-DICTADA-A-VOZ) desde el Hub del Despachador.
-// - Oliver escribe `config/despacho.aviso = { texto, id, activo }`  -> BON lo
-//   muestra como banner en su pantalla de Despacho.
-// - Oliver ve los ACUSES: BON, al dar OK, escribe en `acuses_despacho`
-//   { avisoId, visto, dispositivo, timestamp }. Aquí se leen para mostrar "leído".
-// - También edita `config/despacho.hora_retraso` (hora de corte del semáforo azul
-//   de BON). Reglas: config/despacho y acuses_despacho permiten esAdmin()||esDespacha().
+// Centro de Mensajes del Hub. Oliver/Admin envían un mensaje a un ÁREA
+// (Despacho→BON, Choferes→app-chofer, Encargado→Hub) o a UN chofer por ficha.
+// Se guarda en la colección `avisos`; cada app lo muestra como banner y al dar OK
+// escribe un acuse en `acuses_despacho` (aquí se cuentan como "leído por N").
+// También edita config/despacho.hora_retraso (semáforo azul de BON).
 
 import { useEffect, useState } from "react";
 import {
-  doc, setDoc, onSnapshot, collection, query, where,
+  doc, setDoc, addDoc, updateDoc, onSnapshot, collection, query, where, getDocs, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-interface Aviso { texto: string; id: number; activo: boolean; }
-interface Acuse {
-  id: string;
-  avisoId: string;
-  dispositivo: string;
-  timestamp?: { toDate: () => Date } | null;
-}
+type Area = "despacho" | "chofer" | "encargado";
+interface Aviso { id: string; texto: string; area: Area; ficha: string | null; avisoId: number; }
+interface Chofer { ficha: string; nombre: string; }
 
 export default function AvisoBon() {
-  const [texto, setTexto]         = useState("");
-  const [aviso, setAviso]         = useState<Aviso | null>(null);
-  const [horaInput, setHoraInput] = useState("15");
-  const [acuses, setAcuses]       = useState<Acuse[]>([]);
-  const [busy, setBusy]           = useState(false);
-  const [msg, setMsg]             = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [texto, setTexto]     = useState("");
+  const [area, setArea]       = useState<Area>("despacho");
+  const [ficha, setFicha]     = useState("");           // "" = todos los choferes
+  const [choferes, setChof]   = useState<Chofer[]>([]);
+  const [avisos, setAvisos]   = useState<Aviso[]>([]);
+  const [acuses, setAcuses]   = useState<Record<string, number>>({});
+  const [horaInput, setHora]  = useState("15");
+  const [busy, setBusy]       = useState(false);
+  const [msg, setMsg]         = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  const flash = (type: "ok" | "err", text: string) => {
-    setMsg({ type, text });
-    setTimeout(() => setMsg(null), 3000);
-  };
+  const flash = (type: "ok" | "err", text: string) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 3000); };
 
-  // config/despacho en vivo (aviso actual + hora_retraso)
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "config", "despacho"), (snap) => {
-      const d = (snap.data() || {}) as { aviso?: Aviso; hora_retraso?: number };
-      setAviso(d.aviso ?? null);
-      if (typeof d.hora_retraso === "number") setHoraInput(String(d.hora_retraso));
+    getDocs(query(collection(db, "usuarios"), where("role", "==", "chofer"))).then((s) => {
+      const list = s.docs.map((d) => { const u = d.data() as { ficha?: string; nombre?: string }; return { ficha: String(u.ficha || ""), nombre: u.nombre || "" }; }).filter((c) => c.ficha);
+      list.sort((a, b) => Number(a.ficha) - Number(b.ficha));
+      setChof(list);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(query(collection(db, "avisos"), where("activo", "==", true)), (s) => {
+      const list: Aviso[] = s.docs.map((d) => { const a = d.data() as { texto?: string; area?: Area; ficha?: string | null; id?: number }; return { id: d.id, texto: a.texto || "", area: (a.area || "despacho") as Area, ficha: a.ficha ?? null, avisoId: Number(a.id || 0) }; });
+      list.sort((a, b) => b.avisoId - a.avisoId);
+      setAvisos(list);
     });
     return () => unsub();
   }, []);
 
-  // Acuses del aviso activo
   useEffect(() => {
-    if (!aviso?.id) { setAcuses([]); return; }
-    const q = query(collection(db, "acuses_despacho"), where("avisoId", "==", String(aviso.id)));
-    const unsub = onSnapshot(q, (s) => {
-      setAcuses(s.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Acuse, "id">) })));
+    const unsub = onSnapshot(collection(db, "acuses_despacho"), (s) => {
+      const m: Record<string, number> = {};
+      s.forEach((d) => { const x = d.data() as { avisoId?: string }; const k = String(x.avisoId); m[k] = (m[k] || 0) + 1; });
+      setAcuses(m);
     });
     return () => unsub();
-  }, [aviso?.id]);
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "config", "despacho"), (snap) => {
+      const d = (snap.data() || {}) as { hora_retraso?: number };
+      if (typeof d.hora_retraso === "number") setHora(String(d.hora_retraso));
+    });
+    return () => unsub();
+  }, []);
 
   const enviar = async () => {
     if (!texto.trim()) { flash("err", "Escribe el mensaje"); return; }
     setBusy(true);
     try {
-      await setDoc(doc(db, "config", "despacho"),
-        { aviso: { texto: texto.trim(), id: Date.now(), activo: true } },
-        { merge: true });
+      await addDoc(collection(db, "avisos"), {
+        texto: texto.trim(), area,
+        ficha: area === "chofer" ? (ficha || null) : null,
+        id: Date.now(), activo: true, createdBy: "Hub", timestamp: Timestamp.now(),
+      });
       setTexto("");
-      flash("ok", "Aviso enviado a BON ✓");
+      flash("ok", "Mensaje enviado ✓");
     } catch (e) { flash("err", e instanceof Error ? e.message : "Error"); }
     setBusy(false);
   };
 
-  const quitar = async () => {
-    if (!aviso) return;
+  const quitar = async (id: string) => {
     setBusy(true);
-    try {
-      await setDoc(doc(db, "config", "despacho"),
-        { aviso: { ...aviso, activo: false } }, { merge: true });
-      flash("ok", "Aviso retirado ✓");
-    } catch (e) { flash("err", e instanceof Error ? e.message : "Error"); }
+    try { await updateDoc(doc(db, "avisos", id), { activo: false }); flash("ok", "Mensaje retirado ✓"); }
+    catch (e) { flash("err", e instanceof Error ? e.message : "Error"); }
     setBusy(false);
   };
 
@@ -83,101 +89,85 @@ export default function AvisoBon() {
     const h = parseInt(horaInput, 10);
     if (!Number.isInteger(h) || h < 0 || h > 23) { flash("err", "Hora entre 0 y 23"); return; }
     setBusy(true);
-    try {
-      await setDoc(doc(db, "config", "despacho"), { hora_retraso: h }, { merge: true });
-      flash("ok", "Hora de retraso guardada ✓");
-    } catch (e) { flash("err", e instanceof Error ? e.message : "Error"); }
+    try { await setDoc(doc(db, "config", "despacho"), { hora_retraso: h }, { merge: true }); flash("ok", "Hora de retraso guardada ✓"); }
+    catch (e) { flash("err", e instanceof Error ? e.message : "Error"); }
     setBusy(false);
   };
 
-  const avisoActivo = aviso?.activo === true;
+  const destinoLabel = (a: Area, f: string | null) =>
+    a === "despacho" ? "🎙️ Despacho (BON)" : a === "encargado" ? "🏭 Encargado" : (f ? `🚚 Chofer ${f}` : "🚚 Todos los choferes");
+
+  const areaBtn = (a: Area, label: string) => (
+    <button
+      onClick={() => setArea(a)}
+      className={`rounded-lg px-3 py-2 text-sm font-medium border ${area === a ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300"}`}
+    >{label}</button>
+  );
 
   return (
     <div className="space-y-4">
       {msg && (
-        <div className={`rounded-lg px-3 py-2 text-sm ${msg.type === "ok" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
-          {msg.text}
-        </div>
+        <div className={`rounded-lg px-3 py-2 text-sm ${msg.type === "ok" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>{msg.text}</div>
       )}
 
-      {/* Enviar aviso a BON */}
+      {/* Compositor */}
       <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-3">
-        <h3 className="font-semibold text-blue-800 text-sm">📣 Avisar a la pantalla de Despacho (BON)</h3>
+        <h3 className="font-semibold text-blue-800 text-sm">📣 Enviar mensaje</h3>
         <textarea
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          placeholder="Ej: Despacho cerrado por hoy. Terminen las facturas pendientes. — Oliver"
-          rows={3}
+          value={texto} onChange={(e) => setTexto(e.target.value)} rows={3}
+          placeholder="Escribe el mensaje…"
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
         />
-        <div className="flex gap-2">
-          <button
-            onClick={enviar}
-            disabled={busy}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Enviar aviso a BON
-          </button>
-          {avisoActivo && (
-            <button
-              onClick={quitar}
-              disabled={busy}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50"
-            >
-              Quitar aviso
-            </button>
-          )}
-        </div>
-
-        {/* Estado del aviso actual + acuses */}
-        {avisoActivo ? (
-          <div className="rounded-lg bg-white border border-blue-200 p-3 text-sm space-y-1">
-            <div className="text-gray-500 text-xs">Aviso activo enviado a BON:</div>
-            <div className="whitespace-pre-wrap text-gray-800">{aviso?.texto}</div>
-            <div className="pt-1 text-xs font-medium text-blue-700">
-              {acuses.length > 0
-                ? `✅ Leído por ${acuses.length} dispositivo(s)`
-                : "⏳ Aún no lo han leído"}
-            </div>
-            {acuses.length > 0 && (
-              <ul className="text-xs text-gray-500 list-disc pl-4">
-                {acuses.map((a) => (
-                  <li key={a.id}>
-                    {a.dispositivo || "dispositivo"}
-                    {a.timestamp?.toDate ? ` · ${a.timestamp.toDate().toLocaleString("es-DO")}` : ""}
-                  </li>
-                ))}
-              </ul>
-            )}
+        <div>
+          <div className="text-xs font-medium text-gray-500 mb-1">Enviar a:</div>
+          <div className="flex flex-wrap gap-2">
+            {areaBtn("despacho", "🎙️ Despacho")}
+            {areaBtn("chofer", "🚚 Choferes")}
+            {areaBtn("encargado", "🏭 Encargado")}
           </div>
-        ) : (
-          <div className="text-xs text-gray-500">No hay aviso activo. BON no muestra banner.</div>
+        </div>
+        {area === "chofer" && (
+          <div>
+            <div className="text-xs font-medium text-gray-500 mb-1">Chofer:</div>
+            <select value={ficha} onChange={(e) => setFicha(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              <option value="">Todos los choferes</option>
+              {choferes.map((c) => <option key={c.ficha} value={c.ficha}>Ficha {c.ficha} · {c.nombre}</option>)}
+            </select>
+          </div>
         )}
+        <button onClick={enviar} disabled={busy} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          Enviar mensaje
+        </button>
       </div>
 
-      {/* Hora de retraso (semáforo azul de BON) */}
+      {/* Mensajes activos */}
+      <div className="rounded-xl border border-gray-200 p-4 space-y-2">
+        <h3 className="font-semibold text-gray-800 text-sm">Mensajes activos</h3>
+        {avisos.length === 0 && <div className="text-xs text-gray-500">No hay mensajes activos.</div>}
+        <ul className="space-y-2">
+          {avisos.map((a) => (
+            <li key={a.id} className="rounded-lg bg-white border border-gray-200 p-3 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-blue-700">{destinoLabel(a.area, a.ficha)}</span>
+                <button onClick={() => quitar(a.id)} disabled={busy} className="text-xs text-red-600 disabled:opacity-50">Quitar</button>
+              </div>
+              <div className="whitespace-pre-wrap text-gray-800 mt-1">{a.texto}</div>
+              <div className="text-xs font-medium text-gray-500 mt-1">
+                {acuses[String(a.avisoId)] ? `✅ Leído por ${acuses[String(a.avisoId)]} dispositivo(s)` : "⏳ Aún no lo han leído"}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Hora de retraso */}
       <div className="rounded-xl border border-gray-200 p-4 space-y-2">
         <h3 className="font-semibold text-gray-800 text-sm">⏰ Hora de retraso (semáforo azul en BON)</h3>
-        <p className="text-xs text-gray-500">
-          A partir de esta hora, una factura de hoy sin leer se marca azul (retraso) en BON.
-        </p>
+        <p className="text-xs text-gray-500">A partir de esta hora, una factura de hoy sin leer se marca azul (retraso) en BON.</p>
         <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={0}
-            max={23}
-            value={horaInput}
-            onChange={(e) => setHoraInput(e.target.value)}
-            className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          />
+          <input type="number" min={0} max={23} value={horaInput} onChange={(e) => setHora(e.target.value)} className="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           <span className="text-sm text-gray-500">h (0–23, hora RD)</span>
-          <button
-            onClick={guardarHora}
-            disabled={busy}
-            className="rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Guardar
-          </button>
+          <button onClick={guardarHora} disabled={busy} className="rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Guardar</button>
         </div>
       </div>
     </div>

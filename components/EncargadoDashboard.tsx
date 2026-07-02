@@ -21,6 +21,7 @@ import BuscadorGlobal      from "@/components/encargado/BuscadorGlobal";
 import AsistenteAI         from "@/components/shared/AsistenteAI";
 import SyncSheetsPanel     from "@/components/shared/SyncSheetsPanel";
 import WelcomeBanner       from "@/components/shared/WelcomeBanner";
+import AvisoAreaBanner     from "@/components/shared/AvisoAreaBanner";
 
 type Tab = "lote" | "guardados" | "weight" | "stock" | "urgente" | "reposicion" | "choferes" | "vista";
 
@@ -233,6 +234,7 @@ export default function EncargadoDashboard() {
 
   return (
     <div className="min-h-screen bg-[#F9F9F7]">
+      <AvisoAreaBanner area="encargado" />
 
       {/* ══════════════════════════════════════════
           HEADER — gradiente tricolor Polar Breeze

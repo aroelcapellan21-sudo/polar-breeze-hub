@@ -33,10 +33,18 @@ service cloud.firestore {
       allow write: if esAdmin() || esDespacha();
     }
 
-    // acuses_despacho: BON (service account) escribe el acuse "leído"; el Hub del
-    // Despachador/Admin los lee para mostrar la confirmación del aviso.
+    // acuses_despacho: BON/app-chofer (service account) escriben el acuse "leído";
+    // el Encargado lo escribe desde el Hub (cliente). Admin/Despachador los leen.
     match /acuses_despacho/{id} {
-      allow read, write: if esAdmin() || esDespacha();
+      allow read, write: if esAdmin() || esDespacha() || esEncargado();
+    }
+
+    // avisos: centro de mensajes. Escribe el Hub (admin/despachador); lo leen los
+    // clientes del Hub (incl. Encargado su propia área). BON y app-chofer leen por
+    // service account (ignoran reglas).
+    match /avisos/{id} {
+      allow read:  if esAdmin() || esDespacha() || esEncargado();
+      allow write: if esAdmin() || esDespacha();
     }
 
     // ── usuarios ─────────────────────────────────────────────────────────────
