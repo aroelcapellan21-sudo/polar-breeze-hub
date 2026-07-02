@@ -61,7 +61,10 @@ service cloud.firestore {
     // Se incluye esAdmin() explícito para que el Hub Admin no dependa solo del
     // catch-all al hacer consultas (list) sobre estas colecciones.
     match /history/{id}            { allow read, write: if esAdmin() || esDespacha(); }
-    match /talonario/{id}          { allow read, write: if esAdmin() || esDespacha(); }
+    // talonario: el Encargado también LO LEE (consulta de choferes/despachos). Solo
+    // lectura para encargado; la escritura sigue en admin/despachador.
+    match /talonario/{id}          { allow read:        if esAdmin() || esDespacha() || esEncargado();
+                                      allow write:       if esAdmin() || esDespacha(); }
     match /drivers/{id}            { allow read, write: if esAdmin() || esDespacha(); }
     match /session/{id}            { allow read, write: if esAdmin() || esDespacha(); }
     match /facturascan/{id}        { allow read, write: if esAdmin() || esDespacha(); }
@@ -78,6 +81,7 @@ service cloud.firestore {
 
     // ── Encargado + Admin: lotes_loker · codigos_cajas · weight_alerts · pedidos_bon ───────
     match /lotes_loker/{id}       { allow read, write: if esAdmin() || esEncargado(); }
+    match /lotes_weight/{id}      { allow read, write: if esAdmin() || esEncargado(); }
     match /codigos_cajas/{codigo} { allow read, write: if esAdmin() || esEncargado(); }
     match /weight_alerts/{id}     { allow read, write: if esAdmin() || esEncargado(); }
     match /pedidos_bon/{id}       { allow read, write: if esAdmin() || esEncargado(); }
