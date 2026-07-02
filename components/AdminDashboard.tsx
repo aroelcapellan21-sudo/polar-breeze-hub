@@ -18,6 +18,7 @@ import GestionEncargados     from "@/components/admin/GestionEncargados";
 import GestionUsuarios       from "@/components/admin/GestionUsuarios";
 import Reportes              from "@/components/admin/Reportes";
 import GestionCodigos        from "@/components/admin/GestionCodigos";
+import AvisoBon              from "@/components/despachador/AvisoBon";
 import PWAControl            from "@/components/admin/PWAControl";
 import TiempoReal            from "@/components/admin/TiempoReal";
 import ProyeccionesChoferes  from "@/components/admin/ProyeccionesChoferes";
@@ -27,7 +28,7 @@ import RolePill              from "@/components/shared/RolePill";
 import AsistenteAI           from "@/components/shared/AsistenteAI";
 import WelcomeBanner         from "@/components/shared/WelcomeBanner";
 
-type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp" | "reportes" | "codigos" | "pwa" | "tiemporeal" | "proyecciones" | "usuarios";
+type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp" | "reportes" | "codigos" | "pwa" | "tiemporeal" | "proyecciones" | "usuarios" | "aviso";
 
 type SearchItem =
   | { kind: "chofer";   data: UserProfile }
@@ -286,6 +287,9 @@ export default function AdminDashboard() {
             <NavTab data-active={tab === "usuarios"} active={tab === "usuarios"} onClick={() => { setTab("usuarios"); setChofer(null); }}>
               <span>👤</span><span className="hidden sm:inline">Usuarios</span>
             </NavTab>
+            <NavTab data-active={tab === "aviso"} active={tab === "aviso"} onClick={() => { setTab("aviso"); setChofer(null); }}>
+              <span>📣</span><span className="hidden sm:inline">Aviso BON</span>
+            </NavTab>
           </nav>
 
           {/* Flecha derecha */}
@@ -349,6 +353,9 @@ export default function AdminDashboard() {
             {tab === "usuarios" && (
               <span className="text-white font-medium">👤 Usuarios — gestión de usuarios, crear, editar y desactivar.</span>
             )}
+            {tab === "aviso" && (
+              <span className="text-white font-medium">📣 Aviso BON — envía un mensaje a la pantalla de Despacho de BON y mira quién lo leyó.</span>
+            )}
             {tab === "choferes" && !chofer && (
               <span className="text-white font-medium">👥 Choferes — lista de choferes activos, estado del día, detalles de cada uno.</span>
             )}
@@ -390,6 +397,7 @@ export default function AdminDashboard() {
         {tab === "tiemporeal"   && <TiempoReal />}
         {tab === "proyecciones" && <ProyeccionesChoferes />}
         {tab === "usuarios"     && <GestionUsuarios />}
+        {tab === "aviso"        && <AvisoBon />}
       </main>
 
       {/* ── Asistente IA Admin ── */}
