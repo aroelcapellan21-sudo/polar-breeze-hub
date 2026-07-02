@@ -311,46 +311,46 @@ export default function AdminDashboard() {
         <div className="border-t border-white/10 bg-black/10">
           <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center gap-2 text-xs text-[#F5C800]/80 overflow-x-auto">
             {tab === "overview" && (
-              <span className="text-white font-medium">🏠 Overview — resumen general del sistema</span>
+              <span className="text-white font-medium">🏠 Overview — KPIs del día en tiempo real, gráficos de ventas, ranking de choferes, alertas activas y tablero de rutas.</span>
             )}
             {tab === "inventario" && (
-              <span className="text-white font-medium">📦 Inventario — loker · entradas y movimientos</span>
+              <span className="text-white font-medium">📦 Inventario — Stock del Loker con barras de progreso semáforo, movimientos de entrada y salida, alertas de stock bajo.</span>
             )}
             {tab === "estado" && (
-              <span className="text-white font-medium">🖥️ Estado — salud de servicios · acceso exclusivo del dueño</span>
+              <span className="text-white font-medium">🖥️ Estado — estado del sistema en tiempo real, conexiones activas, salud del Hub.</span>
             )}
             {tab === "informes" && (
-              <span className="text-white font-medium">📋 Informes — cierres del día por fecha</span>
+              <span className="text-white font-medium">📋 Informes — reportes generales del sistema.</span>
             )}
             {tab === "anomalias" && (
-              <span className="text-white font-medium">⚠️ Anomalías — detección automática · Telegram</span>
+              <span className="text-white font-medium">⚠️ Anomalías — anomalías detectadas en el despacho.</span>
             )}
             {tab === "encargados" && (
-              <span className="text-white font-medium">🏭 Encargados — gestión de encargados de almacén</span>
+              <span className="text-white font-medium">🏭 Encargados — lotes registrados por cada encargado, salidas manuales y pedidos a BON.</span>
             )}
             {tab === "anom_desp" && (
-              <span className="text-white font-medium">📋 Anomalías Despacho — faltantes registrados por despachadores</span>
+              <span className="text-white font-medium">📋 Anom. Desp. — anomalías específicas del Despachador.</span>
             )}
             {tab === "reportes" && (
-              <span className="text-white font-medium">📊 Reportes — lotes · movimientos · sync Google Sheets</span>
+              <span className="text-white font-medium">📊 Reportes — reportes detallados por período.</span>
             )}
             {tab === "codigos" && (
-              <span className="text-white font-medium">🔲 Códigos — base de códigos de cajas SPIKINSCAN + Weight</span>
+              <span className="text-white font-medium">🔲 Códigos — gestión de códigos de barras de cajas y paletas.</span>
             )}
             {tab === "pwa" && (
-              <span className="text-white font-medium">📱 PWA — control de apps instaladas · notificaciones · subdominios</span>
+              <span className="text-white font-medium">📱 PWA — estado de las PWAs instaladas.</span>
             )}
             {tab === "tiemporeal" && (
-              <span className="text-white font-medium">⚡ Tiempo Real — feeds en vivo · SPIKINSCAN · FACTURASCAN · IMBENTARIO</span>
+              <span className="text-white font-medium">⚡ Tiempo Real — datos en vivo del sistema.</span>
             )}
             {tab === "proyecciones" && (
-              <span className="text-white font-medium">📈 Proyecciones — rendimiento estimado por chofer · quincena</span>
+              <span className="text-white font-medium">📈 Proyecciones — proyecciones de ventas y stock.</span>
             )}
             {tab === "usuarios" && (
-              <span className="text-white font-medium">👤 Usuarios — crear, editar roles y desactivar accesos</span>
+              <span className="text-white font-medium">👤 Usuarios — gestión de usuarios, crear, editar y desactivar.</span>
             )}
             {tab === "choferes" && !chofer && (
-              <span className="text-white font-medium">👥 Choferes — gestión, inventario y sistema de puntos</span>
+              <span className="text-white font-medium">👥 Choferes — lista de choferes activos, estado del día, detalles de cada uno.</span>
             )}
             {tab === "choferes" && chofer && (
               <>
