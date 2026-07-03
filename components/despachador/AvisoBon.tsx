@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  doc, setDoc, addDoc, updateDoc, onSnapshot, collection, query, where, getDocs, Timestamp,
+  doc, setDoc, addDoc, updateDoc, onSnapshot, collection, query, where, getDocs, orderBy, limit, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
@@ -49,7 +49,10 @@ export default function AvisoBon() {
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "acuses_despacho"), (s) => {
+    // Acotado a los 300 acuses más recientes (los avisos activos son recientes);
+    // evita leer TODA la colección, que crece sin límite con el tiempo.
+    const q = query(collection(db, "acuses_despacho"), orderBy("timestamp", "desc"), limit(300));
+    const unsub = onSnapshot(q, (s) => {
       const m: Record<string, number> = {};
       s.forEach((d) => { const x = d.data() as { avisoId?: string }; const k = String(x.avisoId); m[k] = (m[k] || 0) + 1; });
       setAcuses(m);

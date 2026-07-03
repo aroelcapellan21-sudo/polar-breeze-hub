@@ -99,12 +99,18 @@ export default function InformeCierre() {
         setCargando(false);
       }
     );
-    const u3 = onSnapshot(collection(db, "movimientos_loker"), (s) => {
-      const hoy = s.docs
-        .map((d) => ({ id: d.id, ...d.data() } as MovimientoLoker))
-        .filter((m) => toDate(m.timestamp) >= todayStart);
-      setMovsHoy(hoy);
-    });
+    // Solo los movimientos de HOY (server-side), como el talonario de arriba. Antes
+    // leia TODA la coleccion y filtraba en el cliente (crece sin limite). El filtro
+    // cliente se mantiene como respaldo.
+    const u3 = onSnapshot(
+      query(collection(db, "movimientos_loker"), where("timestamp", ">=", Timestamp.fromDate(todayStart))),
+      (s) => {
+        const hoy = s.docs
+          .map((d) => ({ id: d.id, ...d.data() } as MovimientoLoker))
+          .filter((m) => toDate(m.timestamp) >= todayStart);
+        setMovsHoy(hoy);
+      }
+    );
     return () => { u1(); u2(); u3(); };
   }, [todayStart]);
 
