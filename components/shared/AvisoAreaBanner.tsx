@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { collection, query, where, onSnapshot, addDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-interface Aviso { texto: string; avisoId: number; }
+interface Aviso { texto: string; avisoId: number; de: string; }
 
 export default function AvisoAreaBanner({ area }: { area: string }) {
   const [aviso, setAviso]   = useState<Aviso | null>(null);
@@ -24,9 +24,9 @@ export default function AvisoAreaBanner({ area }: { area: string }) {
     const unsub = onSnapshot(q, (s) => {
       let best: Aviso | null = null;
       s.forEach((d) => {
-        const a = d.data() as { texto?: string; id?: number };
+        const a = d.data() as { texto?: string; id?: number; de?: string };
         const id = Number(a.id || 0);
-        if (!best || id > best.avisoId) best = { texto: a.texto || "", avisoId: id };
+        if (!best || id > best.avisoId) best = { texto: a.texto || "", avisoId: id, de: a.de || "el Hub" };
       });
       setAviso(best);
     });
@@ -49,7 +49,7 @@ export default function AvisoAreaBanner({ area }: { area: string }) {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-white px-4 py-3 shadow-lg flex flex-col gap-2">
-      <div className="font-bold text-sm">📣 Mensaje del despachador (Oliver)</div>
+      <div className="font-bold text-sm">📣 Mensaje de {aviso.de}</div>
       <div className="text-base whitespace-pre-wrap leading-snug">{aviso.texto}</div>
       <button onClick={ok} className="self-end bg-white text-blue-700 font-bold rounded-lg px-5 py-1.5 text-sm">OK</button>
     </div>

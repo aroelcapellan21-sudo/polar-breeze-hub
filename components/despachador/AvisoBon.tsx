@@ -11,12 +11,14 @@ import {
   doc, setDoc, addDoc, updateDoc, onSnapshot, collection, query, where, getDocs, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
 
 type Area = "despacho" | "chofer" | "encargado";
 interface Aviso { id: string; texto: string; area: Area; ficha: string | null; avisoId: number; }
 interface Chofer { ficha: string; nombre: string; }
 
 export default function AvisoBon() {
+  const { profile } = useAuth();
   const [texto, setTexto]     = useState("");
   const [area, setArea]       = useState<Area>("despacho");
   const [ficha, setFicha]     = useState("");           // "" = todos los choferes
@@ -67,10 +69,13 @@ export default function AvisoBon() {
     if (!texto.trim()) { flash("err", "Escribe el mensaje"); return; }
     setBusy(true);
     try {
+      const de = profile?.role === "admin" ? "Administración"
+        : profile?.role === "despachador" ? "Despacho"
+        : (profile?.nombre || "Hub");
       await addDoc(collection(db, "avisos"), {
         texto: texto.trim(), area,
         ficha: area === "chofer" ? (ficha || null) : null,
-        id: Date.now(), activo: true, createdBy: "Hub", timestamp: Timestamp.now(),
+        id: Date.now(), activo: true, de, createdBy: profile?.nombre || "Hub", timestamp: Timestamp.now(),
       });
       setTexto("");
       flash("ok", "Mensaje enviado ✓");
