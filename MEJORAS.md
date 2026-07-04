@@ -65,4 +65,18 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 
 ---
 
+## ⏳ Pendientes — Módulo #23 "Cuentas por Pagar"
+
+Nuevo módulo (Encargado + Hub Admin): facturas de lotes con vencimiento, estados de pago, acciones de cobro/pago e histórico de precios.
+
+| # | Función | Notas |
+|---|---------|-------|
+| 23.1 | **Registro con vencimiento (Encargado)** | Al registrar un lote, el Encargado puede marcar la factura con **fecha de vencimiento** y **monto a pagar**. |
+| 23.2 | **Panel Cuentas por Pagar (Hub Admin / Oliver)** | Oliver ve un panel con estados: **Pendiente**, **Parcialmente pagada**, **Pagada**, **Vencida**. |
+| 23.3 | **Acciones sobre cada factura (Oliver)** | Marcar como **pagada**, registrar **pago parcial**, **posponer** y agregar **comentarios**. |
+| 23.4 | **Notificaciones de vencimiento** | Avisos automáticos cuando una factura esté **próxima a vencer**. |
+| 23.5 | **Historial de precios por producto** | Registrar y consultar el histórico de precios de compra por producto. |
+
+---
+
 *Polar Breeze, S.R.L. · Santiago, Rep. Dom. · mantener este archivo al día con cada mejora.*
