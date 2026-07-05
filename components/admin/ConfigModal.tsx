@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { reauthenticateWithCredential, EmailAuthProvider, updatePassword } from "firebase/auth";
 import { FsConfig } from "@/lib/types";
@@ -58,9 +58,74 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
   const [resetNew,   setResetNew]   = useState("");
   const [resetNew2,  setResetNew2]  = useState("");
 
+  // ── Contraseña de Encargado / Chofer (cuentas individuales) ──────────────────
+  const [encargados, setEncargados] = useState<{ uid: string; label: string }[]>([]);
+  const [choferes,   setChoferes]   = useState<{ uid: string; label: string }[]>([]);
+  const [encUid,   setEncUid]   = useState("");
+  const [encNew,   setEncNew]   = useState("");
+  const [encNew2,  setEncNew2]  = useState("");
+  const [encLoading, setEncLoading] = useState(false);
+  const [chfUid,   setChfUid]   = useState("");
+  const [chfNew,   setChfNew]   = useState("");
+  const [chfNew2,  setChfNew2]  = useState("");
+  const [chfLoading, setChfLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadListas() {
+      const [encSnap, chfSnap] = await Promise.all([
+        getDocs(query(collection(db, "usuarios"), where("role", "==", "encargado"))),
+        getDocs(query(collection(db, "usuarios"), where("role", "==", "chofer"))),
+      ]);
+      setEncargados(encSnap.docs.map((d) => ({ uid: d.id, label: (d.data().nombre as string) ?? d.id })));
+      setChoferes(chfSnap.docs.map((d) => {
+        const data = d.data();
+        const ficha = data.ficha as string | undefined;
+        return { uid: d.id, label: `${data.nombre as string}${ficha ? ` · ficha ${ficha}` : ""}` };
+      }));
+    }
+    loadListas();
+  }, []);
+
   const flash = (type: "ok" | "err", text: string) => {
     setMsg({ type, text });
     setTimeout(() => setMsg(null), 4000);
+  };
+
+  /** Cambia la contraseña de OTRA cuenta (Encargado/Chofer) vía endpoint admin. */
+  async function resetOtherUserPassword(
+    uid: string, newPassword: string, setLoading: (b: boolean) => void, onDone: () => void,
+  ) {
+    setLoading(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Sin sesión");
+      const res = await fetch("/api/admin-reset-user-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, targetUid: uid, newPassword }),
+      }).then((r) => r.json()) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(res.error ?? "Error al actualizar");
+      flash("ok", "Contraseña actualizada ✓");
+      onDone();
+    } catch (e) {
+      flash("err", e instanceof Error ? e.message : "Error al actualizar");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handleEncPw = () => {
+    if (!encUid) { flash("err", "Selecciona un encargado"); return; }
+    if (encNew.length < 6) { flash("err", "Mínimo 6 caracteres"); return; }
+    if (encNew !== encNew2) { flash("err", "Las contraseñas no coinciden"); return; }
+    resetOtherUserPassword(encUid, encNew, setEncLoading, () => { setEncNew(""); setEncNew2(""); });
+  };
+
+  const handleChfPw = () => {
+    if (!chfUid) { flash("err", "Selecciona un chofer"); return; }
+    if (chfNew.length < 6) { flash("err", "Mínimo 6 caracteres"); return; }
+    if (chfNew !== chfNew2) { flash("err", "Las contraseñas no coinciden"); return; }
+    resetOtherUserPassword(chfUid, chfNew, setChfLoading, () => { setChfNew(""); setChfNew2(""); });
   };
 
   // Load config/main (no-secretos) on mount.
@@ -296,14 +361,15 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
                 loading={pwLoading}
                 onSave={handleAdminPw}
               />
-              <PwBlock
-                title="🚛 Contraseña Despachador"
-                curLabel="Contraseña actual del Despachador"
-                cur={desCur} setCur={setDesCur}
-                nw={desNew}  setNw={setDesNew}
-                nw2={desNew2} setNw2={setDesNew2}
-                loading={pwLoading}
-                onSave={handleDesPw}
+              <SelectUserPwBlock
+                title="🏭 Contraseña de Encargado"
+                selectLabel="Elegir encargado"
+                options={encargados}
+                selected={encUid} setSelected={setEncUid}
+                nw={encNew}   setNw={setEncNew}
+                nw2={encNew2} setNw2={setEncNew2}
+                loading={encLoading}
+                onSave={handleEncPw}
               />
               {/* Clave de Restablecer */}
               <div className="border border-gray-100 rounded-xl p-4 space-y-3">
@@ -339,6 +405,25 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
                   </>
                 )}
               </div>
+              <PwBlock
+                title="🚛 Contraseña Despachador"
+                curLabel="Contraseña actual del Despachador"
+                cur={desCur} setCur={setDesCur}
+                nw={desNew}  setNw={setDesNew}
+                nw2={desNew2} setNw2={setDesNew2}
+                loading={pwLoading}
+                onSave={handleDesPw}
+              />
+              <SelectUserPwBlock
+                title="🚚 Contraseña de Chofer"
+                selectLabel="Elegir chofer"
+                options={choferes}
+                selected={chfUid} setSelected={setChfUid}
+                nw={chfNew}   setNw={setChfNew}
+                nw2={chfNew2} setNw2={setChfNew2}
+                loading={chfLoading}
+                onSave={handleChfPw}
+              />
             </div>
           )}
 
@@ -602,6 +687,44 @@ function PwBlock({
       <button
         onClick={onSave}
         disabled={loading || !cur || !nw || !nw2 || nw.length < 3}
+        className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white
+          py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+      >
+        {loading ? "Actualizando..." : "Cambiar contraseña"}
+      </button>
+    </div>
+  );
+}
+
+function SelectUserPwBlock({
+  title, selectLabel, options, selected, setSelected, nw, setNw, nw2, setNw2, loading, onSave,
+}: {
+  title: string; selectLabel: string;
+  options: { uid: string; label: string }[];
+  selected: string; setSelected: (v: string) => void;
+  nw: string;  setNw:  (v: string) => void;
+  nw2: string; setNw2: (v: string) => void;
+  loading: boolean; onSave: () => void;
+}) {
+  return (
+    <div className="border border-gray-100 rounded-xl p-4 space-y-3">
+      <p className="font-semibold text-gray-700 text-sm">{title}</p>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">{selectLabel}</label>
+        <select
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+        >
+          <option value="">— Elegir —</option>
+          {options.map((o) => <option key={o.uid} value={o.uid}>{o.label}</option>)}
+        </select>
+      </div>
+      <Field label="Nueva contraseña (mín. 6)" value={nw} onChange={setNw} type="password" placeholder="••••••••" />
+      <Field label="Confirmar nueva" value={nw2} onChange={setNw2} type="password" placeholder="••••••••" />
+      <button
+        onClick={onSave}
+        disabled={loading || !selected || !nw || !nw2 || nw.length < 6}
         className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white
           py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
       >
