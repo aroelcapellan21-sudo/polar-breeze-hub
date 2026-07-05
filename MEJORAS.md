@@ -62,6 +62,7 @@ Al terminar cada una: marcar ✅, anotar el commit y registrar el detalle en `CH
 | M | **Admin (Reportes) — reorganización por área** | Separar la información por área: Encargado, Despachador y Admin. El Cuarto Frío pertenece al Encargado. |
 | N | **Monitor Telegram — errores de Firestore** | Capturar errores `permission-denied` de Firestore en los `onSnapshot` y enviarlos al bot. |
 | O | **Despachador (sesión) — restaurar sesión en progreso** | Restaurar automáticamente la sesión en progreso si el usuario sale y vuelve a entrar. |
+| 24 | **Inventario real del chofer (ledger de movimientos, Fase 1B)** | El inventario del chofer debe reflejar TODOS los movimientos, no solo la declaración inicial: lo despachado (**+**), lo vendido según reporte nocturno (**-**), agregados del Encargado (**+**), retiros del Despachador (**-**) y ajustes post-cierre autorizados por Oliver. Relacionado con el cruce `inventario_base` vs `reportes_chofer` (Fase 2, ya hecho) y con la cuenta viva del stock del Loker (`PLAN-CONEXION-ECOSISTEMA.md`, Fase 1B). |
 
 ---
 
