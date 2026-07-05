@@ -11,11 +11,11 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { collection, query, where, onSnapshot, getDoc, doc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDoc, setDoc, doc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   UserProfile, TalonarioDoc, MovimientoLoker,
-  PuntoProducto, InventarioBaseItem, toDate,
+  PuntoProducto, InventarioBaseItem, PrecioProducto, toProductoId, toDate,
 } from "@/lib/types";
 import RegistrarInventario from "@/components/encargado/RegistrarInventario";
 import DespachoChofer      from "@/components/encargado/DespachoChofer";
@@ -89,6 +89,86 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
   const [selChofer,   setSelChofer]   = useState("todos");
   const [cargando,    setCargando]    = useState(true);
   const [seccion,     setSeccion]     = useState<Seccion>("cierre");
+
+  // ── Fase 1 (plan de conexión): declarar inventario_base ──────────────────────
+  const [precios, setPrecios] = useState<PrecioProducto[]>([]);
+  useEffect(() => {
+    getDoc(doc(db, "config", "precios")).then((snap) => {
+      if (snap.exists()) setPrecios((snap.data().productos as PrecioProducto[]) ?? []);
+    }).catch(() => {/* catálogo opcional */});
+  }, []);
+
+  // Resuelve un nombre libre contra el catálogo — mismo patrón que
+  // resolverProducto() en components/despachador/Choferes.tsx (fix D-1b):
+  // nunca guardar un producto_id derivado de texto crudo sin anclar.
+  const resolverProducto = (nombreLibre: string): { nombre: string; producto_id: string } => {
+    const pid = toProductoId(nombreLibre);
+    const exacto = precios.find((p) => p.producto_id === pid);
+    if (exacto) return { nombre: exacto.nombre, producto_id: exacto.producto_id };
+    const parcial = precios.find((p) => p.producto_id.includes(pid) || pid.includes(p.producto_id));
+    if (parcial) return { nombre: parcial.nombre, producto_id: parcial.producto_id };
+    return { nombre: nombreLibre.trim(), producto_id: pid };
+  };
+
+  const [editandoBase, setEditandoBase] = useState<string | null>(null); // uid del chofer en edición
+  const [filasBase,    setFilasBase]    = useState<InventarioBaseItem[]>([]);
+  const [nuevoProdId,  setNuevoProdId]  = useState("");
+  const [nuevoCant,    setNuevoCant]    = useState(1);
+  const [guardandoBase, setGuardandoBase] = useState(false);
+  const [baseMsg, setBaseMsg] = useState<{ uid: string; type: "ok" | "err"; text: string } | null>(null);
+
+  const abrirEdicionBase = (c: UserProfile) => {
+    setEditandoBase(c.uid);
+    setFilasBase(c.inventario_base ?? []);
+    setNuevoProdId(""); setNuevoCant(1);
+  };
+
+  const usarHoyComoBorrador = (uid: string) => {
+    const hoyMap = invHoy.get(uid);
+    if (!hoyMap) return;
+    const filas: InventarioBaseItem[] = Array.from(hoyMap.values()).map((item) => {
+      const r = resolverProducto(item.nombre);
+      return { nombre: r.nombre, producto_id: r.producto_id, cantidad: item.cantidad };
+    });
+    setFilasBase(filas);
+  };
+
+  const agregarFilaBase = () => {
+    if (!nuevoProdId || nuevoCant <= 0) return;
+    const prod = precios.find((p) => p.producto_id === nuevoProdId);
+    if (!prod) return;
+    setFilasBase((prev) => {
+      const idx = prev.findIndex((f) => f.producto_id === nuevoProdId);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], cantidad: next[idx].cantidad + nuevoCant };
+        return next;
+      }
+      return [...prev, { nombre: prod.nombre, producto_id: prod.producto_id, cantidad: nuevoCant }];
+    });
+    setNuevoProdId(""); setNuevoCant(1);
+  };
+
+  const quitarFilaBase = (producto_id: string) => {
+    setFilasBase((prev) => prev.filter((f) => f.producto_id !== producto_id));
+  };
+
+  const guardarBase = async (uid: string) => {
+    setGuardandoBase(true);
+    try {
+      await setDoc(doc(db, "usuarios", uid), {
+        inventario_base: filasBase,
+        inventarioBaseDate: Timestamp.now(),
+      }, { merge: true });
+      setBaseMsg({ uid, type: "ok", text: "Base declarada ✓" });
+      setEditandoBase(null);
+    } catch (e) {
+      setBaseMsg({ uid, type: "err", text: e instanceof Error ? e.message : "Error al guardar" });
+    } finally {
+      setGuardandoBase(false);
+      setTimeout(() => setBaseMsg(null), 4000);
+    }
+  };
 
   // Selector de fecha para la sección de cierre
   const [fechaSel,  setFechaSel]  = useState<Date>(() => { const d = new Date(); d.setHours(0,0,0,0); return d; });
@@ -773,8 +853,69 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
                       </div>
                       <div className="grid grid-cols-2 gap-3 px-4 py-3">
                         <div>
-                          <p className="text-xs font-semibold text-blue-600 mb-1.5">📦 Base asignada</p>
-                          {base.length === 0 ? (
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-xs font-semibold text-blue-600">📦 Base asignada</p>
+                            {editandoBase !== c.uid && (
+                              <button onClick={() => abrirEdicionBase(c)}
+                                className="text-xs text-blue-600 hover:text-blue-800 font-semibold active:scale-95 transition-all">
+                                ✏️ Editar
+                              </button>
+                            )}
+                          </div>
+                          {editandoBase === c.uid ? (
+                            <div className="space-y-2 bg-blue-50/60 border border-blue-100 rounded-lg p-2.5">
+                              {filasBase.length === 0 ? (
+                                <p className="text-xs text-gray-400 italic">Sin filas — agrega productos abajo</p>
+                              ) : (
+                                <div className="space-y-1">
+                                  {filasBase.map((item) => (
+                                    <div key={item.producto_id} className="flex items-center justify-between text-xs
+                                      bg-white border border-blue-100 rounded-lg px-2 py-1.5">
+                                      <span className="text-gray-700 truncate mr-1 flex-1 min-w-0">{item.nombre}</span>
+                                      <span className="font-bold text-blue-700 flex-shrink-0 mr-2">{item.cantidad}</span>
+                                      <button onClick={() => quitarFilaBase(item.producto_id)}
+                                        className="text-red-400 hover:text-red-600 flex-shrink-0 font-bold">✕</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="flex gap-1.5">
+                                <select value={nuevoProdId} onChange={(e) => setNuevoProdId(e.target.value)}
+                                  className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-blue-400">
+                                  <option value="">Producto…</option>
+                                  {precios.map((p) => (
+                                    <option key={p.producto_id} value={p.producto_id}>{p.nombre}</option>
+                                  ))}
+                                </select>
+                                <input type="number" min={1} value={nuevoCant}
+                                  onChange={(e) => setNuevoCant(Number(e.target.value) || 1)}
+                                  className="w-14 px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-400" />
+                                <button onClick={agregarFilaBase}
+                                  className="px-2.5 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold hover:bg-blue-200 active:scale-95 transition-all">
+                                  + Agregar
+                                </button>
+                              </div>
+                              <div className="flex gap-1.5 pt-1">
+                                <button onClick={() => usarHoyComoBorrador(c.uid)} disabled={!invHoy.get(c.uid)}
+                                  className="flex-1 text-xs bg-green-50 text-[#1E8C3A] border border-green-200 rounded-lg py-1.5 font-semibold hover:bg-green-100 active:scale-95 transition-all disabled:opacity-40">
+                                  🚛 Usar hoy despachado
+                                </button>
+                                <button onClick={() => setEditandoBase(null)}
+                                  className="px-3 text-xs bg-gray-100 text-gray-600 rounded-lg py-1.5 font-semibold hover:bg-gray-200 active:scale-95 transition-all">
+                                  Cancelar
+                                </button>
+                                <button onClick={() => guardarBase(c.uid)} disabled={guardandoBase}
+                                  className="px-3 text-xs bg-blue-600 text-white rounded-lg py-1.5 font-bold hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-60">
+                                  {guardandoBase ? "..." : "💾 Guardar"}
+                                </button>
+                              </div>
+                              {baseMsg && baseMsg.uid === c.uid && (
+                                <p className={`text-xs font-semibold ${baseMsg.type === "ok" ? "text-[#1E8C3A]" : "text-red-600"}`}>
+                                  {baseMsg.text}
+                                </p>
+                              )}
+                            </div>
+                          ) : base.length === 0 ? (
                             <p className="text-xs text-gray-400 italic">Sin asignar</p>
                           ) : (
                             <div className="space-y-1">

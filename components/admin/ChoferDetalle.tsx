@@ -29,7 +29,35 @@ const SEMAFORO_CFG: Record<Semaforo, { icon: string; label: string; color: strin
   rojo:     { icon: "🚨", label: "Diferencias críticas", color: "text-red-700",   bg: "bg-red-50    border-red-200" },
 };
 
-type SubTab = "stats" | "talonario" | "inventario" | "extras";
+type SubTab = "stats" | "talonario" | "inventario" | "extras" | "cruce";
+
+// Fase 2 (plan de conexión): shape de reportes_chofer/{ficha}/dias/{fecha}
+// (escrito por APP-CHOFER-POLAR-BREEZE, api/index.js — no hay tipo TS
+// compartido porque ese repo es JS puro; se tipa localmente aquí).
+interface ReporteChoferItem {
+  codigo:      number | null;
+  producto_id: string;
+  nombre:      string;
+  carga:       number;
+  sobrante:    number;
+  vendido:     number;
+  precio:      number;
+  rd:          number;
+  puntos:      number;
+}
+interface ReporteChoferDia {
+  ficha:   string;
+  nombre:  string;
+  fecha:   string;
+  items:   ReporteChoferItem[];
+  totales: { unidades: number; rd: number; puntos: number };
+  estado:  string;
+}
+
+function hoyFechaKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export default function ChoferDetalle({ chofer, onBack }: Props) {
   const [records,       setRecords]       = useState<ImbentarioRecord[]>([]);
@@ -40,6 +68,42 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
   const [rango,      setRango]      = useState<7 | 15 | 30>(15);
   const [fechaBuscar, setFechaBuscar] = useState("");
   const [subTab,     setSubTab]     = useState<SubTab>("stats");
+
+  // ── Fase 2 (plan de conexión): cruce inventario_base vs reportes_chofer ──────
+  const [fechaCruce,      setFechaCruce]      = useState(() => hoyFechaKey());
+  const [reporteDia,      setReporteDia]      = useState<ReporteChoferDia | null>(null);
+  const [reporteCargando, setReporteCargando] = useState(false);
+  const [reporteError,    setReporteError]    = useState(false);
+
+  useEffect(() => {
+    if (subTab !== "cruce" || !chofer.ficha) return;
+    setReporteCargando(true);
+    setReporteError(false);
+    getDoc(doc(db, "reportes_chofer", chofer.ficha, "dias", fechaCruce))
+      .then((snap) => setReporteDia(snap.exists() ? (snap.data() as ReporteChoferDia) : null))
+      .catch(() => setReporteError(true))
+      .finally(() => setReporteCargando(false));
+  }, [subTab, fechaCruce, chofer.ficha]);
+
+  const filasCruce = useMemo(() => {
+    const baseMap  = new Map((chofer.inventario_base ?? []).map((b) => [b.producto_id, b]));
+    const itemsMap = new Map((reporteDia?.items ?? []).map((it) => [it.producto_id, it]));
+    const ids = new Set([...baseMap.keys(), ...itemsMap.keys()]);
+    return Array.from(ids).map((pid) => {
+      const b  = baseMap.get(pid);
+      const it = itemsMap.get(pid);
+      const declaradoActual = b?.cantidad ?? 0;
+      const cargaReporte    = it?.carga ?? 0;
+      return {
+        producto_id: pid,
+        nombre: it?.nombre ?? b?.nombre ?? pid,
+        declaradoActual, cargaReporte,
+        sobrante: it?.sobrante ?? null,
+        vendido:  it?.vendido  ?? null,
+        diferencia: declaradoActual - cargaReporte,
+      };
+    }).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [chofer.inventario_base, reporteDia]);
 
   // Inventory editing
   const [invPwd,     setInvPwd]     = useState("");
@@ -341,12 +405,13 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
 
       {/* ── Sub tabs + compartir ── */}
       <div className="space-y-2">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           {([
             { key: "stats",      emoji: "📊", label: "Stats" },
             { key: "talonario",  emoji: "📋", label: "Talonario" },
             { key: "inventario", emoji: "📦", label: "Inventario" },
             { key: "extras",     emoji: "⭐", label: "Extras" },
+            { key: "cruce",      emoji: "🔀", label: "Cruce" },
           ] as { key: SubTab; emoji: string; label: string }[]).map((t) => (
             <button
               key={t.key}
@@ -1299,6 +1364,82 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
           )}
         </div>
       )}
+
+      {/* ── Cruce: inventario_base declarado vs reportes_chofer reportado (Fase 2) ── */}
+      {subTab === "cruce" && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 bg-gradient-to-r from-indigo-50 to-indigo-100 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="font-bold text-indigo-900 text-sm">🔀 Cruce: base declarada vs reportado</h3>
+              <p className="text-xs text-indigo-600 mt-0.5">
+                inventario_base (declarado por Encargado) vs reportes_chofer (reportado por el chofer)
+              </p>
+            </div>
+            <input
+              type="date" value={fechaCruce}
+              onChange={(e) => setFechaCruce(e.target.value)}
+              className="px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-400"
+            />
+          </div>
+          <div className="p-5">
+            {!chofer.ficha ? (
+              <p className="text-sm text-gray-400 text-center py-8">Este chofer no tiene ficha asignada.</p>
+            ) : reporteCargando ? (
+              <p className="text-sm text-gray-400 text-center py-8 animate-pulse">Cargando reporte…</p>
+            ) : reporteError ? (
+              <p className="text-sm text-red-500 text-center py-8">Error al leer el reporte del chofer.</p>
+            ) : !reporteDia ? (
+              <p className="text-sm text-gray-400 text-center py-8">Sin reporte del chofer para esta fecha.</p>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-gray-400 border-b">
+                        <th className="text-left pb-1.5 pr-2">Producto</th>
+                        <th className="text-right pb-1.5 pr-2">Declarado (ahora)</th>
+                        <th className="text-right pb-1.5 pr-2">Carga en reporte</th>
+                        <th className="text-right pb-1.5 pr-2">Sobrante</th>
+                        <th className="text-right pb-1.5 pr-2">Vendido</th>
+                        <th className="text-right pb-1.5">Diferencia</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {filasCruce.map((f) => (
+                        <tr key={f.producto_id} className={f.diferencia !== 0 ? "bg-red-50" : ""}>
+                          <td className="py-1.5 pr-2">{f.nombre}</td>
+                          <td className="text-right py-1.5 pr-2">{f.declaradoActual}</td>
+                          <td className="text-right py-1.5 pr-2">{f.cargaReporte}</td>
+                          <td className="text-right py-1.5 pr-2">{f.sobrante ?? "—"}</td>
+                          <td className="text-right py-1.5 pr-2 font-semibold">{f.vendido ?? "—"}</td>
+                          <td className={`text-right py-1.5 font-bold ${f.diferencia !== 0 ? "text-red-600" : "text-gray-300"}`}>
+                            {f.diferencia !== 0 ? (f.diferencia > 0 ? `+${f.diferencia}` : f.diferencia) : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mt-4">
+                  <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+                    <p className="text-lg font-bold text-gray-700">{reporteDia.totales?.unidades ?? 0}</p>
+                    <p className="text-xs text-gray-400">Unidades</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+                    <p className="text-lg font-bold text-gray-700">RD$ {reporteDia.totales?.rd ?? 0}</p>
+                    <p className="text-xs text-gray-400">Total RD$</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+                    <p className="text-lg font-bold text-gray-700">{reporteDia.totales?.puntos ?? 0}</p>
+                    <p className="text-xs text-gray-400">Puntos</p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Modal confirmación guardar inventario base ── */}
       {confirmSaveBase && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">

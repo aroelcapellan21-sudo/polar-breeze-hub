@@ -62,10 +62,20 @@ service cloud.firestore {
     // ── usuarios ─────────────────────────────────────────────────────────────
     // Cada usuario lee su propio doc (auth-context necesita leer el rol al iniciar).
     // Encargado y Despachador leen todos (buscan choferes por nombre/ficha).
-    // Solo lectura — la escritura sigue restringida a admin vía el catch-all.
+    // Escritura: admin-only vía el catch-all, salvo la excepción acotada de
+    // Encargado sobre inventario_base (ver más abajo).
     match /usuarios/{uid} {
       allow read: if request.auth != null &&
                      (request.auth.uid == uid || esEncargado() || esDespacha());
+
+      // Fase 1 (plan de conexión, 2026-07-05): Encargado declara el
+      // inventario_base del chofer. Acotado por campo — Encargado NUNCA
+      // puede tocar role/email/activo ni ningún otro campo de este doc,
+      // solo estos dos (el resto de la escritura sigue admin-only vía
+      // el catch-all de arriba).
+      allow write: if esEncargado() &&
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['inventario_base', 'inventarioBaseDate']);
     }
 
     // ── inventarios/{fecha}/choferes/{ficha} ─────────────────────────────────

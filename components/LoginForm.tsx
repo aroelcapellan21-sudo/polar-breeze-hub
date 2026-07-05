@@ -117,11 +117,12 @@ export default function LoginForm({ modo }: Props) {
         ? credentialPwd
         : credential;
       await login(email, password);
-    } catch {
+    } catch (e) {
       const msg = isChofer
         ? "Ficha no reconocida. Verifica el número."
         : "Contraseña incorrecta. Intenta de nuevo.";
-      setError(msg);
+      const code = e && typeof e === "object" && "code" in e ? (e as { code: string }).code : undefined;
+      setError(IS_DEV && code ? `${msg} (${code})` : msg);
     } finally {
       setLoading(false);
     }
