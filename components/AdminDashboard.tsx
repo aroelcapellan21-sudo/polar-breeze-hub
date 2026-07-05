@@ -357,6 +357,7 @@ export default function AdminDashboard() {
         userName={profile?.nombre}
         userRoleLabel="Administrador"
         onLogout={logout}
+        headerColor="#1D4ED8"
       />
 
       {/* ── Modal Configuración ── */}

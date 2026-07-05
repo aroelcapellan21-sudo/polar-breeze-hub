@@ -197,13 +197,6 @@ export default function DespachadorDashboard() {
               🔄 Reset
             </button>
             <RolePill rol="despachador" nombre={profile?.nombre ?? ""} />
-            <button
-              onClick={logout}
-              className="bg-white/10 hover:bg-white/20 active:scale-95 px-2 py-1.5
-                rounded-lg text-xs transition-all duration-100 font-medium flex-shrink-0"
-            >
-              Salir
-            </button>
           </div>
         </div>
 
@@ -402,6 +395,10 @@ export default function DespachadorDashboard() {
         activeKey={tab}
         onSelect={(key) => setTab(key as Tab)}
         roleLabel="Despacho"
+        userName={profile?.nombre}
+        userRoleLabel="Despachador"
+        onLogout={logout}
+        headerColor="#D42B2B"
       />
 
       {/* ── Modal Tablas ── */}

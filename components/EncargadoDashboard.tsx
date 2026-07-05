@@ -477,6 +477,7 @@ export default function EncargadoDashboard() {
         userName={profile?.nombre}
         userRoleLabel="Supervisor"
         onLogout={logout}
+        headerColor="#1E8C3A"
       />
 
       {/* Modal Tablas */}

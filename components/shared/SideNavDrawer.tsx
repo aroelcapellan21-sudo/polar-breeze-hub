@@ -32,10 +32,11 @@ interface Props {
   userName?: string;
   userRoleLabel?: string;
   onLogout?: () => void;
+  headerColor?: string;
 }
 
 export default function SideNavDrawer({
-  open, onClose, sections, activeKey, onSelect, roleLabel, userName, userRoleLabel, onLogout,
+  open, onClose, sections, activeKey, onSelect, roleLabel, userName, userRoleLabel, onLogout, headerColor,
 }: Props) {
   return (
     <>
@@ -55,7 +56,7 @@ export default function SideNavDrawer({
         }`}
       >
         {/* Header del panel */}
-        <div className="bg-[#1D4ED8] flex-shrink-0">
+        <div className="flex-shrink-0" style={{ background: headerColor ?? "#1D4ED8" }}>
           <div className="flex items-center justify-between px-5 pt-4 pb-3">
             <div className="flex items-center gap-2.5">
               <div
