@@ -395,7 +395,7 @@ export default function DespachadorDashboard() {
         activeKey={tab}
         onSelect={(key) => setTab(key as Tab)}
         roleLabel="Despacho"
-        userName={profile?.nombre}
+        userName={despNombre || undefined}
         userRoleLabel="Despachador"
         onLogout={logout}
         headerColor="#D42B2B"
