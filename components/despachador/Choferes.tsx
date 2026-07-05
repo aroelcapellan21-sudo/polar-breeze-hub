@@ -178,19 +178,27 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     setTimeout(() => setMsg(null), 4000);
   };
 
-  // Busca el precio de un producto en el catálogo (por producto_id normalizado o parcial)
-  const buscarPrecio = (nombre: string): number | null => {
-    if (precios.length === 0) return null;
-    const pid = toProductoId(nombre);
-    // Búsqueda exacta
-    const exacto = precios.find((p) => p.producto_id === pid);
-    if (exacto) return exacto.precio;
-    // Búsqueda parcial: el pid del catálogo contiene el pid del nombre buscado
-    const parcial = precios.find(
-      (p) => p.producto_id.includes(pid) || pid.includes(p.producto_id)
-    );
-    return parcial?.precio ?? null;
+  // Resuelve un nombre libre (texto/IA) contra el catálogo config/precios —
+  // devuelve el nombre/producto_id CANÓNICOS cuando hay match (fix D-1b:
+  // antes solo el precio se anclaba al catálogo, el producto_id se
+  // recalculaba aparte del texto crudo y podía divergir silenciosamente).
+  const resolverProducto = (nombreLibre: string): { nombre: string; producto_id: string; precio: number | null } => {
+    const pid = toProductoId(nombreLibre);
+    if (precios.length > 0) {
+      // Búsqueda exacta
+      const exacto = precios.find((p) => p.producto_id === pid);
+      if (exacto) return { nombre: exacto.nombre, producto_id: exacto.producto_id, precio: exacto.precio };
+      // Búsqueda parcial: el pid del catálogo contiene el pid del nombre buscado
+      const parcial = precios.find(
+        (p) => p.producto_id.includes(pid) || pid.includes(p.producto_id)
+      );
+      if (parcial) return { nombre: parcial.nombre, producto_id: parcial.producto_id, precio: parcial.precio };
+    }
+    return { nombre: nombreLibre.trim(), producto_id: pid, precio: null };
   };
+
+  // Busca el precio de un producto en el catálogo (por producto_id normalizado o parcial)
+  const buscarPrecio = (nombre: string): number | null => resolverProducto(nombre).precio;
 
   const resetEntrada = () => {
     setPreview(null); setImgData(null); setTexto(""); setProductos([]); setObservaciones("");
@@ -271,7 +279,7 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
         .map((p) => ({
           nombre:     p.nombre,
           necesita:   p.cantidad ?? 0,
-          disponible: saldoMap.get(toProductoId(p.nombre)) ?? 0,
+          disponible: saldoMap.get(resolverProducto(p.nombre).producto_id) ?? 0,
         }))
         .filter((f) => f.disponible < f.necesita);
 
@@ -327,10 +335,11 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
       // ── Registrar salidas en loker (una entrada por producto) ───────────────
       const notaBase = `Despacho → ${sel.nombre}${sel.ficha ? ` · ficha ${sel.ficha}` : ""}`;
       for (const p of productos) {
+        const resuelto = resolverProducto(p.nombre);
         await addDoc(collection(db, "movimientos_loker"), {
           tipo:         "salida_despacho",
-          producto_id:  toProductoId(p.nombre),
-          nombre:       p.nombre,
+          producto_id:  resuelto.producto_id,
+          nombre:       resuelto.nombre,
           cantidad:     -(p.cantidad ?? 0),
           responsable:  despNombre,
           choferId:     sel.uid,
@@ -361,13 +370,13 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
     const esRetiro = categoria === "retiro_despacho";
     const nota     = form.nota.trim();
     try {
+      const resuelto = resolverProducto(form.nombre);
       // Stock check para salidas
       if (!esRetiro) {
         const lokerSnap = await getDocs(collection(db, "movimientos_loker"));
-        const pid    = toProductoId(form.nombre);
         const saldo  = lokerSnap.docs.reduce((s, d) => {
           const m = d.data() as MovimientoLoker;
-          return m.producto_id === pid ? s + m.cantidad : s;
+          return m.producto_id === resuelto.producto_id ? s + m.cantidad : s;
         }, 0);
         if (saldo < form.cantidad) {
           flash("err", `Stock insuficiente — ${form.nombre}: disponible ${saldo}`);
@@ -379,8 +388,8 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
         tipo:         esRetiro ? "devolucion_chofer" : "salida_despacho",
         categoria,
         ...(categoria !== "retiro_despacho" && { generaPuntos: categoria === "agregado_1" }),
-        producto_id:  toProductoId(form.nombre),
-        nombre:       form.nombre.trim(),
+        producto_id:  resuelto.producto_id,
+        nombre:       resuelto.nombre,
         cantidad:     esRetiro ? form.cantidad : -(form.cantidad),
         responsable:  despNombre,
         choferId:     sel.uid,
