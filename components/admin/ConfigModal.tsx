@@ -63,16 +63,16 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
     setTimeout(() => setMsg(null), 4000);
   };
 
-  // Load config/main on mount
+  // Load config/main (no-secretos) on mount.
+  // NOTA (fix S1): los campos sensibles (telegramToken, telegramChatId,
+  // resetPassword, correoMonitoreo, correoPassword) viven en config/secrets
+  // (solo-admin), NO en config/main (que cualquier rol autenticado puede leer).
+  // Telegram/correo se cargan solo al desbloquear su sección (abajo), para no
+  // traer secretos a memoria antes de que el admin los pida explícitamente.
   useEffect(() => {
     async function load() {
       const snap = await getDoc(doc(db, "config", "main"));
-      if (snap.exists()) {
-        const data = snap.data() as FsConfig;
-        setCfg(data);
-        if (data.telegramToken) setTgToken(data.telegramToken as string);
-        if (data.telegramChatId) setTgChat(data.telegramChatId as string);
-      }
+      if (snap.exists()) setCfg(snap.data() as FsConfig);
     }
     load();
   }, []);
@@ -116,15 +116,11 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  // ── Guardar config ───────────────────────────────────────────────────────────
+  // ── Guardar config (config/main — sin secretos) ─────────────────────────────
   const saveConfig = async () => {
     setCfgLoad(true);
     try {
-      await setDoc(doc(db, "config", "main"), {
-        ...cfg,
-        ...(tgToken && { telegramToken: tgToken }),
-        ...(tgChat  && { telegramChatId: tgChat }),
-      }, { merge: true });
+      await setDoc(doc(db, "config", "main"), cfg, { merge: true });
       flash("ok", "Configuración guardada ✓");
     } catch (e) {
       flash("err", e instanceof Error ? e.message : "Error");
@@ -140,9 +136,29 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
     try {
       const cred = EmailAuthProvider.credential(user.email, tgPwd);
       await reauthenticateWithCredential(user, cred);
+      // Recién al desbloquear se leen los secretos (config/secrets, solo-admin).
+      const snap = await getDoc(doc(db, "config", "secrets"));
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.telegramToken) setTgToken(data.telegramToken as string);
+        if (data.telegramChatId) setTgChat(data.telegramChatId as string);
+      }
       setTgLock(false); setTgPwd("");
     } catch {
       flash("err", "Contraseña Admin incorrecta");
+    }
+  };
+
+  // ── Guardar Telegram (config/secrets) ────────────────────────────────────────
+  const saveTelegram = async () => {
+    try {
+      await setDoc(doc(db, "config", "secrets"), {
+        ...(tgToken && { telegramToken: tgToken }),
+        ...(tgChat  && { telegramChatId: tgChat }),
+      }, { merge: true });
+      flash("ok", "Telegram guardado ✓");
+    } catch (e) {
+      flash("err", e instanceof Error ? e.message : "Error");
     }
   };
 
@@ -163,7 +179,7 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
     if (resetNew.length < 3) { flash("err", "Mínimo 3 caracteres"); return; }
     if (resetNew !== resetNew2) { flash("err", "Las contraseñas no coinciden"); return; }
     try {
-      await setDoc(doc(db, "config", "main"), { resetPassword: resetNew }, { merge: true });
+      await setDoc(doc(db, "config", "secrets"), { resetPassword: resetNew }, { merge: true });
       flash("ok", "Clave de Restablecer guardada ✓");
       setResetNew(""); setResetNew2("");
     } catch (e) {
@@ -185,7 +201,7 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
     try {
       const cred = EmailAuthProvider.credential(user.email, correoPwd);
       await reauthenticateWithCredential(user, cred);
-      const snap = await getDoc(doc(db, "config", "main"));
+      const snap = await getDoc(doc(db, "config", "secrets"));
       if (snap.exists()) {
         const data = snap.data();
         setCorreoEmail((data.correoMonitoreo as string) ?? "");
@@ -200,7 +216,7 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
   const saveCorreo = async () => {
     if (!correoEmail.trim()) { flash("err", "Ingresa el correo a monitorear"); return; }
     try {
-      await setDoc(doc(db, "config", "main"), {
+      await setDoc(doc(db, "config", "secrets"), {
         correoMonitoreo: correoEmail.trim(),
         ...(correoPass.trim() && { correoPassword: correoPass.trim() }),
       }, { merge: true });
@@ -539,7 +555,7 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
                     Crea un bot con @BotFather en Telegram. El Chat ID puede ser un grupo o canal donde el bot esté agregado.
                   </p>
                   <button
-                    onClick={saveConfig}
+                    onClick={saveTelegram}
                     className="w-full bg-green-600 hover:bg-green-700 active:scale-95 text-white
                       py-2.5 rounded-lg text-sm font-semibold transition-all duration-100"
                   >

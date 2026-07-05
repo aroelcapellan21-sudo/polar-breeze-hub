@@ -21,8 +21,20 @@ service cloud.firestore {
     // Datos de referencia que necesitan las apps de todos los roles (catálogo,
     // tabla de puntos, número de WhatsApp). Lectura para cualquier autenticado;
     // la escritura sigue restringida a admin vía el catch-all de arriba.
+    // Excluye 'secrets': si no, esta regla general lo seguiría cubriendo igual
+    // (Firestore evalúa TODAS las reglas que apliquen a un doc con OR — no basta
+    // con agregar una regla más estricta aparte, hay que excluirlo aquí).
     match /config/{doc} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && doc != 'secrets';
+    }
+
+    // config/secrets: fix S1 (2026-07-05). Antes vivían en config/main
+    // (resetPassword, telegramToken, telegramChatId, correoMonitoreo,
+    // correoPassword) y CUALQUIER rol autenticado los podía leer. Ahora: SOLO
+    // admin, ni siquiera Despachador (la clave de Reset se verifica server-side
+    // en /api/verify-reset-password, que lee esto con el service account).
+    match /config/secrets {
+      allow read, write: if esAdmin();
     }
 
     // config/despacho: aviso de Oliver a BON + hora_retraso del semáforo.

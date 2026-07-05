@@ -85,10 +85,15 @@ export default function DespachadorDashboard() {
     if (!resetPwd) return;
     setResetLoading(true);
     try {
-      // Verify reset password from config/main
-      const cfgSnap = await getDoc(doc(db, "config", "main"));
-      const storedPwd = cfgSnap.exists() ? cfgSnap.data()?.resetPassword : null;
-      if (!storedPwd || storedPwd !== resetPwd) {
+      // Fix S1 (2026-07-05): la clave YA NO se lee ni se compara en el navegador
+      // (config/main es legible por cualquier rol autenticado). Se verifica en
+      // el servidor, que lee config/secrets (solo-admin) con el service account.
+      const verify = await fetch("/api/verify-reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: resetPwd }),
+      }).then((r) => r.json()).catch(() => ({ ok: false }));
+      if (!verify.ok) {
         flashReset("err", "Clave de Restablecer incorrecta");
         setResetLoading(false);
         return;
