@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { MovimientoLoker } from "@/lib/types";
 import RegistroLote       from "@/components/encargado/RegistroLote";
 import SalidaPicking      from "@/components/encargado/SalidaPicking";
+import InventarioChoferesTab from "@/components/encargado/InventarioChoferesTab";
 import LotesGuardados     from "@/components/encargado/LotesGuardados";
 import Reposicion         from "@/components/encargado/Reposicion";
 import BuscadorArea, { coincide } from "@/components/shared/BuscadorArea";
@@ -94,7 +95,7 @@ export default function EncargadoDashboard() {
   const { profile, logout } = useAuth();
 
   const [tab,          setTab]          = useState<Tab>("lote");
-  const [loteVista,    setLoteVista]    = useState<"entrada" | "salida">("entrada");
+  const [loteVista,    setLoteVista]    = useState<"entrada" | "salida" | "choferes">("entrada");
   const [movimientos,  setMovimientos]  = useState<MovimientoLoker[]>([]);
   const [showTablas,     setShowTablas]     = useState(false);
   const [showBuscador,   setShowBuscador]   = useState(false);
@@ -285,7 +286,9 @@ export default function EncargadoDashboard() {
               {tab === "lote"
                 ? (loteVista === "entrada"
                     ? "📥 Entrada — registrar lotes recibidos de BON"
-                    : "📤 Salida (Picking) — descuenta del stock del loker")
+                    : loteVista === "salida"
+                    ? "📤 Salida (Picking) — descuenta del stock del loker"
+                    : "📋 Inventario Choferes — ajusta el inventario fijo del chofer")
                 : BREADCRUMB[tab]}
             </span>
             <span className="flex items-center gap-1 text-gray-400 text-[10px] flex-shrink-0 ml-2">
@@ -305,7 +308,7 @@ export default function EncargadoDashboard() {
 
         {tab === "lote" && (
           <div className="space-y-4">
-            {/* Sub-toggle Entrada / Salida (Picking) */}
+            {/* Sub-toggle Entrada / Salida (Picking) / Inventario Choferes */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 flex gap-1">
               <button
                 type="button"
@@ -329,8 +332,23 @@ export default function EncargadoDashboard() {
               >
                 📤 Salida (Picking)
               </button>
+              <button
+                type="button"
+                onClick={() => setLoteVista("choferes")}
+                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
+                  loteVista === "choferes"
+                    ? "bg-[#1E8C3A] text-white shadow-sm"
+                    : "text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                📋 Inv. Choferes
+              </button>
             </div>
-            {loteVista === "entrada" ? <RegistroLote /> : <SalidaPicking />}
+            {loteVista === "entrada"
+              ? <RegistroLote />
+              : loteVista === "salida"
+              ? <SalidaPicking />
+              : <InventarioChoferesTab />}
           </div>
         )}
         {tab === "guardados"  && <LotesGuardados />}

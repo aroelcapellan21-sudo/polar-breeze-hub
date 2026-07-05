@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import PasswordInput from "@/components/shared/PasswordInput";
+import InventarioChoferesAjuste from "@/components/shared/InventarioChoferesAjuste";
 import {
   collection, query, where, orderBy, onSnapshot,
   doc, getDoc, setDoc, addDoc, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import {
   UserProfile, ImbentarioRecord, InventarioBaseItem,
@@ -54,15 +56,39 @@ interface ReporteChoferDia {
   estado:  string;
 }
 
-function hoyFechaKey(): string {
-  const d = new Date();
+function dateKeyOf(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function hoyFechaKey(): string {
+  return dateKeyOf(new Date());
+}
+
+// Fase 1B (mejora #24): un movimiento del ledger del chofer, ya traducido a
+// signo desde SU perspectiva (no la del stock del Loker, que es la opuesta
+// para salida_despacho/devolucion_chofer — ver admin/Inventario.tsx TIPO_CFG).
+interface LedgerEntry {
+  tipo: "base" | "despacho" | "agregado" | "retiro" | "devolucion" | "ajuste" | "vendido";
+  label: string;
+  meta: string;
+  qty: number;
+  oliver?: boolean;
+}
+interface LedgerProducto {
+  producto_id: string;
+  nombre: string;
+  entries: LedgerEntry[];
+  balanceCalculado: number;
+  sobranteReportado: number | null;
+  diferencia: number | null;
+  semaforo: "verde" | "amarillo" | "rojo" | "pendiente";
 }
 
 export default function ChoferDetalle({ chofer, onBack }: Props) {
+  const { profile } = useAuth();
   const [records,       setRecords]       = useState<ImbentarioRecord[]>([]);
   const [talonarios,    setTalonarios]    = useState<TalonarioDoc[]>([]);
   const [extrasChofer,  setExtrasChofer]  = useState<(MovimientoLoker & { id: string })[]>([]);
+  const [movsLoker,     setMovsLoker]     = useState<(MovimientoLoker & { id: string })[]>([]);
   const [driverEntregas, setDriverEntregas] = useState<ProductoItem[]>([]);
   const [invBase,        setInvBase]        = useState<InventarioBaseItem[]>([]);
   const [rango,      setRango]      = useState<7 | 15 | 30>(15);
@@ -75,6 +101,17 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
   const [reporteCargando, setReporteCargando] = useState(false);
   const [reporteError,    setReporteError]    = useState(false);
 
+  // ── Fase 1B (mejora #24): ledger por producto — cuál está desplegado ──
+  const [expandedProd, setExpandedProd] = useState<string | null>(null);
+
+  // ── Fase 1B (mejora #24): registrar ajuste post-cierre autorizado por Oliver ──
+  const [ajusteProd,     setAjusteProd]     = useState("");
+  const [ajusteCantidad, setAjusteCantidad] = useState("");
+  const [ajusteMotivo,   setAjusteMotivo]   = useState("");
+  const [ajustePwd,      setAjustePwd]      = useState("");
+  const [ajusteLoading,  setAjusteLoading]  = useState(false);
+  const [ajusteMsg,      setAjusteMsg]      = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
   useEffect(() => {
     if (subTab !== "cruce" || !chofer.ficha) return;
     setReporteCargando(true);
@@ -85,25 +122,136 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
       .finally(() => setReporteCargando(false));
   }, [subTab, fechaCruce, chofer.ficha]);
 
-  const filasCruce = useMemo(() => {
+  // Fase 1B (mejora #24): ledger de movimientos por producto — declarado
+  // inicial (Fase 1) + despacho/agregados/retiros (movimientos_loker del
+  // día, choferId=chofer.uid) + vendido (reportes_chofer) = balance
+  // calculado, comparado contra el sobrante que reportó el chofer.
+  const ledgerPorProducto = useMemo<LedgerProducto[]>(() => {
     const baseMap  = new Map((chofer.inventario_base ?? []).map((b) => [b.producto_id, b]));
     const itemsMap = new Map((reporteDia?.items ?? []).map((it) => [it.producto_id, it]));
-    const ids = new Set([...baseMap.keys(), ...itemsMap.keys()]);
+
+    const movsDia = movsLoker.filter(
+      (m) =>
+        (m.tipo === "salida_despacho" || m.tipo === "devolucion_chofer" || m.tipo === "ajuste") &&
+        dateKeyOf(toDate(m.timestamp)) === fechaCruce,
+    );
+    const movsPorProducto = new Map<string, (MovimientoLoker & { id: string })[]>();
+    for (const m of movsDia) {
+      const list = movsPorProducto.get(m.producto_id) ?? [];
+      list.push(m);
+      movsPorProducto.set(m.producto_id, list);
+    }
+
+    const ids = new Set([...baseMap.keys(), ...itemsMap.keys(), ...movsPorProducto.keys()]);
+
     return Array.from(ids).map((pid) => {
-      const b  = baseMap.get(pid);
-      const it = itemsMap.get(pid);
-      const declaradoActual = b?.cantidad ?? 0;
-      const cargaReporte    = it?.carga ?? 0;
+      const base = baseMap.get(pid);
+      const item = itemsMap.get(pid);
+      const movs = (movsPorProducto.get(pid) ?? [])
+        .slice()
+        .sort((a, b) => toDate(a.timestamp).getTime() - toDate(b.timestamp).getTime());
+
+      const entries: LedgerEntry[] = [
+        {
+          tipo: "base",
+          label: "Declarado inicial",
+          meta: chofer.inventarioBaseDate ? `${fmtDate(chofer.inventarioBaseDate)} · Encargado` : "Encargado",
+          qty: base?.cantidad ?? 0,
+        },
+      ];
+
+      let running = base?.cantidad ?? 0;
+      for (const m of movs) {
+        let tipoLbl: LedgerEntry["tipo"];
+        let label: string;
+        let qty: number;
+        if (m.tipo === "salida_despacho") {
+          qty = Math.abs(m.cantidad);
+          if (m.categoria === "agregado_1")      { tipoLbl = "agregado"; label = "Agregado del Encargado (con puntos)"; }
+          else if (m.categoria === "agregado_0") { tipoLbl = "agregado"; label = "Agregado del Encargado"; }
+          else                                    { tipoLbl = "despacho"; label = "Despachado"; }
+        } else if (m.tipo === "devolucion_chofer") {
+          qty = -Math.abs(m.cantidad);
+          if (m.categoria === "retiro_despacho") { tipoLbl = "retiro"; label = "Retiro del Despachador"; }
+          else                                    { tipoLbl = "devolucion"; label = "Devolución del chofer"; }
+        } else {
+          qty = m.cantidad; // ajuste: el signo ya viene dado por quien lo registró
+          tipoLbl = "ajuste"; label = "Ajuste post-cierre";
+        }
+        running += qty;
+        entries.push({
+          tipo: tipoLbl,
+          label,
+          meta: `${fmtDate(m.timestamp)} · ${m.responsable}${m.motivo ? " — " + m.motivo : m.notas ? " — " + m.notas : ""}`,
+          qty,
+          oliver: m.tipo === "ajuste",
+        });
+      }
+
+      if (item) {
+        running -= item.vendido;
+        entries.push({
+          tipo: "vendido",
+          label: "Vendido — reporte nocturno",
+          meta: "reportado por el chofer",
+          qty: -item.vendido,
+        });
+      }
+
+      const balanceCalculado   = running;
+      const sobranteReportado  = item?.sobrante ?? null;
+      const diferencia = sobranteReportado != null ? balanceCalculado - sobranteReportado : null;
+      let semaforo: LedgerProducto["semaforo"] = "pendiente";
+      if (diferencia != null) {
+        const denom = Math.max(balanceCalculado, sobranteReportado ?? 0, 1);
+        const ratio = Math.abs(diferencia) / denom;
+        semaforo = diferencia === 0 ? "verde" : ratio <= 0.1 ? "amarillo" : "rojo";
+      }
+
       return {
         producto_id: pid,
-        nombre: it?.nombre ?? b?.nombre ?? pid,
-        declaradoActual, cargaReporte,
-        sobrante: it?.sobrante ?? null,
-        vendido:  it?.vendido  ?? null,
-        diferencia: declaradoActual - cargaReporte,
+        nombre: item?.nombre ?? base?.nombre ?? pid,
+        entries, balanceCalculado, sobranteReportado, diferencia, semaforo,
       };
     }).sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [chofer.inventario_base, reporteDia]);
+  }, [chofer.inventario_base, chofer.inventarioBaseDate, reporteDia, movsLoker, fechaCruce]);
+
+  // Registrar ajuste post-cierre — requiere reautenticar con la contraseña
+  // Admin actual (mismo patrón que unlockInventario) para que "autorizado
+  // por Oliver" sea real y no solo un texto.
+  const registrarAjuste = async () => {
+    const prod = ledgerPorProducto.find((p) => p.producto_id === ajusteProd);
+    const qty  = parseFloat(ajusteCantidad);
+    if (!prod || isNaN(qty) || qty === 0 || !ajusteMotivo.trim()) {
+      setAjusteMsg({ type: "err", text: "Completa producto, cantidad (≠0) y motivo." });
+      return;
+    }
+    setAjusteLoading(true);
+    try {
+      const user = auth.currentUser;
+      if (!user?.email) throw new Error("Sin sesión");
+      const cred = EmailAuthProvider.credential(user.email, ajustePwd);
+      await reauthenticateWithCredential(user, cred);
+      await addDoc(collection(db, "movimientos_loker"), {
+        tipo:         "ajuste",
+        producto_id:  prod.producto_id,
+        nombre:       prod.nombre,
+        cantidad:     qty,
+        responsable:  profile?.nombre ?? "Oliver (Admin)",
+        choferId:     chofer.uid,
+        choferNombre: chofer.nombre,
+        timestamp:    Timestamp.now(),
+        motivo:       ajusteMotivo.trim(),
+      } satisfies Omit<MovimientoLoker, "id">);
+      setAjusteProd(""); setAjusteCantidad(""); setAjusteMotivo(""); setAjustePwd("");
+      setAjusteMsg({ type: "ok", text: "Ajuste registrado ✓" });
+    } catch {
+      setAjusteMsg({ type: "err", text: "Contraseña incorrecta o error al guardar." });
+    } finally {
+      setAjusteLoading(false);
+      setTimeout(() => setAjusteMsg(null), 4000);
+    }
+  };
 
   // Inventory editing
   const [invPwd,     setInvPwd]     = useState("");
@@ -153,6 +301,10 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
         .filter((d) => !!(d as { categoria?: string }).categoria)
         .sort((a, b) => toDate(b.timestamp).getTime() - toDate(a.timestamp).getTime());
       setExtrasChofer(extras);
+
+      // Fase 1B: todos los movimientos del chofer, sin filtrar — la 1B.2
+      // (ledger de la Cruce) filtra por fecha en el useMemo de abajo.
+      setMovsLoker(allMovs);
 
       // Inventario base — todos los movimientos tipo entrada_consignacion_inicial
       // sin ningún filtro de fecha para capturar datos históricos
@@ -1255,6 +1407,9 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
         );
       })()}
 
+      {/* ── Inventario Choferes: ajuste rápido +/- (sin historial) ── */}
+      {subTab === "inventario" && <InventarioChoferesAjuste chofer={chofer} />}
+
       {/* ── Inventario FacturaScan (editable) ── */}
       {subTab === "inventario" && (
         <div className="bg-white rounded-xl shadow-sm p-5">
@@ -1365,80 +1520,169 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
         </div>
       )}
 
-      {/* ── Cruce: inventario_base declarado vs reportes_chofer reportado (Fase 2) ── */}
-      {subTab === "cruce" && (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 bg-gradient-to-r from-indigo-50 to-indigo-100 flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <h3 className="font-bold text-indigo-900 text-sm">🔀 Cruce: base declarada vs reportado</h3>
-              <p className="text-xs text-indigo-600 mt-0.5">
-                inventario_base (declarado por Encargado) vs reportes_chofer (reportado por el chofer)
-              </p>
+      {/* ── Cruce: inventario real del chofer, ledger de movimientos (Fase 1B) ── */}
+      {subTab === "cruce" && (() => {
+        const SEM_ICON:  Record<LedgerProducto["semaforo"], string> = { verde: "🟢", amarillo: "🟡", rojo: "🔴", pendiente: "⚪" };
+        const SEM_LABEL: Record<LedgerProducto["semaforo"], string> = {
+          verde: "Cuadra", amarillo: "Sin explicar (revisar)", rojo: "Sin explicar (crítico)", pendiente: "Sin reporte aún",
+        };
+        const criticos   = ledgerPorProducto.filter((p) => p.semaforo === "rojo").length;
+        const porRevisar = ledgerPorProducto.filter((p) => p.semaforo === "amarillo").length;
+        const cuadran    = ledgerPorProducto.filter((p) => p.semaforo === "verde").length;
+
+        return (
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-5 py-4 bg-gradient-to-r from-indigo-50 to-indigo-100 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h3 className="font-bold text-indigo-900 text-sm">🔀 Inventario real (Fase 1B · ledger de movimientos por producto)</h3>
+                <p className="text-xs text-indigo-600 mt-0.5">{chofer.nombre} · Ficha {chofer.ficha ?? "—"}</p>
+              </div>
+              <input
+                type="date" value={fechaCruce}
+                onChange={(e) => setFechaCruce(e.target.value)}
+                className="px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-400"
+              />
             </div>
-            <input
-              type="date" value={fechaCruce}
-              onChange={(e) => setFechaCruce(e.target.value)}
-              className="px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-indigo-400"
-            />
-          </div>
-          <div className="p-5">
+
             {!chofer.ficha ? (
               <p className="text-sm text-gray-400 text-center py-8">Este chofer no tiene ficha asignada.</p>
             ) : reporteCargando ? (
               <p className="text-sm text-gray-400 text-center py-8 animate-pulse">Cargando reporte…</p>
             ) : reporteError ? (
               <p className="text-sm text-red-500 text-center py-8">Error al leer el reporte del chofer.</p>
-            ) : !reporteDia ? (
-              <p className="text-sm text-gray-400 text-center py-8">Sin reporte del chofer para esta fecha.</p>
             ) : (
               <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-xs text-gray-400 border-b">
-                        <th className="text-left pb-1.5 pr-2">Producto</th>
-                        <th className="text-right pb-1.5 pr-2">Declarado (ahora)</th>
-                        <th className="text-right pb-1.5 pr-2">Carga en reporte</th>
-                        <th className="text-right pb-1.5 pr-2">Sobrante</th>
-                        <th className="text-right pb-1.5 pr-2">Vendido</th>
-                        <th className="text-right pb-1.5">Diferencia</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {filasCruce.map((f) => (
-                        <tr key={f.producto_id} className={f.diferencia !== 0 ? "bg-red-50" : ""}>
-                          <td className="py-1.5 pr-2">{f.nombre}</td>
-                          <td className="text-right py-1.5 pr-2">{f.declaradoActual}</td>
-                          <td className="text-right py-1.5 pr-2">{f.cargaReporte}</td>
-                          <td className="text-right py-1.5 pr-2">{f.sobrante ?? "—"}</td>
-                          <td className="text-right py-1.5 pr-2 font-semibold">{f.vendido ?? "—"}</td>
-                          <td className={`text-right py-1.5 font-bold ${f.diferencia !== 0 ? "text-red-600" : "text-gray-300"}`}>
-                            {f.diferencia !== 0 ? (f.diferencia > 0 ? `+${f.diferencia}` : f.diferencia) : "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                {/* Resumen de estados */}
+                <div className="grid grid-cols-3 gap-2 p-4">
+                  <div className="bg-red-50 border border-red-100 rounded-xl p-2.5 text-center">
+                    <p className="text-lg font-bold text-red-600">{criticos}</p>
+                    <p className="text-xs text-red-500">Críticos</p>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-2.5 text-center">
+                    <p className="text-lg font-bold text-yellow-600">{porRevisar}</p>
+                    <p className="text-xs text-yellow-500">Por revisar</p>
+                  </div>
+                  <div className="bg-green-50 border border-green-100 rounded-xl p-2.5 text-center">
+                    <p className="text-lg font-bold text-green-600">{cuadran}</p>
+                    <p className="text-xs text-green-500">Cuadran</p>
+                  </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2 mt-4">
-                  <div className="bg-gray-50 rounded-xl p-2.5 text-center">
-                    <p className="text-lg font-bold text-gray-700">{reporteDia.totales?.unidades ?? 0}</p>
-                    <p className="text-xs text-gray-400">Unidades</p>
+
+                {ledgerPorProducto.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-8">Sin movimientos para esta fecha.</p>
+                ) : (
+                  <div className="px-4 pb-2 space-y-2">
+                    <p className="text-xs text-gray-400 px-1">Toca un producto para ver los movimientos</p>
+                    {ledgerPorProducto.map((p) => {
+                      const isOpen = expandedProd === p.producto_id;
+                      return (
+                        <div key={p.producto_id} className="border border-gray-100 rounded-xl overflow-hidden">
+                          <button
+                            onClick={() => setExpandedProd(isOpen ? null : p.producto_id)}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 active:scale-[0.99] transition-all duration-100"
+                          >
+                            <span className="text-lg flex-shrink-0">{SEM_ICON[p.semaforo]}</span>
+                            <div className="flex-1 text-left min-w-0">
+                              <p className="font-medium text-sm text-gray-800 truncate">{p.nombre}</p>
+                              <p className="text-xs text-gray-400">{SEM_LABEL[p.semaforo]}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="font-bold text-gray-700">{p.balanceCalculado} uds</p>
+                              {p.diferencia != null && p.diferencia !== 0 && (
+                                <p className={`text-xs font-semibold ${p.diferencia > 0 ? "text-red-500" : "text-yellow-600"}`}>
+                                  {p.diferencia > 0 ? `+${p.diferencia}` : p.diferencia} sin explicar
+                                </p>
+                              )}
+                            </div>
+                            <span className="text-gray-300 flex-shrink-0">{isOpen ? "▲" : "▼"}</span>
+                          </button>
+
+                          {isOpen && (
+                            <div className="px-4 pb-4 border-t border-gray-50 bg-gray-50/50">
+                              <p className="text-xs font-semibold text-gray-500 mt-3 mb-2">Historial de movimientos</p>
+                              <div className="space-y-1.5">
+                                {p.entries.map((e, i) => (
+                                  <div key={i} className="flex items-start gap-2 text-xs bg-white rounded-lg px-3 py-2 border border-gray-100">
+                                    {e.oliver && (
+                                      <span title="Ajuste post-cierre — requiere autorización de Oliver" className="flex-shrink-0">🔒</span>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-gray-700">{e.label}</p>
+                                      <p className="text-gray-400 truncate">{e.meta}</p>
+                                    </div>
+                                    <span className={`font-bold flex-shrink-0 ${e.qty >= 0 ? "text-green-600" : "text-red-500"}`}>
+                                      {e.qty >= 0 ? `+${e.qty}` : e.qty}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 mt-3">
+                                <div className="bg-white rounded-lg p-2.5 text-center border border-gray-100">
+                                  <p className="text-base font-bold text-gray-700">{p.balanceCalculado}</p>
+                                  <p className="text-xs text-gray-400">Balance calculado</p>
+                                </div>
+                                <div className="bg-white rounded-lg p-2.5 text-center border border-gray-100">
+                                  <p className="text-base font-bold text-gray-700">{p.sobranteReportado ?? "—"}</p>
+                                  <p className="text-xs text-gray-400">Sobrante reportado por el chofer</p>
+                                </div>
+                              </div>
+
+                              {/* Registrar ajuste post-cierre (candado — requiere Oliver) */}
+                              <div className="mt-3 pt-3 border-t border-gray-100">
+                                <p className="text-xs font-semibold text-gray-500 mb-2">🔒 Registrar ajuste post-cierre (autoriza Oliver)</p>
+                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                  <input
+                                    type="number" placeholder="Cantidad (+/-)"
+                                    value={ajusteProd === p.producto_id ? ajusteCantidad : ""}
+                                    onChange={(e) => { setAjusteProd(p.producto_id); setAjusteCantidad(e.target.value); }}
+                                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-400"
+                                  />
+                                  <input
+                                    type="text" placeholder="Motivo"
+                                    value={ajusteProd === p.producto_id ? ajusteMotivo : ""}
+                                    onChange={(e) => { setAjusteProd(p.producto_id); setAjusteMotivo(e.target.value); }}
+                                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-400"
+                                  />
+                                </div>
+                                <div className="flex gap-2">
+                                  <PasswordInput
+                                    value={ajusteProd === p.producto_id ? ajustePwd : ""}
+                                    onChange={(e) => { setAjusteProd(p.producto_id); setAjustePwd(e.target.value); }}
+                                    placeholder="Contraseña Admin"
+                                    className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-400"
+                                  />
+                                  <button
+                                    onClick={registrarAjuste}
+                                    disabled={ajusteLoading || ajusteProd !== p.producto_id}
+                                    className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold active:scale-95 hover:bg-indigo-700 transition-all duration-100 disabled:opacity-50"
+                                  >
+                                    {ajusteLoading && ajusteProd === p.producto_id ? "..." : "Guardar"}
+                                  </button>
+                                </div>
+                                {ajusteMsg && ajusteProd === p.producto_id && (
+                                  <p className={`text-xs mt-1.5 ${ajusteMsg.type === "ok" ? "text-green-600" : "text-red-500"}`}>{ajusteMsg.text}</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="bg-gray-50 rounded-xl p-2.5 text-center">
-                    <p className="text-lg font-bold text-gray-700">RD$ {reporteDia.totales?.rd ?? 0}</p>
-                    <p className="text-xs text-gray-400">Total RD$</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-xl p-2.5 text-center">
-                    <p className="text-lg font-bold text-gray-700">{reporteDia.totales?.puntos ?? 0}</p>
-                    <p className="text-xs text-gray-400">Puntos</p>
-                  </div>
+                )}
+
+                {/* Leyenda */}
+                <div className="px-5 py-3 border-t border-gray-100 flex flex-wrap gap-4 text-xs text-gray-500">
+                  <span><span className="text-green-600 font-bold">▲</span> Entradas (despacho / agregado)</span>
+                  <span><span className="text-red-500 font-bold">▼</span> Salidas (venta / retiro / ajuste)</span>
+                  <span>🔒 Ajuste post-cierre — requiere autorización de Oliver</span>
                 </div>
               </>
             )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Modal confirmación guardar inventario base ── */}
       {confirmSaveBase && (
