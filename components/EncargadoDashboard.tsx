@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
@@ -22,6 +22,7 @@ import AsistenteAI         from "@/components/shared/AsistenteAI";
 import SyncSheetsPanel     from "@/components/shared/SyncSheetsPanel";
 import WelcomeBanner       from "@/components/shared/WelcomeBanner";
 import AvisoAreaBanner     from "@/components/shared/AvisoAreaBanner";
+import SideNavDrawer, { NavSection } from "@/components/shared/SideNavDrawer";
 
 type Tab = "lote" | "guardados" | "weight" | "stock" | "urgente" | "reposicion" | "choferes" | "vista";
 
@@ -194,43 +195,26 @@ export default function EncargadoDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Flechas de navegación de tabs ─────────────────────────────────────────
-  const navRef  = useRef<HTMLElement>(null);
-  const [canScrollLeft,  setCanScrollLeft]  = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  // ── Menú lateral de navegación ───────────────────────────────────────────
+  const [showNav, setShowNav] = useState(false);
 
-  const checkScroll = useCallback(() => {
-    const el = navRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 2);
-    setCanScrollRight(Math.ceil(el.scrollLeft + el.clientWidth) < el.scrollWidth - 2);
-  }, []);
-
-  useEffect(() => {
-    const el = navRef.current;
-    if (!el) return;
-    checkScroll();
-    el.addEventListener("scroll", checkScroll, { passive: true });
-    const ro = new ResizeObserver(checkScroll);
-    ro.observe(el);
-    return () => { el.removeEventListener("scroll", checkScroll); ro.disconnect(); };
-  }, [checkScroll]);
-
-  // Scroll al tab activo cuando cambia
-  useEffect(() => {
-    const el = navRef.current;
-    if (!el) return;
-    const active = el.querySelector<HTMLButtonElement>("[data-active='true']");
-    if (active) active.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
-    setTimeout(checkScroll, 300);
-  }, [tab, checkScroll]);
-
-  const scrollNav = (dir: "left" | "right") => {
-    const el = navRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir === "right" ? 120 : -120, behavior: "smooth" });
-    setTimeout(checkScroll, 350);
-  };
+  const NAV_SECTIONS: NavSection[] = [
+    {
+      title: "Supervisor",
+      color: "verde",
+      items: TABS.map((t) => ({
+        key: t.key,
+        icon: t.icon,
+        label: t.label,
+        badge:
+          t.key === "choferes" && pendientesBadge > 0
+            ? (pendientesBadge > 9 ? "9+" : String(pendientesBadge))
+            : t.key === "urgente" && criticos.length > 0
+            ? (criticos.length > 9 ? "9+" : String(criticos.length))
+            : undefined,
+      })),
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-[#F9F9F7]">
@@ -243,8 +227,16 @@ export default function EncargadoDashboard() {
         className="text-white shadow-lg sticky top-0 z-30"
         style={{ background: HEADER_BG }}
       >
-        {/* ── Fila 1: Logo + Nombre + Acciones ── */}
+        {/* ── Fila 1: Menú + Logo + Nombre + Acciones ── */}
         <div className="max-w-2xl mx-auto px-4 pt-3 pb-2 flex items-center gap-3">
+          <button
+            onClick={() => setShowNav(true)}
+            title="Menú"
+            className="bg-white/15 hover:bg-white/25 active:scale-95 w-9 h-9 rounded-lg
+              flex items-center justify-center text-lg transition-all duration-100 flex-shrink-0"
+          >
+            ☰
+          </button>
           <div className="flex items-center gap-2 flex-shrink-0">
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/20"
@@ -276,69 +268,7 @@ export default function EncargadoDashboard() {
               📋
             </button>
             <RolePill rol="encargado" nombre={profile?.nombre ?? "Encargado"} />
-            <button
-              onClick={logout}
-              className="bg-white/15 hover:bg-white/25 active:scale-95 px-2 py-1.5
-                rounded-lg text-xs transition-all font-medium"
-            >
-              Salir
-            </button>
           </div>
-        </div>
-
-        {/* ── Fila 2: Tabs con flechas (separados de la fila de arriba) ── */}
-        <div className="max-w-2xl mx-auto px-2 pt-2.5 pb-2 mt-1 border-t border-white/10 flex items-center gap-0.5">
-          <button
-            onClick={() => scrollNav("left")}
-            className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
-              text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
-              text-lg font-bold leading-none
-              ${canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-          >
-            ‹
-          </button>
-          <nav
-            ref={navRef}
-            className="flex gap-1 overflow-x-auto scrollbar-none flex-1 scroll-smooth"
-          >
-            {TABS.map(t => (
-              <button
-                key={t.key}
-                data-active={tab === t.key}
-                onClick={() => setTab(t.key)}
-                className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
-                  whitespace-nowrap transition-all duration-100 active:scale-95 flex-shrink-0 ${
-                  tab === t.key
-                    ? "bg-white text-[#1A1A1A] shadow-sm font-bold"
-                    : "text-white/80 hover:bg-white/15 hover:text-white"
-                }`}
-              >
-                <span>{t.icon}</span>
-                <span className="hidden sm:inline">{t.label}</span>
-                {t.key === "choferes" && pendientesBadge > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#D42B2B] rounded-full
-                    flex items-center justify-center text-[9px] font-black text-white border border-white/30">
-                    {pendientesBadge > 9 ? "9+" : pendientesBadge}
-                  </span>
-                )}
-                {t.key === "urgente" && criticos.length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 bg-[#D42B2B] rounded-full
-                    flex items-center justify-center text-[9px] font-black text-white border border-white/30 animate-pulse">
-                    {criticos.length > 9 ? "9+" : criticos.length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-          <button
-            onClick={() => scrollNav("right")}
-            className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
-              text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
-              text-lg font-bold leading-none
-              ${canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-          >
-            ›
-          </button>
         </div>
 
         {/* Banda tricolor 5 px */}
@@ -535,6 +465,19 @@ export default function EncargadoDashboard() {
         {/* Tab Vista — polar-breeze-final.html */}
         {tab === "vista" && <PolarBreezeHTML />}
       </main>
+
+      {/* ── Menú lateral de navegación ── */}
+      <SideNavDrawer
+        open={showNav}
+        onClose={() => setShowNav(false)}
+        sections={NAV_SECTIONS}
+        activeKey={tab}
+        onSelect={(key) => setTab(key as Tab)}
+        roleLabel="Supervisor"
+        userName={profile?.nombre}
+        userRoleLabel="Supervisor"
+        onLogout={logout}
+      />
 
       {/* Modal Tablas */}
       {showTablas && <ConsultarTablaModal onClose={() => setShowTablas(false)} />}
