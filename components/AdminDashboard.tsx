@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
@@ -27,6 +27,7 @@ import ConsultarTablaModal   from "@/components/shared/ConsultarTablaModal";
 import RolePill              from "@/components/shared/RolePill";
 import AsistenteAI           from "@/components/shared/AsistenteAI";
 import WelcomeBanner         from "@/components/shared/WelcomeBanner";
+import SideNavDrawer, { NavSection } from "@/components/shared/SideNavDrawer";
 
 type Tab = "overview" | "choferes" | "inventario" | "estado" | "informes" | "anomalias" | "encargados" | "anom_desp" | "reportes" | "codigos" | "pwa" | "tiemporeal" | "proyecciones" | "usuarios" | "aviso";
 
@@ -123,42 +124,48 @@ export default function AdminDashboard() {
 
   const volverALista = () => setChofer(null);
 
-  // ── Flechas de navegación de tabs ────────────────────────────────────────
-  const navRef  = useRef<HTMLElement>(null);
-  const [canScrollLeft,  setCanScrollLeft]  = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  // ── Menú lateral de navegación ───────────────────────────────────────────
+  const [showNav, setShowNav] = useState(false);
 
-  const checkScroll = useCallback(() => {
-    const el = navRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 2);
-    setCanScrollRight(Math.ceil(el.scrollLeft + el.clientWidth) < el.scrollWidth - 2);
-  }, []);
+  const NAV_SECTIONS: NavSection[] = [
+    {
+      title: "Operación",
+      color: "amarillo",
+      items: [
+        { key: "overview",    icon: "🏠", label: "Overview" },
+        { key: "inventario",  icon: "📦", label: "Inventario" },
+        { key: "estado",      icon: "🖥️", label: "Estado" },
+        { key: "tiemporeal",  icon: "⚡", label: "Tiempo Real" },
+        { key: "pwa",         icon: "📱", label: "PWA" },
+      ],
+    },
+    {
+      title: "Gestión",
+      color: "rojo",
+      items: [
+        { key: "choferes",   icon: "👥", label: "Choferes", badge: chofer ? chofer.nombre.split(" ")[0] : undefined },
+        { key: "encargados", icon: "🏭", label: "Encargados" },
+        { key: "usuarios",   icon: "👤", label: "Usuarios" },
+        { key: "codigos",    icon: "🔲", label: "Códigos" },
+        { key: "aviso",      icon: "📣", label: "Aviso BON" },
+      ],
+    },
+    {
+      title: "Reportes y Análisis",
+      color: "verde",
+      items: [
+        { key: "informes",     icon: "📋", label: "Informes" },
+        { key: "anomalias",    icon: "⚠️", label: "Anomalías" },
+        { key: "anom_desp",    icon: "📋", label: "Anom. Desp." },
+        { key: "reportes",     icon: "📊", label: "Reportes" },
+        { key: "proyecciones", icon: "📈", label: "Proyecciones" },
+      ],
+    },
+  ];
 
-  useEffect(() => {
-    const el = navRef.current;
-    if (!el) return;
-    checkScroll();
-    el.addEventListener("scroll", checkScroll, { passive: true });
-    const ro = new ResizeObserver(checkScroll);
-    ro.observe(el);
-    return () => { el.removeEventListener("scroll", checkScroll); ro.disconnect(); };
-  }, [checkScroll]);
-
-  useEffect(() => {
-    const el = navRef.current;
-    if (!el) return;
-    const active = el.querySelector<HTMLButtonElement>("[data-active='true']");
-    if (active) active.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
-    setTimeout(checkScroll, 300);
-  }, [tab, checkScroll]);
-
-  const scrollNav = (dir: "left" | "right") => {
-    const el = navRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir === "right" ? 140 : -140, behavior: "smooth" });
-    // Forzar recheck después de que termine la animación smooth
-    setTimeout(checkScroll, 350);
+  const handleNavSelect = (key: string) => {
+    setTab(key as Tab);
+    if (key !== "choferes") setChofer(null);
   };
 
   return (
@@ -169,8 +176,18 @@ export default function AdminDashboard() {
         className="text-white shadow-lg sticky top-0 z-30"
         style={{ background: "linear-gradient(90deg, rgba(245,200,0,0.55) 0% 33.33%, rgba(212,43,43,0.55) 33.33% 66.66%, rgba(30,140,58,0.55) 66.66% 100%), #1A1A1A" }}
       >
-        {/* ── Fila 1: Logo + Nombre + Acciones ── */}
+        {/* ── Fila 1: Menú + Logo + Nombre + Acciones ── */}
         <div className="max-w-7xl mx-auto px-4 pt-3 pb-2 flex items-center gap-3">
+
+          {/* ☰ Menú de navegación */}
+          <button
+            onClick={() => setShowNav(true)}
+            title="Menú"
+            className="bg-white/15 hover:bg-white/25 active:scale-95 w-9 h-9 rounded-lg
+              flex items-center justify-center text-lg transition-all duration-100 flex-shrink-0"
+          >
+            ☰
+          </button>
 
           {/* Logo + nombre de departamento */}
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -212,7 +229,7 @@ export default function AdminDashboard() {
               onClick={() => setShowConfig(true)}
               title="Configuración"
               className="bg-white/10 hover:bg-white/20 active:scale-95 w-8 h-8 rounded-lg
-                flex items-center justify-center text-base transition-all duration-100 hidden sm:flex"
+                flex items-center justify-center text-base transition-all duration-100 flex-shrink-0"
             >
               ⚙️
             </button>
@@ -225,83 +242,6 @@ export default function AdminDashboard() {
               Salir
             </button>
           </div>
-        </div>
-
-        {/* ── Fila 2: Tabs con flechas (ancho completo) ── */}
-        <div className="max-w-7xl mx-auto px-2 pb-2 flex items-center gap-0.5">
-          {/* Flecha izquierda */}
-          <button
-            onClick={() => scrollNav("left")}
-            className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
-              text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
-              text-lg font-bold leading-none
-              ${canScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-          >
-            ‹
-          </button>
-
-          <nav
-            ref={navRef}
-            className="flex gap-1 overflow-x-auto scrollbar-none flex-1 scroll-smooth"
-          >
-            <NavTab data-active={tab === "overview"} active={tab === "overview"} onClick={() => { setTab("overview"); setChofer(null); }}>
-              <span>🏠</span><span className="hidden sm:inline">Overview</span>
-            </NavTab>
-            <NavTab data-active={tab === "choferes"} active={tab === "choferes"} onClick={() => setTab("choferes")}>
-              <span>👥</span><span className="hidden sm:inline">Choferes</span>
-              {chofer && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded-full hidden sm:inline">{chofer.nombre.split(" ")[0]}</span>}
-            </NavTab>
-            <NavTab data-active={tab === "inventario"} active={tab === "inventario"} onClick={() => { setTab("inventario"); setChofer(null); }}>
-              <span>📦</span><span className="hidden sm:inline">Inventario</span>
-            </NavTab>
-            <NavTab data-active={tab === "estado"} active={tab === "estado"} onClick={() => { setTab("estado"); setChofer(null); }}>
-              <span>🖥️</span><span className="hidden sm:inline">Estado</span>
-            </NavTab>
-            <NavTab data-active={tab === "informes"} active={tab === "informes"} onClick={() => { setTab("informes"); setChofer(null); }}>
-              <span>📋</span><span className="hidden sm:inline">Informes</span>
-            </NavTab>
-            <NavTab data-active={tab === "anomalias"} active={tab === "anomalias"} onClick={() => { setTab("anomalias"); setChofer(null); }}>
-              <span>⚠️</span><span className="hidden sm:inline">Anomalías</span>
-            </NavTab>
-            <NavTab data-active={tab === "encargados"} active={tab === "encargados"} onClick={() => { setTab("encargados"); setChofer(null); }}>
-              <span>🏭</span><span className="hidden sm:inline">Encargados</span>
-            </NavTab>
-            <NavTab data-active={tab === "anom_desp"} active={tab === "anom_desp"} onClick={() => { setTab("anom_desp"); setChofer(null); }}>
-              <span>📋</span><span className="hidden sm:inline">Anom. Desp.</span>
-            </NavTab>
-            <NavTab data-active={tab === "reportes"} active={tab === "reportes"} onClick={() => { setTab("reportes"); setChofer(null); }}>
-              <span>📊</span><span className="hidden sm:inline">Reportes</span>
-            </NavTab>
-            <NavTab data-active={tab === "codigos"} active={tab === "codigos"} onClick={() => { setTab("codigos"); setChofer(null); }}>
-              <span>🔲</span><span className="hidden sm:inline">Códigos</span>
-            </NavTab>
-            <NavTab data-active={tab === "pwa"} active={tab === "pwa"} onClick={() => { setTab("pwa"); setChofer(null); }}>
-              <span>📱</span><span className="hidden sm:inline">PWA</span>
-            </NavTab>
-            <NavTab data-active={tab === "tiemporeal"} active={tab === "tiemporeal"} onClick={() => { setTab("tiemporeal"); setChofer(null); }}>
-              <span>⚡</span><span className="hidden sm:inline">Tiempo Real</span>
-            </NavTab>
-            <NavTab data-active={tab === "proyecciones"} active={tab === "proyecciones"} onClick={() => { setTab("proyecciones"); setChofer(null); }}>
-              <span>📈</span><span className="hidden sm:inline">Proyecciones</span>
-            </NavTab>
-            <NavTab data-active={tab === "usuarios"} active={tab === "usuarios"} onClick={() => { setTab("usuarios"); setChofer(null); }}>
-              <span>👤</span><span className="hidden sm:inline">Usuarios</span>
-            </NavTab>
-            <NavTab data-active={tab === "aviso"} active={tab === "aviso"} onClick={() => { setTab("aviso"); setChofer(null); }}>
-              <span>📣</span><span className="hidden sm:inline">Aviso BON</span>
-            </NavTab>
-          </nav>
-
-          {/* Flecha derecha */}
-          <button
-            onClick={() => scrollNav("right")}
-            className={`flex-shrink-0 w-7 h-8 rounded-md flex items-center justify-center
-              text-white/70 hover:text-white hover:bg-white/15 transition-all active:scale-90
-              text-lg font-bold leading-none
-              ${canScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-          >
-            ›
-          </button>
         </div>
 
         {/* ── Banda tricolor 5 px ── */}
@@ -407,6 +347,16 @@ export default function AdminDashboard() {
         contexto={`Tab activo: ${tab}. Admin: ${profile?.nombre ?? "Oliver"}. Sistema Polar Breeze Hub.`}
       />
 
+      {/* ── Menú lateral de navegación ── */}
+      <SideNavDrawer
+        open={showNav}
+        onClose={() => setShowNav(false)}
+        sections={NAV_SECTIONS}
+        activeKey={tab}
+        onSelect={handleNavSelect}
+        roleLabel="Hub Admin"
+      />
+
       {/* ── Modal Configuración ── */}
       {showConfig && <ConfigModal onClose={() => setShowConfig(false)} />}
 
@@ -491,22 +441,3 @@ export default function AdminDashboard() {
   );
 }
 
-function NavTab({ active, onClick, children, "data-active": dataActive }: {
-  active: boolean; onClick: () => void; children: React.ReactNode;
-  "data-active"?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      data-active={dataActive ?? active}
-      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium
-        transition-all duration-100 active:scale-95 whitespace-nowrap flex-shrink-0 ${
-        active
-          ? "bg-[#F5C800] text-[#1A1A1A] shadow-sm font-bold"
-          : "text-white/80 hover:bg-white/15 hover:text-white"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
