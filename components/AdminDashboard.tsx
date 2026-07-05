@@ -136,7 +136,6 @@ export default function AdminDashboard() {
         { key: "inventario",  icon: "📦", label: "Inventario" },
         { key: "estado",      icon: "🖥️", label: "Estado" },
         { key: "tiemporeal",  icon: "⚡", label: "Tiempo Real" },
-        { key: "pwa",         icon: "📱", label: "PWA" },
       ],
     },
     {
@@ -146,19 +145,26 @@ export default function AdminDashboard() {
         { key: "choferes",   icon: "👥", label: "Choferes", badge: chofer ? chofer.nombre.split(" ")[0] : undefined },
         { key: "encargados", icon: "🏭", label: "Encargados" },
         { key: "usuarios",   icon: "👤", label: "Usuarios" },
-        { key: "codigos",    icon: "🔲", label: "Códigos" },
-        { key: "aviso",      icon: "📣", label: "Aviso BON" },
       ],
     },
     {
-      title: "Reportes y Análisis",
+      title: "Sistema",
       color: "verde",
       items: [
+        { key: "pwa",       icon: "📱", label: "PWA" },
+        { key: "codigos",   icon: "🔲", label: "Códigos" },
+        { key: "anomalias", icon: "⚠️", label: "Anomalías" },
+        { key: "anom_desp", icon: "📋", label: "Anom. Desp." },
+      ],
+    },
+    {
+      title: "Administración",
+      color: "azul",
+      items: [
         { key: "informes",     icon: "📋", label: "Informes" },
-        { key: "anomalias",    icon: "⚠️", label: "Anomalías" },
-        { key: "anom_desp",    icon: "📋", label: "Anom. Desp." },
         { key: "reportes",     icon: "📊", label: "Reportes" },
         { key: "proyecciones", icon: "📈", label: "Proyecciones" },
+        { key: "aviso",        icon: "📣", label: "Aviso BON" },
       ],
     },
   ];
@@ -234,13 +240,6 @@ export default function AdminDashboard() {
               ⚙️
             </button>
             <RolePill rol="admin" nombre={profile?.nombre ?? ""} />
-            <button
-              onClick={logout}
-              className="bg-white/15 hover:bg-white/25 active:scale-95 px-2.5 py-1.5
-                rounded-lg text-xs transition-all duration-100 font-medium flex-shrink-0"
-            >
-              Salir
-            </button>
           </div>
         </div>
 
@@ -355,6 +354,9 @@ export default function AdminDashboard() {
         activeKey={tab}
         onSelect={handleNavSelect}
         roleLabel="Hub Admin"
+        userName={profile?.nombre}
+        userRoleLabel="Administrador"
+        onLogout={logout}
       />
 
       {/* ── Modal Configuración ── */}
