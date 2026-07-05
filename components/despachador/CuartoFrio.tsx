@@ -160,6 +160,8 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
       const totalPeso     = productos.reduce((s, p) => s + (p.peso     ?? 0), 0);
       const ts            = Timestamp.now();
 
+      // merge:true: session/despacho también lo escribe factura-escaner
+      // (campos entries/updated); no pisar esos campos (1.3).
       await setDoc(doc(db, "session", "despacho"), {
         cuartoFrio:        productos,
         totalProductos:    productos.length,
@@ -174,7 +176,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
         estado:            "activa",
         totalDespachos:    0,
         totalMonto:        0,
-      });
+      }, { merge: true });
 
       await addDoc(collection(db, "history"), {
         tipo:              "cuarto_frio",

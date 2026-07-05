@@ -100,7 +100,8 @@ export default function DespachadorDashboard() {
         return;
       }
 
-      // Clear session/despacho
+      // Clear session/despacho — merge:true: este doc también lo escribe
+      // factura-escaner (campos entries/updated); no pisar esos campos (1.3).
       await setDoc(doc(db, "session", "despacho"), {
         cuartoFrio: [],
         totalProductos: 0, totalUnidades: 0, totalPeso: null,
@@ -109,7 +110,7 @@ export default function DespachadorDashboard() {
         despachadorNombre: profile?.nombre ?? "",
         fecha: Timestamp.now(), estado: "activa",
         resetAt: Timestamp.now(),
-      });
+      }, { merge: true });
 
       // Clear each driver's entregas
       const driversSnap = await getDocs(collection(db, "drivers"));
