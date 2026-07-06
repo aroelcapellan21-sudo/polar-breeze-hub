@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { doc, setDoc, addDoc, collection, Timestamp, getDoc, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { ProductoItem, PuntoProducto, toProductoId } from "@/lib/types";
+import { ProductoItem, PrecioProducto, resolverProductoEnCatalogo } from "@/lib/types";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
 import {
@@ -44,7 +44,7 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
   const [msg,           setMsg]           = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   // Catálogo para modo manual
-  const [catalogo,      setCatalogo]      = useState<PuntoProducto[]>([]);
+  const [catalogo,      setCatalogo]      = useState<PrecioProducto[]>([]);
   const [manualProd,    setManualProd]    = useState("");
   const [manualCajas,   setManualCajas]   = useState(0);
   const [manualUnids,   setManualUnids]   = useState(0);
@@ -83,12 +83,12 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
   }, []);
 
   useEffect(() => {
-    getDoc(doc(db, "config", "puntos")).then((snap) => {
+    getDoc(doc(db, "config", "precios")).then((snap) => {
       if (snap.exists()) {
         const pd = snap.data();
         setCatalogo(pd.productos ?? []);
-        if ((pd.productos as PuntoProducto[] ?? []).length > 0) {
-          setManualProd((pd.productos as PuntoProducto[])[0].nombre);
+        if ((pd.productos as PrecioProducto[] ?? []).length > 0) {
+          setManualProd((pd.productos as PrecioProducto[])[0].nombre);
         }
       }
     });
@@ -197,11 +197,13 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
           const cantidad = (p.cajas ?? 0) + (p.cantidad ?? 0);
           if (!est || est.estado === "pendiente") continue;
 
+          const resuelto = resolverProductoEnCatalogo(p.nombre, catalogo);
+
           if (est.estado === "recibido" && cantidad > 0) {
             await addDoc(collection(db, "movimientos_loker"), {
               tipo:        "entrada_interior",
-              producto_id: toProductoId(p.nombre),
-              nombre:      p.nombre,
+              producto_id: resuelto.producto_id,
+              nombre:      resuelto.nombre,
               cantidad,
               responsable: despNombre,
               timestamp:   ts,
@@ -210,8 +212,8 @@ export default function CuartoFrio({ despachadorActivo }: Props) {
           } else if (est.estado === "no_recibido") {
             await addDoc(collection(db, "movimientos_loker"), {
               tipo:        "recepcion_pendiente",
-              producto_id: toProductoId(p.nombre),
-              nombre:      p.nombre,
+              producto_id: resuelto.producto_id,
+              nombre:      resuelto.nombre,
               cantidad:    0,
               responsable: despNombre,
               timestamp:   ts,
