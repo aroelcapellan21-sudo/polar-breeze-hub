@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { reauthenticateWithCredential, EmailAuthProvider, updatePassword } from "firebase/auth";
-import { FsConfig } from "@/lib/types";
+import {
+  FsConfig, PuntoProducto, PuntosConfig, PrecioProducto, PreciosConfig, toProductoId,
+} from "@/lib/types";
 import PasswordInput from "@/components/shared/PasswordInput";
 
 const API_KEY  = process.env.NEXT_PUBLIC_FIREBASE_API_KEY!;
@@ -26,7 +28,7 @@ async function restUpdatePassword(idToken: string, newPassword: string) {
   return r.json() as Promise<{ error?: { message: string } }>;
 }
 
-type Section = "passwords" | "config" | "telegram" | "correo";
+type Section = "passwords" | "config" | "puntos" | "precios" | "telegram" | "correo";
 
 export default function ConfigModal({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<Section>("passwords");
@@ -45,6 +47,92 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
   const [cfg, setCfg]     = useState<FsConfig>({});
   const [cfgLoad, setCfgLoad] = useState(false);
   const [nuevoDespachador, setNuevoDespachador] = useState("");
+
+  // ── Puntos (config/puntos) ────────────────────────────────────────────────────
+  const [puntos,     setPuntos]     = useState<PuntoProducto[]>([]);
+  const [puntosMeta, setPuntosMeta] = useState(100);
+  const [puntosLock, setPuntosLock] = useState(true);
+  const [puntosPwd,  setPuntosPwd]  = useState("");
+  const [puntosMsg,  setPuntosMsg]  = useState<{ type: "ok"|"err"; text: string }|null>(null);
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "puntos")).then((snap) => {
+      if (snap.exists()) {
+        const pd = snap.data() as PuntosConfig;
+        setPuntos(pd.productos ?? []);
+        setPuntosMeta(pd.meta ?? 100);
+      }
+    });
+  }, []);
+
+  const flashPuntos = (type: "ok"|"err", text: string) => {
+    setPuntosMsg({ type, text });
+    setTimeout(() => setPuntosMsg(null), 4000);
+  };
+
+  const unlockPuntos = async () => {
+    const user = auth.currentUser;
+    if (!user?.email) return;
+    try {
+      const cred = EmailAuthProvider.credential(user.email, puntosPwd);
+      await reauthenticateWithCredential(user, cred);
+      setPuntosLock(false); setPuntosPwd("");
+    } catch {
+      flashPuntos("err", "Contraseña Admin incorrecta");
+    }
+  };
+
+  const savePuntos = async () => {
+    try {
+      await setDoc(doc(db, "config", "puntos"), { productos: puntos, meta: puntosMeta });
+      flashPuntos("ok", "Puntos guardados ✓");
+    } catch (e) {
+      flashPuntos("err", e instanceof Error ? e.message : "Error");
+    }
+  };
+
+  // ── Precios (config/precios) ──────────────────────────────────────────────────
+  const [precios,     setPrecios]     = useState<PrecioProducto[]>([]);
+  const [preciosLock, setPreciosLock] = useState(true);
+  const [preciosPwd,  setPreciosPwd]  = useState("");
+  const [preciosMsg,  setPreciosMsg]  = useState<{ type: "ok"|"err"; text: string }|null>(null);
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "precios")).then((snap) => {
+      if (snap.exists()) {
+        const pd = snap.data() as PreciosConfig;
+        setPrecios(pd.productos ?? []);
+      }
+    });
+  }, []);
+
+  const flashPrecios = (type: "ok"|"err", text: string) => {
+    setPreciosMsg({ type, text });
+    setTimeout(() => setPreciosMsg(null), 4000);
+  };
+
+  const unlockPrecios = async () => {
+    const user = auth.currentUser;
+    if (!user?.email) return;
+    try {
+      const cred = EmailAuthProvider.credential(user.email, preciosPwd);
+      await reauthenticateWithCredential(user, cred);
+      setPreciosLock(false); setPreciosPwd("");
+    } catch {
+      flashPrecios("err", "Contraseña Admin incorrecta");
+    }
+  };
+
+  const savePrecios = async () => {
+    try {
+      const productos = precios.map((p) => ({ ...p, producto_id: toProductoId(p.nombre) }));
+      await setDoc(doc(db, "config", "precios"), { productos, moneda: "RD$" });
+      setPrecios(productos);
+      flashPrecios("ok", "Precios guardados ✓");
+    } catch (e) {
+      flashPrecios("err", e instanceof Error ? e.message : "Error");
+    }
+  };
 
   // ── Telegram ─────────────────────────────────────────────────────────────────
   const [tgToken, setTgToken] = useState("");
@@ -309,6 +397,8 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
   const SECTIONS: { key: Section; label: string; icon: string }[] = [
     { key: "passwords", label: "Contraseñas", icon: "🔑" },
     { key: "config",    label: "Config",       icon: "🏢" },
+    { key: "puntos",    label: "Puntos",       icon: "⭐" },
+    { key: "precios",   label: "Precios",      icon: "💵" },
     { key: "telegram",  label: "Telegram",     icon: "🤖" },
     { key: "correo",    label: "Correo",        icon: "📧" },
   ];
@@ -527,6 +617,202 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
               >
                 {cfgLoad ? "Guardando..." : "Guardar Configuración"}
               </button>
+            </div>
+          )}
+
+          {/* ── Puntos ── */}
+          {section === "puntos" && (
+            <div className="space-y-4">
+              {puntosLock ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-500">Ingresa tu contraseña Admin para ver/editar los puntos.</p>
+                  <PasswordInput
+                    value={puntosPwd}
+                    onChange={(e) => setPuntosPwd(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && puntosPwd && unlockPuntos()}
+                    placeholder="Contraseña Admin"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  <button
+                    onClick={unlockPuntos} disabled={!puntosPwd}
+                    className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white
+                      py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+                  >
+                    🔓 Desbloquear
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Meta de puntos por quincena</label>
+                    <input
+                      type="number" value={puntosMeta}
+                      onChange={(e) => setPuntosMeta(Number(e.target.value))}
+                      className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm text-right outline-none focus:ring-2 focus:ring-yellow-400"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Los choferes acumulan puntos por cada unidad entregada según el producto. Los puntos se muestran en su panel personal cada quincena.
+                  </p>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-gray-700">Puntos por producto</p>
+                      <button
+                        onClick={() => setPuntos((p) => [...p, { nombre: "", puntos: 1 }])}
+                        className="text-xs text-yellow-600 hover:text-yellow-700 font-medium"
+                      >
+                        + Agregar
+                      </button>
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {puntos.map((p, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            value={p.nombre}
+                            onChange={(e) => {
+                              const next = [...puntos];
+                              next[i] = { ...next[i], nombre: e.target.value };
+                              setPuntos(next);
+                            }}
+                            placeholder="Producto"
+                            className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm outline-none focus:ring-1 focus:ring-yellow-400"
+                          />
+                          <input
+                            type="number" value={p.puntos}
+                            onChange={(e) => {
+                              const next = [...puntos];
+                              next[i] = { ...next[i], puntos: Number(e.target.value) };
+                              setPuntos(next);
+                            }}
+                            className="w-20 px-2 py-1.5 border border-gray-200 rounded text-sm text-right outline-none focus:ring-1 focus:ring-yellow-400"
+                          />
+                          <span className="text-xs text-gray-400">pts</span>
+                          <button
+                            onClick={() => setPuntos((prev) => prev.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-400 text-lg leading-none"
+                          >×</button>
+                        </div>
+                      ))}
+                      {puntos.length === 0 && (
+                        <p className="text-xs text-gray-400 text-center py-3">Sin productos configurados</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={savePuntos}
+                      className="px-5 py-2.5 bg-yellow-500 hover:bg-yellow-600 active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100"
+                    >
+                      ⭐ Guardar Puntos
+                    </button>
+                    {puntosMsg && (
+                      <span className={`text-sm px-3 py-1.5 rounded-lg ${
+                        puntosMsg.type === "ok" ? "bg-green-50 text-green-700 border border-green-200"
+                                               : "bg-red-50 text-red-700 border border-red-200"
+                      }`}>{puntosMsg.text}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Precios ── */}
+          {section === "precios" && (
+            <div className="space-y-4">
+              {preciosLock ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-500">Ingresa tu contraseña Admin para ver/editar los precios.</p>
+                  <PasswordInput
+                    value={preciosPwd}
+                    onChange={(e) => setPreciosPwd(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && preciosPwd && unlockPrecios()}
+                    placeholder="Contraseña Admin"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  <button
+                    onClick={unlockPrecios} disabled={!preciosPwd}
+                    className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white
+                      py-2.5 rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+                  >
+                    🔓 Desbloquear
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-400">
+                    Precio de venta en RD$ por producto. El código es el número de producto usado en otras pantallas (ej. FacturaScan).
+                  </p>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-gray-700">Precios por producto</p>
+                      <button
+                        onClick={() => setPrecios((p) => [...p, { codigo: 0, nombre: "", producto_id: "", precio: 0, moneda: "RD$" }])}
+                        className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                      >
+                        + Agregar
+                      </button>
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {precios.map((p, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            type="number" value={p.codigo}
+                            onChange={(e) => {
+                              const next = [...precios];
+                              next[i] = { ...next[i], codigo: Number(e.target.value) };
+                              setPrecios(next);
+                            }}
+                            placeholder="Cód."
+                            className="w-14 px-2 py-1.5 border border-gray-200 rounded text-sm text-right outline-none focus:ring-1 focus:ring-emerald-400"
+                          />
+                          <input
+                            value={p.nombre}
+                            onChange={(e) => {
+                              const next = [...precios];
+                              next[i] = { ...next[i], nombre: e.target.value };
+                              setPrecios(next);
+                            }}
+                            placeholder="Producto"
+                            className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm outline-none focus:ring-1 focus:ring-emerald-400"
+                          />
+                          <span className="text-xs text-gray-400">RD$</span>
+                          <input
+                            type="number" value={p.precio}
+                            onChange={(e) => {
+                              const next = [...precios];
+                              next[i] = { ...next[i], precio: Number(e.target.value) };
+                              setPrecios(next);
+                            }}
+                            className="w-20 px-2 py-1.5 border border-gray-200 rounded text-sm text-right outline-none focus:ring-1 focus:ring-emerald-400"
+                          />
+                          <button
+                            onClick={() => setPrecios((prev) => prev.filter((_, idx) => idx !== i))}
+                            className="text-gray-300 hover:text-red-400 text-lg leading-none"
+                          >×</button>
+                        </div>
+                      ))}
+                      {precios.length === 0 && (
+                        <p className="text-xs text-gray-400 text-center py-3">Sin productos configurados</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={savePrecios}
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100"
+                    >
+                      💵 Guardar Precios
+                    </button>
+                    {preciosMsg && (
+                      <span className={`text-sm px-3 py-1.5 rounded-lg ${
+                        preciosMsg.type === "ok" ? "bg-green-50 text-green-700 border border-green-200"
+                                                 : "bg-red-50 text-red-700 border border-red-200"
+                      }`}>{preciosMsg.text}</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
