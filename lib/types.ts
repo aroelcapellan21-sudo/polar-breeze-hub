@@ -267,23 +267,62 @@ export function toProductoId(nombre: string): string {
   return nombre.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_áéíóúñü]/g, "");
 }
 
-// Ancla un nombre libre (texto/IA) contra un catálogo — busca match exacto por
-// producto_id, luego parcial (substring en cualquier dirección), y si no hay
-// match devuelve el texto libre tal cual. Evita que nombre y producto_id se
+// Umbral mínimo de cobertura para aceptar un match parcial (ver más abajo):
+// la porción compartida debe cubrir al menos este % del string más corto
+// Y del más largo involucrados, para evitar que un fragmento corto/genérico
+// se "cuele" dentro de un producto_id mucho más largo sin relación real
+// (bug crítico reportado por Oliver en producción: "LENGUILETTA FRUTOS
+// ROJOS 24/1" — producto ya eliminado del catálogo — se asignó mal a otro
+// producto existente por un match parcial sin ningún umbral).
+const MIN_LONGITUD_PARCIAL = 4;
+const MIN_COBERTURA_PARCIAL = 0.6;
+
+// Ancla un nombre libre (texto/IA) contra un catálogo — busca, en orden:
+// 1) alias explícito ya asignado a mano (máxima prioridad y confianza),
+// 2) match exacto por producto_id,
+// 3) match parcial (substring en cualquier dirección) SOLO si la porción
+//    compartida cubre una fracción significativa de ambos strings y no hay
+//    más de un candidato posible (ambigüedad = no se asigna nada).
+// Si nada de eso aplica, devuelve el texto libre tal cual con
+// reconocido:false — nunca adivina. Evita que nombre y producto_id se
 // calculen por separado y diverjan silenciosamente (bug D-1b en Choferes.tsx).
 export function resolverProductoEnCatalogo<T extends { nombre: string; producto_id?: string }>(
   nombreLibre: string,
-  catalogo: T[]
-): { nombre: string; producto_id: string; match: T | null } {
+  catalogo: T[],
+  aliases?: Record<string, string>  // clave normalizada → producto_id canónico
+): { nombre: string; producto_id: string; match: T | null; reconocido: boolean } {
   const idDe = (p: T) => p.producto_id ?? toProductoId(p.nombre);
   const pid = toProductoId(nombreLibre);
+
+  const aliasId = aliases?.[pid];
+  if (aliasId) {
+    const viaAlias = catalogo.find((p) => idDe(p) === aliasId);
+    if (viaAlias) return { nombre: viaAlias.nombre, producto_id: idDe(viaAlias), match: viaAlias, reconocido: true };
+  }
+
   if (catalogo.length > 0) {
     const exacto = catalogo.find((p) => idDe(p) === pid);
-    if (exacto) return { nombre: exacto.nombre, producto_id: idDe(exacto), match: exacto };
-    const parcial = catalogo.find((p) => idDe(p).includes(pid) || pid.includes(idDe(p)));
-    if (parcial) return { nombre: parcial.nombre, producto_id: idDe(parcial), match: parcial };
+    if (exacto) return { nombre: exacto.nombre, producto_id: idDe(exacto), match: exacto, reconocido: true };
+
+    if (pid.length >= MIN_LONGITUD_PARCIAL) {
+      const candidatos = catalogo.filter((p) => {
+        const catId = idDe(p);
+        if (catId.length < MIN_LONGITUD_PARCIAL) return false;
+        const catContieneAlLibre = catId.includes(pid);
+        const libreContieneAlCat = pid.includes(catId);
+        if (!catContieneAlLibre && !libreContieneAlCat) return false;
+        const corto = catContieneAlLibre ? pid.length : catId.length;
+        const largo = catContieneAlLibre ? catId.length : pid.length;
+        return corto / largo >= MIN_COBERTURA_PARCIAL;
+      });
+      if (candidatos.length === 1) {
+        const p = candidatos[0];
+        return { nombre: p.nombre, producto_id: idDe(p), match: p, reconocido: true };
+      }
+    }
   }
-  return { nombre: nombreLibre.trim(), producto_id: pid, match: null };
+
+  return { nombre: nombreLibre.trim(), producto_id: pid, match: null, reconocido: false };
 }
 
 // ─── Semáforo ─────────────────────────────────────────────────────────────────
