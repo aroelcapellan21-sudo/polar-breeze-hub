@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  collection, query, where, orderBy, onSnapshot, addDoc, Timestamp,
+  collection, query, where, orderBy, onSnapshot, addDoc, getDoc, doc, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { UserProfile, toDate } from "@/lib/types";
+import { UserProfile, PrecioProducto, toDate, resolverProductoEnCatalogo } from "@/lib/types";
 import { ShareBar } from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, openPrint, pbTable } from "@/lib/print-template";
@@ -37,6 +37,10 @@ export default function AnomaliasDespachador({ mode, registradorNombre }: Props)
   const [loading,   setLoading]   = useState(false);
   const [msg,       setMsg]       = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
+  // Catálogo canónico (config/precios) — solo para sugerir/anclar nombres,
+  // nunca bloquea: si el producto de verdad es nuevo, se guarda tal cual se escribió.
+  const [catalogoPrecios, setCatalogoPrecios] = useState<PrecioProducto[]>([]);
+
   // Form
   const todayStr = new Date().toISOString().slice(0, 10);
   const [formFecha,    setFormFecha]    = useState(todayStr);
@@ -63,6 +67,12 @@ export default function AnomaliasDespachador({ mode, registradorNombre }: Props)
     return () => { unsub(); uChof(); };
   }, []);
 
+  useEffect(() => {
+    getDoc(doc(db, "config", "precios")).then((snap) => {
+      if (snap.exists()) setCatalogoPrecios((snap.data().productos as PrecioProducto[]) ?? []);
+    }).catch(() => { /* sin catálogo → los nombres se guardan tal cual se escriban */ });
+  }, []);
+
   const flash = (type: "ok" | "err", text: string) => {
     setMsg({ type, text });
     setTimeout(() => setMsg(null), 4000);
@@ -75,8 +85,9 @@ export default function AnomaliasDespachador({ mode, registradorNombre }: Props)
     try {
       const chofer = choferes.find((c) => c.uid === formReceptor);
       const nombreRegistrador = registradorNombre ?? profile?.nombre ?? "Despachador";
+      const nombreAnclado = resolverProductoEnCatalogo(formProducto, catalogoPrecios).nombre;
       await addDoc(collection(db, "anomalias_despacho"), {
-        producto:            formProducto.trim(),
+        producto:            nombreAnclado,
         cantidad:            formCantidad,
         costoUnitario:       formCosto,
         total:               formCantidad * formCosto,
@@ -179,8 +190,14 @@ export default function AnomaliasDespachador({ mode, registradorNombre }: Props)
             <input
               value={formProducto} onChange={(e) => setFormProducto(e.target.value)}
               required placeholder="Ej: Barquillos x24"
+              list="catalogo-precios-anomalias"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-400"
             />
+            <datalist id="catalogo-precios-anomalias">
+              {catalogoPrecios.map((p) => (
+                <option key={p.producto_id} value={p.nombre} />
+              ))}
+            </datalist>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Cantidad</label>
