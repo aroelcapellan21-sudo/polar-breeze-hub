@@ -116,6 +116,12 @@ service cloud.firestore {
     match /weight_alerts/{id}     { allow read, write: if esAdmin() || esEncargado(); }
     match /pedidos_bon/{id}       { allow read, write: if esAdmin() || esEncargado(); }
 
+    // alias_productos: diccionario inteligente de Registro de Lote (mejora #30/#34) —
+    // el Encargado vincula un texto no reconocido de la IA a un producto_id existente;
+    // config/precios en sí sigue admin-only (se escribe vía /api/registrar-producto-nuevo
+    // con service account, no desde el cliente).
+    match /alias_productos/{clave} { allow read, write: if esAdmin() || esEncargado(); }
+
     // ── notas_credito: gestionadas desde el Hub Admin (Inventario) ───────────
     match /notas_credito/{id}     { allow read, write: if esAdmin(); }
 

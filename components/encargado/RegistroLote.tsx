@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   collection, addDoc, getDocs, Timestamp, getDoc, doc, setDoc, serverTimestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { PrecioProducto, LoteLoker, ProductoItem, toProductoId, toDate, resolverProductoEnCatalogo } from "@/lib/types";
 import CameraScanner from "@/components/shared/CameraScanner";
@@ -18,6 +18,7 @@ interface ProductoLote {
   unidadesPorCaja: number;
   total:           number;
   costoUnitario?:  number;
+  reconocido:      boolean;  // false = detectado por IA sin match confiable en config/precios
 }
 
 // Fecha de hoy en formato YYYY-MM-DD (hora local del dispositivo, RD = UTC-4)
@@ -43,6 +44,13 @@ export default function RegistroLote() {
   const { profile } = useAuth();
 
   const [catalogo,    setCatalogo]    = useState<PrecioProducto[]>([]);
+  // Diccionario inteligente: clave normalizada (texto detectado) → producto_id canónico ya asignado a mano
+  const [aliases,     setAliases]     = useState<Record<string, string>>({});
+  // Panel abierto por ítem no reconocido (keyed por producto_id del ítem, que mientras no está
+  // reconocido ES la clave normalizada del texto detectado)
+  const [panelAbierto, setPanelAbierto] = useState<Record<string, "vincular" | "nuevo">>({});
+  const [formNuevo,    setFormNuevo]    = useState<Record<string, { codigo: string; nombre: string; precio: string }>>({});
+  const [guardandoNuevo, setGuardandoNuevo] = useState<string | null>(null);
   const [selProd,     setSelProd]     = useState("");
   const [busqueda,    setBusqueda]    = useState("");
   const [showDrop,    setShowDrop]    = useState(false);
@@ -148,6 +156,16 @@ export default function RegistroLote() {
         setWaNum(String(num));
       }
     });
+
+    // Diccionario inteligente: alias ya asignados a mano en sesiones anteriores
+    getDocs(collection(db, "alias_productos")).then((snap) => {
+      const map: Record<string, string> = {};
+      snap.forEach((d) => {
+        const pid = d.data().producto_id;
+        if (pid) map[d.id] = pid;
+      });
+      setAliases(map);
+    }).catch(() => { /* sin alias → sigue funcionando con match exacto/parcial normal */ });
   }, []);
 
   // Autocompletar uds/caja desde la tabla de conversión al fijar el producto.
@@ -216,7 +234,8 @@ export default function RegistroLote() {
     }
     setMsg(null);
     const costo  = parseFloat(costoStr) || null;
-    const { nombre: prodResuelto, producto_id: pid } = resolverProductoEnCatalogo(prod, catalogo);
+    const resuelto = resolverProductoEnCatalogo(prod, catalogo);
+    const pid = resuelto.producto_id;
     // Si el campo uds/caja quedó vacío, usa la conversión conocida del producto
     const udsCaja = Math.max(1, parseInt(udsCajaStr) || convMap[pid] || 1);
     const total  = cajas * udsCaja + unids;
@@ -230,8 +249,9 @@ export default function RegistroLote() {
           : it
         );
       }
-      return [...prev, { nombre: prodResuelto, producto_id: pid, cajas, unidades: unids,
-        unidadesPorCaja: udsCaja, total,
+      // La selección viene del dropdown del catálogo → siempre reconocido
+      return [...prev, { nombre: resuelto.nombre, producto_id: pid, cajas, unidades: unids,
+        unidadesPorCaja: udsCaja, total, reconocido: resuelto.reconocido,
         ...(costo != null ? { costoUnitario: costo } : {}) }];
     });
     setCajasStr(""); setUnidsStr(""); setCostoStr("");
@@ -275,7 +295,8 @@ export default function RegistroLote() {
       const next = [...prev];
       for (const d of detectados) {
         if (!d?.nombre) continue;
-        const { nombre, producto_id: pid } = resolverProductoEnCatalogo(d.nombre, catalogo);
+        const resuelto = resolverProductoEnCatalogo(d.nombre, catalogo, aliases);
+        const pid = resuelto.producto_id;
         const cajas   = Math.max(0, Math.round(Number(d.cantidad) || 0));
         if (cajas === 0) continue;
         const udsCaja = Math.max(1, convMap[pid] || 1);
@@ -286,8 +307,8 @@ export default function RegistroLote() {
             total: next[idx].total + cajas * udsCaja,
             costoUnitario: costo ?? next[idx].costoUnitario };
         } else {
-          next.push({ nombre, producto_id: pid, cajas, unidades: 0,
-            unidadesPorCaja: udsCaja, total: cajas * udsCaja,
+          next.push({ nombre: resuelto.nombre, producto_id: pid, cajas, unidades: 0,
+            unidadesPorCaja: udsCaja, total: cajas * udsCaja, reconocido: resuelto.reconocido,
             ...(costo != null ? { costoUnitario: costo } : {}) });
         }
         agregados++;
@@ -295,6 +316,90 @@ export default function RegistroLote() {
       return next;
     });
     return agregados;
+  }
+
+  // Re-resuelve todos los ítems aún no reconocidos contra el catálogo/alias actualizado —
+  // así un producto nuevo recién registrado (o un alias recién asignado) resuelve de una
+  // vez todas las filas que compartían el mismo texto detectado, sin volver a analizar la imagen.
+  function reresolverPendientes(catalogoActual: PrecioProducto[], aliasesActuales: Record<string, string>) {
+    setItems(prev => prev.map(it => {
+      if (it.reconocido) return it;
+      const r = resolverProductoEnCatalogo(it.nombre, catalogoActual, aliasesActuales);
+      return { ...it, nombre: r.nombre, producto_id: r.producto_id, reconocido: r.reconocido };
+    }));
+  }
+
+  function abrirPanel(item: ProductoLote, modo: "vincular" | "nuevo") {
+    setPanelAbierto(prev => ({ ...prev, [item.producto_id]: modo }));
+    if (modo === "nuevo") {
+      setFormNuevo(prev => ({
+        ...prev,
+        [item.producto_id]: prev[item.producto_id] ?? {
+          codigo: String(catalogo.reduce((max, p) => Math.max(max, p.codigo), 0) + 1),
+          nombre: item.nombre,
+          precio: String(item.costoUnitario ?? 0),
+        },
+      }));
+    }
+  }
+
+  function cerrarPanel(item: ProductoLote) {
+    setPanelAbierto(prev => { const n = { ...prev }; delete n[item.producto_id]; return n; });
+  }
+
+  // Vincula un ítem no reconocido a un producto existente del catálogo — guarda el alias
+  // permanentemente para que la próxima vez que aparezca ese mismo texto se reconozca solo.
+  async function vincularExistente(item: ProductoLote, elegido: PrecioProducto) {
+    const claveAlias = item.producto_id; // mientras no reconocido, ES toProductoId(texto detectado)
+    try {
+      await setDoc(doc(db, "alias_productos", claveAlias), {
+        producto_id:    elegido.producto_id,
+        nombreCanonico: elegido.nombre,
+        textoOriginal:  item.nombre,
+        creadoPor:      profile?.nombre ?? "Encargado",
+        creadoEn:       serverTimestamp(),
+      });
+      const nuevosAliases = { ...aliases, [claveAlias]: elegido.producto_id };
+      setAliases(nuevosAliases);
+      reresolverPendientes(catalogo, nuevosAliases);
+      cerrarPanel(item);
+    } catch {
+      setMsg({ type: "err", text: "No se pudo guardar la relación. Intenta de nuevo." });
+    }
+  }
+
+  // Registra un producto genuinamente nuevo en config/precios (vía endpoint server-side,
+  // el Encargado no tiene permiso de escritura directo ahí) y re-resuelve lo pendiente.
+  async function registrarProductoNuevo(item: ProductoLote) {
+    const form = formNuevo[item.producto_id];
+    if (!form) return;
+    const codigo = parseInt(form.codigo, 10);
+    const precio = parseFloat(form.precio);
+    if (!form.nombre.trim() || !Number.isFinite(codigo) || codigo <= 0 || !Number.isFinite(precio) || precio < 0) {
+      setMsg({ type: "err", text: "Completa código, nombre y precio válidos para el producto nuevo." });
+      return;
+    }
+    setGuardandoNuevo(item.producto_id);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Sesión inválida, vuelve a iniciar sesión.");
+      const res = await fetch("/api/registrar-producto-nuevo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, codigo, nombre: form.nombre.trim(), precio }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error ?? "Error al registrar el producto.");
+      const catalogoActualizado: PrecioProducto[] = data.catalogo;
+      setCatalogo(catalogoActualizado);
+      reresolverPendientes(catalogoActualizado, aliases);
+      cerrarPanel(item);
+      setMsg({ type: "ok", text: `Producto "${form.nombre.trim()}" registrado en el catálogo.` });
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Error al registrar el producto." });
+    } finally {
+      setGuardandoNuevo(null);
+    }
   }
 
   async function analizarFactura() {
@@ -328,6 +433,10 @@ export default function RegistroLote() {
   async function guardar() {
     if (items.length === 0) {
       setMsg({ type: "err", text: "Agrega al menos un producto." });
+      return;
+    }
+    if (items.some(i => !i.reconocido)) {
+      setMsg({ type: "err", text: "Hay productos no reconocidos — resuélvelos antes de guardar el lote." });
       return;
     }
     setGuardando(true);
@@ -435,8 +544,20 @@ export default function RegistroLote() {
     return `https://wa.me/${waNum.replace(/\D/g, "")}?text=${encodeURIComponent(lines)}`;
   }
 
+  const hayNoReconocidos = items.some(i => !i.reconocido);
+
   return (
     <div className="space-y-4 max-w-lg mx-auto">
+
+      {/* Banner de alerta — no se puede cerrar, solo desaparece cuando todo queda resuelto */}
+      {hayNoReconocidos && (
+        <div className="sticky top-0 z-30 bg-red-600 text-white px-4 py-2.5 rounded-xl shadow-lg
+          flex items-center gap-2 text-sm font-bold">
+          <span className="text-lg flex-shrink-0">⚠️</span>
+          <span>Hay productos no reconocidos en la lista — resuélvelos (vincula o registra como
+            nuevos) antes de poder guardar el lote.</span>
+        </div>
+      )}
 
       {/* Escáner por cámara */}
       {showCamera && (
@@ -782,11 +903,15 @@ export default function RegistroLote() {
               </p>
               {items.map((it, idx) => (
                 <div key={it.producto_id}
-                  className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5"
+                  className={it.reconocido
+                    ? "bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5"
+                    : "bg-red-50 border-2 border-red-300 rounded-xl px-3 py-2.5"}
                 >
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-emerald-900 truncate flex-1 min-w-0">{it.nombre}</p>
-                    <span className="text-xs font-bold text-emerald-700 tabular-nums flex-shrink-0">
+                    <p className={`text-sm font-medium truncate flex-1 min-w-0 ${
+                      it.reconocido ? "text-emerald-900" : "text-red-900"}`}>{it.nombre}</p>
+                    <span className={`text-xs font-bold tabular-nums flex-shrink-0 ${
+                      it.reconocido ? "text-emerald-700" : "text-red-700"}`}>
                       {it.total} uds
                     </span>
                     <button
@@ -798,6 +923,12 @@ export default function RegistroLote() {
                       ×
                     </button>
                   </div>
+                  {!it.reconocido && (
+                    <span className="inline-block text-[11px] font-bold text-red-700 bg-red-100
+                      border border-red-200 rounded-full px-2 py-0.5 mt-1">
+                      <span className="pb-icon-pulse inline-block">⚠️</span> No reconocido
+                    </span>
+                  )}
                   <div className="flex flex-wrap items-end gap-1.5 mt-2">
                     <label className="flex flex-col">
                       <span className="text-[10px] text-gray-400 mb-0.5">cajas</span>
@@ -846,6 +977,109 @@ export default function RegistroLote() {
                       ${it.costoUnitario.toFixed(2)}/ud · ${(it.costoUnitario * it.total).toFixed(2)} total
                     </p>
                   )}
+
+                  {/* ── Resolución de "no reconocido": vincular a existente o registrar nuevo ── */}
+                  {!it.reconocido && (
+                    <div className="mt-2 pt-2 border-t border-red-200">
+                      {!panelAbierto[it.producto_id] && (
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => abrirPanel(it, "vincular")}
+                            className="flex-1 text-xs font-semibold bg-white border border-red-300
+                              text-red-700 rounded-lg py-1.5 active:scale-95 transition-all"
+                          >
+                            🔗 Vincular a existente
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => abrirPanel(it, "nuevo")}
+                            className="flex-1 text-xs font-semibold bg-red-600 text-white
+                              rounded-lg py-1.5 active:scale-95 transition-all"
+                          >
+                            🆕 Registrar nuevo
+                          </button>
+                        </div>
+                      )}
+
+                      {panelAbierto[it.producto_id] === "vincular" && (
+                        <div className="space-y-1.5">
+                          <select
+                            defaultValue=""
+                            onChange={(e) => {
+                              const elegido = catalogo.find(p => p.producto_id === e.target.value);
+                              if (elegido) vincularExistente(it, elegido);
+                            }}
+                            className="w-full border border-red-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                          >
+                            <option value="" disabled>Selecciona el producto correcto…</option>
+                            {catalogo.map(p => (
+                              <option key={p.producto_id} value={p.producto_id}>{p.nombre}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => cerrarPanel(it)}
+                            className="text-xs text-gray-500 hover:text-gray-700"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      )}
+
+                      {panelAbierto[it.producto_id] === "nuevo" && formNuevo[it.producto_id] && (
+                        <div className="space-y-1.5">
+                          <div className="flex gap-1.5">
+                            <input
+                              value={formNuevo[it.producto_id].codigo}
+                              onChange={(e) => setFormNuevo(prev => ({ ...prev,
+                                [it.producto_id]: { ...prev[it.producto_id], codigo: e.target.value } }))}
+                              placeholder="Código" inputMode="numeric"
+                              className="w-16 border border-red-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                            />
+                            <input
+                              value={formNuevo[it.producto_id].nombre}
+                              onChange={(e) => setFormNuevo(prev => ({ ...prev,
+                                [it.producto_id]: { ...prev[it.producto_id], nombre: e.target.value } }))}
+                              placeholder="Nombre del producto"
+                              className="flex-1 border border-red-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                            />
+                          </div>
+                          <div className="flex gap-1.5 items-center">
+                            <input
+                              value={formNuevo[it.producto_id].precio}
+                              onChange={(e) => setFormNuevo(prev => ({ ...prev,
+                                [it.producto_id]: { ...prev[it.producto_id], precio: e.target.value } }))}
+                              placeholder="Precio" type="number" min="0" step="0.01"
+                              className="w-24 border border-red-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                            />
+                            <span className="text-[11px] text-gray-400 flex-1">
+                              provisional — Admin lo puede ajustar en Configuración
+                            </span>
+                          </div>
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => registrarProductoNuevo(it)}
+                              disabled={guardandoNuevo === it.producto_id}
+                              className="flex-1 text-xs font-bold bg-red-600 text-white rounded-lg py-1.5
+                                active:scale-95 transition-all disabled:opacity-50"
+                            >
+                              {guardandoNuevo === it.producto_id ? "Guardando…" : "✓ Confirmar producto nuevo"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => cerrarPanel(it)}
+                              disabled={guardandoNuevo === it.producto_id}
+                              className="text-xs text-gray-500 hover:text-gray-700 px-2"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -891,7 +1125,7 @@ export default function RegistroLote() {
 
           <button
             onClick={guardar}
-            disabled={guardando || items.length === 0}
+            disabled={guardando || items.length === 0 || hayNoReconocidos}
             className="w-full bg-gradient-to-r from-emerald-600 to-emerald-800 hover:from-emerald-500
               hover:to-emerald-700 text-white font-bold py-3 rounded-xl text-sm transition-all
               duration-100 active:scale-95 disabled:opacity-60"

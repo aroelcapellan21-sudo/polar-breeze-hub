@@ -66,6 +66,16 @@ input, textarea, select {
   .pb-alarm { animation: none; background-color: rgba(212, 43, 43, 0.18); }
 }
 
+/* ── Ícono "no reconocido" (Registro de Lote): pulso suave y lento en opacidad ── */
+@keyframes pb-icon-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+.pb-icon-pulse { animation: pb-icon-pulse 2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .pb-icon-pulse { animation: none; }
+}
+
 /* ── Impresión: ocultar UI chrome, mostrar solo el contenido ──────────── */
 /* Aplica a CUALQUIER impresión (FAB o Ctrl+P nativo). El FAB inyecta además
    estilos por modo (factura/tabla/normal) encima de estas reglas base.
