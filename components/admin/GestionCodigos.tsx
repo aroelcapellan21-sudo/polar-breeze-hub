@@ -10,11 +10,11 @@
 import { useState, useEffect } from "react";
 import {
   collection, onSnapshot, orderBy, query,
-  doc, setDoc, deleteDoc, serverTimestamp,
+  doc, getDoc, setDoc, deleteDoc, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { CodigoCaja, toDate } from "@/lib/types";
+import { CodigoCaja, PrecioProducto, toDate, resolverProductoEnCatalogo } from "@/lib/types";
 
 interface CodigoCajaDoc extends CodigoCaja {
   id: string;
@@ -29,6 +29,10 @@ export default function GestionCodigos() {
   const [editando,   setEditando]  = useState<CodigoCajaDoc | null>(null);
   const [guardando,  setGuardando] = useState(false);
   const [eliminando, setEliminando] = useState<string | null>(null);
+
+  // Catálogo canónico (config/precios) — solo para sugerir/anclar nombres,
+  // nunca bloquea: si el producto de verdad es nuevo, se guarda tal cual se escribió.
+  const [catalogoPrecios, setCatalogoPrecios] = useState<PrecioProducto[]>([]);
 
   // Form state
   const [fCodigo,   setFCodigo]   = useState("");
@@ -46,6 +50,12 @@ export default function GestionCodigos() {
       }
     );
     return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "precios")).then((snap) => {
+      if (snap.exists()) setCatalogoPrecios((snap.data().productos as PrecioProducto[]) ?? []);
+    }).catch(() => { /* sin catálogo → los nombres se guardan tal cual se escriban */ });
   }, []);
 
   const openNuevo = () => {
@@ -74,9 +84,10 @@ export default function GestionCodigos() {
     setFormMsg(null);
     try {
       const docId = fCodigo.trim();
+      const nombreAnclado = resolverProductoEnCatalogo(fProducto, catalogoPrecios).nombre;
       await setDoc(doc(db, "codigos_cajas", docId), {
         codigo:          docId,
-        producto:        fProducto.trim(),
+        producto:        nombreAnclado,
         unidadesPorCaja: fUnids,
         pesoCajaKg:      fPeso ? parseFloat(fPeso) : null,
         creadoPor:       profile?.nombre ?? "Admin",
@@ -166,9 +177,15 @@ export default function GestionCodigos() {
                   value={fProducto}
                   onChange={(e) => setFProducto(e.target.value)}
                   placeholder="Ej. Paleta Chocolate 90ml"
+                  list="catalogo-precios-codigos"
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm
                     text-gray-800 outline-none focus:ring-2 focus:ring-[#F5C800]"
                 />
+                <datalist id="catalogo-precios-codigos">
+                  {catalogoPrecios.map((p) => (
+                    <option key={p.producto_id} value={p.nombre} />
+                  ))}
+                </datalist>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
