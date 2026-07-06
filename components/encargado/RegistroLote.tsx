@@ -6,7 +6,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { PuntoProducto, LoteLoker, ProductoItem, toProductoId, toDate, resolverProductoEnCatalogo } from "@/lib/types";
+import { PrecioProducto, LoteLoker, ProductoItem, toProductoId, toDate, resolverProductoEnCatalogo } from "@/lib/types";
 import CameraScanner from "@/components/shared/CameraScanner";
 import { ImageUploader, AiButton } from "@/components/despachador/shared";
 
@@ -42,7 +42,7 @@ function fechaAStamp(fechaISO: string): Timestamp {
 export default function RegistroLote() {
   const { profile } = useAuth();
 
-  const [catalogo,    setCatalogo]    = useState<PuntoProducto[]>([]);
+  const [catalogo,    setCatalogo]    = useState<PrecioProducto[]>([]);
   const [selProd,     setSelProd]     = useState("");
   const [busqueda,    setBusqueda]    = useState("");
   const [showDrop,    setShowDrop]    = useState(false);
@@ -121,10 +121,10 @@ export default function RegistroLote() {
       setConvMap({ ...base, ...overrides });
     }).catch(() => { /* sin conversión → default 1 */ });
 
-    getDoc(doc(db, "config", "puntos")).then((snap) => {
+    getDoc(doc(db, "config", "precios")).then((snap) => {
       if (snap.exists()) {
         const d = snap.data();
-        const prods: PuntoProducto[] = d.productos ?? [];
+        const prods: PrecioProducto[] = d.productos ?? [];
         setCatalogo(prods);
         setCatalogoErr(prods.length === 0 ? "El catálogo está vacío. Pide al Admin que agregue productos." : null);
         if (prods.length > 0) {
@@ -132,7 +132,7 @@ export default function RegistroLote() {
           setBusqueda(prods[0].nombre);
         }
       } else {
-        setCatalogoErr("No existe el catálogo (config/puntos). Pide al Admin que lo configure.");
+        setCatalogoErr("No existe el catálogo (config/precios). Pide al Admin que lo configure.");
       }
     }).catch((e) => {
       setCatalogoErr(
