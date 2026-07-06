@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  collection, query, orderBy, onSnapshot, addDoc, getDocs, Timestamp, where,
+  collection, query, orderBy, onSnapshot, addDoc, getDocs, getDoc, doc, Timestamp, where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import {
-  MovimientoLoker, TalonarioDoc, LoteLoker, NotaCredito, toDate, fmtDate, toProductoId,
+  MovimientoLoker, TalonarioDoc, LoteLoker, NotaCredito, PrecioProducto,
+  toDate, fmtDate, resolverProductoEnCatalogo,
 } from "@/lib/types";
 import { ShareBar }           from "@/components/shared/ShareButtons";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
@@ -73,6 +74,10 @@ export default function Inventario() {
   const [talonarioHoy, setTalonarioHoy] = useState<TalonarioDoc[]>([]);
   const [cargando,     setCargando]     = useState(true);
   const [stockError,   setStockError]   = useState<string | null>(null);
+
+  // Catálogo canónico (config/precios) — solo para sugerir/anclar nombres,
+  // nunca bloquea: si el producto de verdad es nuevo, se guarda tal cual se escribió.
+  const [catalogoPrecios, setCatalogoPrecios] = useState<PrecioProducto[]>([]);
 
   // Form state
   const [tipo,      setTipo]      = useState<TipoLoker>("entrada_interior");
@@ -174,6 +179,13 @@ export default function Inventario() {
     return onSnapshot(q, (snap) => {
       setNotasCredito(snap.docs.map((d) => ({ id: d.id, ...d.data() } as NotaCredito)));
     }, () => setNotasCredito([]));
+  }, []);
+
+  // ── Catálogo canónico (config/precios), para sugerir/anclar nombres ──────
+  useEffect(() => {
+    getDoc(doc(db, "config", "precios")).then((snap) => {
+      if (snap.exists()) setCatalogoPrecios((snap.data().productos as PrecioProducto[]) ?? []);
+    }).catch(() => { /* sin catálogo → los nombres se guardan tal cual se escriban */ });
   }, []);
 
   // ── Movimientos de hoy ────────────────────────────────────────────────────
@@ -416,9 +428,9 @@ export default function Inventario() {
     const cant = parseInt(ncCantidad) || 0;
     if (!ncNombre.trim() || cant <= 0) return;
     const costo = parseFloat(ncCosto) || null;
+    const resuelto = resolverProductoEnCatalogo(ncNombre, catalogoPrecios);
     setNcItems((prev) => {
-      const pid = toProductoId(ncNombre.trim());
-      const idx = prev.findIndex((i) => i.producto_id === pid);
+      const idx = prev.findIndex((i) => i.producto_id === resuelto.producto_id);
       if (idx >= 0) {
         return prev.map((it, i) => {
           if (i !== idx) return it;
@@ -434,7 +446,7 @@ export default function Inventario() {
         });
       }
       return [...prev, {
-        nombre: ncNombre.trim(), producto_id: pid, cantidad: cant,
+        nombre: resuelto.nombre, producto_id: resuelto.producto_id, cantidad: cant,
         ...(costo != null ? { costoUnitario: costo, subtotal: costo * cant } : {}),
       }];
     });
@@ -501,10 +513,11 @@ export default function Inventario() {
     setMsg(null);
     const cfg  = TIPO_CFG[tipo];
     const sign = cfg.sign !== 0 ? cfg.sign : (ajustePos ? 1 : -1);
+    const resuelto = resolverProductoEnCatalogo(nombre, catalogoPrecios);
     const mov: Omit<MovimientoLoker, "id"> = {
       tipo,
-      producto_id: toProductoId(nombre),
-      nombre:      nombre.trim(),
+      producto_id: resuelto.producto_id,
+      nombre:      resuelto.nombre,
       cantidad:    sign * qty,
       responsable: profile?.nombre ?? "—",
       timestamp:   Timestamp.now(),
@@ -1587,9 +1600,15 @@ export default function Inventario() {
                       value={ncNombre}
                       onChange={(e) => setNcNombre(e.target.value)}
                       placeholder="Nombre del producto"
+                      list="catalogo-precios-nc"
                       className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm
                         outline-none focus:ring-2 focus:ring-red-300"
                     />
+                    <datalist id="catalogo-precios-nc">
+                      {catalogoPrecios.map((p) => (
+                        <option key={p.producto_id} value={p.nombre} />
+                      ))}
+                    </datalist>
                     <input
                       type="number" min={1}
                       value={ncCantidad}
@@ -1746,9 +1765,15 @@ export default function Inventario() {
                   type="text" value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   placeholder="Ej. Helado de fresa"
+                  list="catalogo-precios-mov"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
                     focus:outline-none focus:ring-2 focus:ring-[#F5C800]"
                 />
+                <datalist id="catalogo-precios-mov">
+                  {catalogoPrecios.map((p) => (
+                    <option key={p.producto_id} value={p.nombre} />
+                  ))}
+                </datalist>
               </div>
 
               <div>
