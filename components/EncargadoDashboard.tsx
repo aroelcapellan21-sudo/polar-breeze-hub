@@ -313,7 +313,7 @@ export default function EncargadoDashboard() {
               <button
                 type="button"
                 onClick={() => setLoteVista("entrada")}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
+                className={`flex-1 py-2 rounded-lg text-xs font-bold truncate transition-all ${
                   loteVista === "entrada"
                     ? "bg-blue-600 text-white shadow-sm"
                     : "text-gray-500 hover:bg-gray-50"
@@ -324,24 +324,24 @@ export default function EncargadoDashboard() {
               <button
                 type="button"
                 onClick={() => setLoteVista("salida")}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
+                className={`flex-1 py-2 rounded-lg text-xs font-bold truncate transition-all ${
                   loteVista === "salida"
                     ? "bg-[#D42B2B] text-white shadow-sm"
                     : "text-gray-500 hover:bg-gray-50"
                 }`}
               >
-                📤 Salida (Picking)
+                📤 Salida
               </button>
               <button
                 type="button"
                 onClick={() => setLoteVista("choferes")}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${
+                className={`flex-1 py-2 rounded-lg text-xs font-bold truncate transition-all ${
                   loteVista === "choferes"
                     ? "bg-[#1E8C3A] text-white shadow-sm"
                     : "text-gray-500 hover:bg-gray-50"
                 }`}
               >
-                📋 Inv. Choferes
+                📋 Choferes
               </button>
             </div>
             {loteVista === "entrada"

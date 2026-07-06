@@ -84,19 +84,19 @@ export default function InventarioChoferesAjuste({ chofer }: Props) {
           <div className="divide-y divide-gray-50">
             {filas.map((f) => (
               <div key={f.producto_id} className="flex items-center gap-3 px-4 py-3">
-                <p className="flex-1 text-sm font-medium text-gray-800 truncate">{f.nombre}</p>
+                <p className="flex-1 min-w-0 text-sm font-medium text-gray-800 truncate">{f.nombre}</p>
                 <button
                   onClick={() => ajustar(f, -1)}
                   disabled={savingId === f.producto_id || f.cantidad <= 0}
-                  className="w-9 h-9 rounded-lg bg-red-50 text-red-600 font-bold text-lg flex items-center justify-center active:scale-95 hover:bg-red-100 transition-all duration-100 disabled:opacity-40"
+                  className="w-9 h-9 flex-shrink-0 rounded-lg bg-red-50 text-red-600 font-bold text-lg flex items-center justify-center active:scale-95 hover:bg-red-100 transition-all duration-100 disabled:opacity-40"
                 >
                   −
                 </button>
-                <span className="w-8 text-center font-bold text-gray-800 tabular-nums">{f.cantidad}</span>
+                <span className="w-8 flex-shrink-0 text-center text-sm font-bold text-gray-800 tabular-nums">{f.cantidad}</span>
                 <button
                   onClick={() => ajustar(f, 1)}
                   disabled={savingId === f.producto_id}
-                  className="w-9 h-9 rounded-lg bg-green-50 text-green-700 font-bold text-lg flex items-center justify-center active:scale-95 hover:bg-green-100 transition-all duration-100 disabled:opacity-40"
+                  className="w-9 h-9 flex-shrink-0 rounded-lg bg-green-50 text-green-700 font-bold text-lg flex items-center justify-center active:scale-95 hover:bg-green-100 transition-all duration-100 disabled:opacity-40"
                 >
                   +
                 </button>

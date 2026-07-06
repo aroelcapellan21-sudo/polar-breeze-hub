@@ -575,7 +575,7 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
               }`}
             >
               <span className="text-3xl leading-none">{t.emoji}</span>
-              <span className="text-base font-extrabold leading-tight">{t.label}</span>
+              <span className="text-[10px] font-extrabold leading-tight w-full text-center truncate">{t.label}</span>
             </button>
           ))}
         </div>
@@ -1584,17 +1584,17 @@ export default function ChoferDetalle({ chofer, onBack }: Props) {
                             <span className="text-lg flex-shrink-0">{SEM_ICON[p.semaforo]}</span>
                             <div className="flex-1 text-left min-w-0">
                               <p className="font-medium text-sm text-gray-800 truncate">{p.nombre}</p>
-                              <p className="text-xs text-gray-400">{SEM_LABEL[p.semaforo]}</p>
+                              <p className="text-xs text-gray-400 truncate">{SEM_LABEL[p.semaforo]}</p>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <p className="font-bold text-gray-700">{p.balanceCalculado} uds</p>
+                              <p className="text-sm font-bold text-gray-700">{p.balanceCalculado} uds</p>
                               {p.diferencia != null && p.diferencia !== 0 && (
                                 <p className={`text-xs font-semibold ${p.diferencia > 0 ? "text-red-500" : "text-yellow-600"}`}>
                                   {p.diferencia > 0 ? `+${p.diferencia}` : p.diferencia} sin explicar
                                 </p>
                               )}
                             </div>
-                            <span className="text-gray-300 flex-shrink-0">{isOpen ? "▲" : "▼"}</span>
+                            <span className="text-sm text-gray-300 flex-shrink-0">{isOpen ? "▲" : "▼"}</span>
                           </button>
 
                           {isOpen && (
