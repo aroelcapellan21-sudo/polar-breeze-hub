@@ -267,6 +267,25 @@ export function toProductoId(nombre: string): string {
   return nombre.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_áéíóúñü]/g, "");
 }
 
+// Ancla un nombre libre (texto/IA) contra un catálogo — busca match exacto por
+// producto_id, luego parcial (substring en cualquier dirección), y si no hay
+// match devuelve el texto libre tal cual. Evita que nombre y producto_id se
+// calculen por separado y diverjan silenciosamente (bug D-1b en Choferes.tsx).
+export function resolverProductoEnCatalogo<T extends { nombre: string; producto_id?: string }>(
+  nombreLibre: string,
+  catalogo: T[]
+): { nombre: string; producto_id: string; match: T | null } {
+  const idDe = (p: T) => p.producto_id ?? toProductoId(p.nombre);
+  const pid = toProductoId(nombreLibre);
+  if (catalogo.length > 0) {
+    const exacto = catalogo.find((p) => idDe(p) === pid);
+    if (exacto) return { nombre: exacto.nombre, producto_id: idDe(exacto), match: exacto };
+    const parcial = catalogo.find((p) => idDe(p).includes(pid) || pid.includes(idDe(p)));
+    if (parcial) return { nombre: parcial.nombre, producto_id: idDe(parcial), match: parcial };
+  }
+  return { nombre: nombreLibre.trim(), producto_id: pid, match: null };
+}
+
 // ─── Semáforo ─────────────────────────────────────────────────────────────────
 
 export type Semaforo = "verde" | "amarillo" | "rojo";

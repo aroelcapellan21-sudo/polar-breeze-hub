@@ -7,7 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { ProductoItem, UserProfile, FsDriver, FsSession, MovimientoLoker, PrecioProducto, TalonarioDoc, toProductoId, toDate } from "@/lib/types";
+import { ProductoItem, UserProfile, FsDriver, FsSession, MovimientoLoker, PrecioProducto, TalonarioDoc, toDate, resolverProductoEnCatalogo } from "@/lib/types";
 import { pbHeader, pbFooter } from "@/lib/wa-format";
 import { pbPrintDoc, pbTable } from "@/lib/print-template";
 import { ShareBar } from "@/components/shared/ShareButtons";
@@ -183,18 +183,8 @@ export default function Choferes({ onChoferSelect, despachadorActivo }: Props) {
   // antes solo el precio se anclaba al catálogo, el producto_id se
   // recalculaba aparte del texto crudo y podía divergir silenciosamente).
   const resolverProducto = (nombreLibre: string): { nombre: string; producto_id: string; precio: number | null } => {
-    const pid = toProductoId(nombreLibre);
-    if (precios.length > 0) {
-      // Búsqueda exacta
-      const exacto = precios.find((p) => p.producto_id === pid);
-      if (exacto) return { nombre: exacto.nombre, producto_id: exacto.producto_id, precio: exacto.precio };
-      // Búsqueda parcial: el pid del catálogo contiene el pid del nombre buscado
-      const parcial = precios.find(
-        (p) => p.producto_id.includes(pid) || pid.includes(p.producto_id)
-      );
-      if (parcial) return { nombre: parcial.nombre, producto_id: parcial.producto_id, precio: parcial.precio };
-    }
-    return { nombre: nombreLibre.trim(), producto_id: pid, precio: null };
+    const r = resolverProductoEnCatalogo(nombreLibre, precios);
+    return { nombre: r.nombre, producto_id: r.producto_id, precio: r.match?.precio ?? null };
   };
 
   // Busca el precio de un producto en el catálogo (por producto_id normalizado o parcial)
