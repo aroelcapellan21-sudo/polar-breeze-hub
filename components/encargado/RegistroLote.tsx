@@ -6,7 +6,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { PuntoProducto, LoteLoker, ProductoItem, toProductoId, toDate } from "@/lib/types";
+import { PuntoProducto, LoteLoker, ProductoItem, toProductoId, toDate, resolverProductoEnCatalogo } from "@/lib/types";
 import CameraScanner from "@/components/shared/CameraScanner";
 import { ImageUploader, AiButton } from "@/components/despachador/shared";
 
@@ -216,7 +216,7 @@ export default function RegistroLote() {
     }
     setMsg(null);
     const costo  = parseFloat(costoStr) || null;
-    const pid    = toProductoId(prod);
+    const { nombre: prodResuelto, producto_id: pid } = resolverProductoEnCatalogo(prod, catalogo);
     // Si el campo uds/caja quedó vacío, usa la conversión conocida del producto
     const udsCaja = Math.max(1, parseInt(udsCajaStr) || convMap[pid] || 1);
     const total  = cajas * udsCaja + unids;
@@ -230,7 +230,7 @@ export default function RegistroLote() {
           : it
         );
       }
-      return [...prev, { nombre: prod, producto_id: pid, cajas, unidades: unids,
+      return [...prev, { nombre: prodResuelto, producto_id: pid, cajas, unidades: unids,
         unidadesPorCaja: udsCaja, total,
         ...(costo != null ? { costoUnitario: costo } : {}) }];
     });
@@ -268,17 +268,6 @@ export default function RegistroLote() {
     }));
   }
 
-  // Casa un nombre detectado por IA con un producto del catálogo (o lo deja tal cual)
-  function matchCatalogo(nombre: string): string {
-    const q = toProductoId(nombre);
-    const exacto = catalogo.find(p => toProductoId(p.nombre) === q);
-    if (exacto) return exacto.nombre;
-    const parcial = catalogo.find(p =>
-      toProductoId(p.nombre).includes(q) || q.includes(toProductoId(p.nombre))
-    );
-    return parcial ? parcial.nombre : nombre.trim();
-  }
-
   // Vuelca los productos detectados en la factura a la lista del lote (editable)
   function aplicarDetectados(detectados: ProductoItem[]) {
     let agregados = 0;
@@ -286,8 +275,7 @@ export default function RegistroLote() {
       const next = [...prev];
       for (const d of detectados) {
         if (!d?.nombre) continue;
-        const nombre  = matchCatalogo(d.nombre);
-        const pid     = toProductoId(nombre);
+        const { nombre, producto_id: pid } = resolverProductoEnCatalogo(d.nombre, catalogo);
         const cajas   = Math.max(0, Math.round(Number(d.cantidad) || 0));
         if (cajas === 0) continue;
         const udsCaja = Math.max(1, convMap[pid] || 1);
