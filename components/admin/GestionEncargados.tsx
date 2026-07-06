@@ -168,7 +168,7 @@ export default function GestionEncargados() {
         lote.numero,
         lote.facturaEntregada ? "✅ Entregada" : "⏳ Pendiente",
         lote.proveedor ?? "—",
-        lote.productos.map(p => p.nombre.split(" ")[0]).join(", "),
+        lote.productos.map(p => p.nombre).join(", "),
         `<b>+${totalUds}</b>`,
       ];
     });
@@ -541,7 +541,7 @@ export default function GestionEncargados() {
                                 className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200
                                   px-2 py-0.5 rounded-full"
                               >
-                                {p.nombre.split(" ")[0]}
+                                {p.nombre}
                                 {p.cajas > 0    ? ` ${p.cajas}caj`  : ""}
                                 {p.unidades > 0 ? ` ${p.unidades}uds` : ""}
                               </span>

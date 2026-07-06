@@ -1144,7 +1144,7 @@ export default function Inventario() {
                             className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200
                               px-2 py-0.5 rounded-full"
                           >
-                            {p.nombre.split(" ")[0]} {p.cajas > 0 ? `${p.cajas}caj` : ""}{p.cajas > 0 && p.unidades > 0 ? "+" : ""}{p.unidades > 0 ? `${p.unidades}uds` : ""}
+                            {p.nombre} {p.cajas > 0 ? `${p.cajas}caj` : ""}{p.cajas > 0 && p.unidades > 0 ? "+" : ""}{p.unidades > 0 ? `${p.unidades}uds` : ""}
                           </span>
                         ))}
                       </div>
@@ -1692,7 +1692,7 @@ export default function Inventario() {
                       {nc.productos.map((p, i) => (
                         <span key={i} className="text-xs bg-red-50 text-red-700 border
                           border-red-100 px-2 py-0.5 rounded-full">
-                          {p.nombre.split(" ")[0]} ×{p.cantidad}
+                          {p.nombre} ×{p.cantidad}
                         </span>
                       ))}
                       {nc.totalMonto != null && nc.totalMonto > 0 && (
