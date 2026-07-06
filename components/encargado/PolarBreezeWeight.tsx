@@ -24,7 +24,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { CodigoCaja, WeightItem, LoteWeight, toDate } from "@/lib/types";
+import { CodigoCaja, WeightItem, LoteWeight, PrecioProducto, toDate, resolverProductoEnCatalogo } from "@/lib/types";
 import CameraScanner from "@/components/shared/CameraScanner";
 
 // ─── Tipos locales ────────────────────────────────────────────────────────────
@@ -89,6 +89,10 @@ export default function PolarBreezeWeight() {
   const [pesoRefNuevo,   setPesoRefNuevo]   = useState("");
   const [guardandoCod,   setGuardandoCod]   = useState(false);
 
+  // Catálogo canónico (config/precios) — solo para sugerir/anclar nombres,
+  // nunca bloquea: si el producto de verdad es nuevo, se guarda tal cual se escribió.
+  const [catalogoPrecios, setCatalogoPrecios] = useState<PrecioProducto[]>([]);
+
   // ── Báscula Bluetooth ─────────────────────────────────────────────────────
   const [btEstado,      setBtEstado]      = useState<BtEstado>("desconectado");
   const [btNombreDisp,  setBtNombreDisp]  = useState("");
@@ -116,6 +120,13 @@ export default function PolarBreezeWeight() {
       setTimeout(() => scanInputRef.current?.focus(), 100);
     }
   }, [seccion, modalNombrar, itemPendiente]);
+
+  // ─── Catálogo canónico (config/precios), para sugerir/anclar nombres ─────
+  useEffect(() => {
+    getDoc(doc(db, "config", "precios")).then((snap) => {
+      if (snap.exists()) setCatalogoPrecios((snap.data().productos as PrecioProducto[]) ?? []);
+    }).catch(() => { /* sin catálogo → los nombres se guardan tal cual se escriban */ });
+  }, []);
 
   // ─── Cargar historial al cambiar de sección ───────────────────────────────
   useEffect(() => {
@@ -243,9 +254,12 @@ export default function PolarBreezeWeight() {
     if (!nombreNuevo.trim() || !unidadesNuevo) return;
     setGuardandoCod(true);
     try {
+      // Si el nombre escrito matchea (exacto o parcial) contra config/precios, se guarda
+      // el nombre canónico; si de verdad es un producto nuevo, se guarda tal cual se escribió.
+      const nombreAnclado = resolverProductoEnCatalogo(nombreNuevo, catalogoPrecios).nombre;
       const nuevoCodigo: CodigoCaja = {
         codigo:          codigoNuevo,
-        producto:        nombreNuevo.trim(),
+        producto:        nombreAnclado,
         unidadesPorCaja: parseInt(unidadesNuevo) || 1,
         ...(pesoRefNuevo ? { pesoCajaKg: parseFloat(pesoRefNuevo) } : {}),
         creadoEn:        Timestamp.now(),
@@ -333,10 +347,11 @@ export default function PolarBreezeWeight() {
 
       // También registrar cada ítem como entrada_interior en movimientos_loker
       for (const item of loteItems) {
+        const resuelto = resolverProductoEnCatalogo(item.producto, catalogoPrecios);
         await addDoc(collection(db, "movimientos_loker"), {
           tipo:        "entrada_interior",
-          producto_id: item.producto.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_áéíóúñü]/g, ""),
-          nombre:      item.producto,
+          producto_id: resuelto.producto_id,
+          nombre:      resuelto.nombre,
           cantidad:    item.unidades,
           responsable: profile?.nombre ?? "Encargado",
           timestamp:   Timestamp.now(),
@@ -955,9 +970,18 @@ export default function PolarBreezeWeight() {
                   onChange={(e) => setNombreNuevo(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && nombreNuevo.trim() && guardarCodigoNuevo()}
                   placeholder="Ej: Paleta Chocolate Grande"
+                  list="catalogo-precios-sugerencias"
                   className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl text-sm
                     outline-none focus:ring-2 focus:ring-[#F5C800] focus:border-[#F5C800]"
                 />
+                <datalist id="catalogo-precios-sugerencias">
+                  {catalogoPrecios.map((p) => (
+                    <option key={p.producto_id} value={p.nombre} />
+                  ))}
+                </datalist>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Si ya existe en el catálogo, elige la sugerencia — si es un producto nuevo, escríbelo tal cual.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
