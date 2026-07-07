@@ -1,0 +1,371 @@
+"use client";
+
+import { useState } from "react";
+import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
+import { FacturaProveedorLinea, FacturaProveedorTotales } from "@/lib/types";
+import { ImageUploader, AiButton } from "@/components/despachador/shared";
+
+const TOTALES_VACIOS: FacturaProveedorTotales = {
+  valorBruto: 0, totalDescuento: 0, subtotalGravado: 0, subtotalExento: 0,
+  totalItbis: 0, valorTotal: 0, valorAPagar: 0,
+};
+
+const CAMPOS_TOTALES: { key: keyof FacturaProveedorTotales; label: string }[] = [
+  { key: "valorBruto",      label: "Valor bruto"       },
+  { key: "totalDescuento",  label: "Total descuento"   },
+  { key: "subtotalGravado", label: "Subtotal gravado"  },
+  { key: "subtotalExento",  label: "Subtotal exento"   },
+  { key: "totalItbis",      label: "Total ITBIS"       },
+  { key: "valorTotal",      label: "Valor total"       },
+  { key: "valorAPagar",     label: "Valor a pagar"     },
+];
+
+function fmtRD(n: number): string {
+  return `RD$ ${n.toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Fila incompleta = código Y descripción en blanco (aunque tenga cantidad/precio/total)
+function lineaIncompleta(l: FacturaProveedorLinea): boolean {
+  return !l.codigo.trim() && !l.descripcion.trim();
+}
+
+export default function FacturaProveedor() {
+  const { profile } = useAuth();
+
+  const [imgFactura,    setImgFactura]    = useState<{ base64: string; mimeType: string } | null>(null);
+  const [preview,       setPreview]       = useState<string | null>(null);
+  const [analizando,    setAnalizando]    = useState(false);
+  const [guardando,     setGuardando]     = useState(false);
+  const [msg,           setMsg]           = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  const [proveedor,     setProveedor]     = useState("");
+  const [numeroFactura, setNumeroFactura] = useState("");
+  const [lineas,        setLineas]        = useState<FacturaProveedorLinea[]>([]);
+  const [totales,       setTotales]       = useState<FacturaProveedorTotales>(TOTALES_VACIOS);
+  const [guardado,      setGuardado]      = useState<{ numeroFactura?: string; revisarManualmente: boolean } | null>(null);
+
+  const sumaLineas = lineas.reduce((s, l) => s + (l.valorTotalConItbis || 0), 0);
+  const diferencia = Math.abs(sumaLineas - totales.valorTotal);
+  const revisarManualmente = lineas.length > 0 && diferencia > 1;
+  const hayIncompletas = lineas.some(lineaIncompleta);
+
+  const flash = (type: "ok" | "err", text: string) => {
+    setMsg({ type, text });
+    setTimeout(() => setMsg(null), 5000);
+  };
+
+  async function analizar() {
+    if (!imgFactura) return;
+    setAnalizando(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: "factura_proveedor", imageBase64: imgFactura.base64, mimeType: imgFactura.mimeType }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const lin: FacturaProveedorLinea[] = Array.isArray(data.lineas)
+        ? data.lineas.map((l: Record<string, unknown>) => ({
+            codigo:             String(l.codigo ?? ""),
+            descripcion:        String(l.descripcion ?? ""),
+            cantidad:           Number(l.cantidad) || 0,
+            precioUnitario:     Number(l.precioUnitario) || 0,
+            valorTotalConItbis: Number(l.valorTotalConItbis) || 0,
+          }))
+        : [];
+      if (lin.length === 0) {
+        flash("err", "No se detectaron líneas. Intenta con otra foto.");
+        return;
+      }
+      const t = data.totales_factura ?? {};
+      setLineas(lin);
+      setTotales({
+        valorBruto:      Number(t.valorBruto) || 0,
+        totalDescuento:  Number(t.totalDescuento) || 0,
+        subtotalGravado: Number(t.subtotalGravado) || 0,
+        subtotalExento:  Number(t.subtotalExento) || 0,
+        totalItbis:      Number(t.totalItbis) || 0,
+        valorTotal:      Number(t.valorTotal) || 0,
+        valorAPagar:     Number(t.valorAPagar) || 0,
+      });
+      if (data.proveedor && typeof data.proveedor === "string" && !proveedor.trim()) setProveedor(data.proveedor);
+      if (data.numeroFactura && typeof data.numeroFactura === "string" && !numeroFactura.trim()) setNumeroFactura(data.numeroFactura);
+      setImgFactura(null); setPreview(null);
+      flash("ok", `Factura analizada: ${lin.length} línea${lin.length !== 1 ? "s" : ""} leídas.`);
+    } catch (e) {
+      flash("err", e instanceof Error ? e.message : "Error al analizar la factura.");
+    } finally {
+      setAnalizando(false);
+    }
+  }
+
+  function editarLinea(idx: number, campo: keyof FacturaProveedorLinea, valor: string) {
+    setLineas(prev => prev.map((l, i) => {
+      if (i !== idx) return l;
+      if (campo === "codigo" || campo === "descripcion") return { ...l, [campo]: valor };
+      return { ...l, [campo]: parseFloat(valor) || 0 };
+    }));
+  }
+
+  function quitarLinea(idx: number) {
+    setLineas(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  function limpiarTodo() {
+    if (lineas.length > 0 && !window.confirm("¿Descartar esta factura sin guardar?")) return;
+    setLineas([]); setTotales(TOTALES_VACIOS);
+    setProveedor(""); setNumeroFactura(""); setMsg(null); setGuardado(null);
+  }
+
+  async function guardar() {
+    if (lineas.length === 0) {
+      flash("err", "Analiza una factura primero.");
+      return;
+    }
+    if (hayIncompletas) {
+      flash("err", "Hay líneas incompletas — completa código/descripción antes de guardar.");
+      return;
+    }
+    setGuardando(true);
+    setMsg(null);
+    try {
+      await addDoc(collection(db, "facturas_proveedor"), {
+        ...(proveedor.trim()     ? { proveedor: proveedor.trim() } : {}),
+        ...(numeroFactura.trim() ? { numeroFactura: numeroFactura.trim() } : {}),
+        lineas,
+        totales,
+        sumaLineas,
+        diferencia,
+        revisarManualmente,
+        registradoPor:   profile?.nombre ?? "Encargado",
+        registradoPorId: profile?.uid    ?? "",
+        timestamp:       Timestamp.now(),
+      });
+      setGuardado({ numeroFactura: numeroFactura.trim() || undefined, revisarManualmente });
+      setLineas([]); setTotales(TOTALES_VACIOS); setProveedor(""); setNumeroFactura("");
+      flash("ok", revisarManualmente ? "Factura guardada — ⚠️ marcada para revisar manualmente." : "Factura guardada correctamente.");
+    } catch (e) {
+      flash("err", e instanceof Error ? e.message : "Error al guardar la factura.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4 max-w-lg mx-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-800">
+          <h2 className="text-white font-bold text-sm">🧾 Recepción de factura de proveedor</h2>
+          <p className="text-blue-200 text-xs mt-0.5">Registro fiscal — no afecta el stock del Loker</p>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Proveedor <span className="text-gray-400 font-normal">(opcional)</span>
+              </label>
+              <input
+                value={proveedor} onChange={(e) => setProveedor(e.target.value)}
+                placeholder="Ej. Helados Bon"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                  focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Nº Factura <span className="text-gray-400 font-normal">(opcional)</span>
+              </label>
+              <input
+                value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value)}
+                placeholder="Ej. B1500012345"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                  focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+
+          {lineas.length === 0 && (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500">
+                Toma o sube una foto de la factura del proveedor. La IA extrae las líneas de
+                producto y el resumen de totales por separado.
+              </p>
+              <ImageUploader
+                preview={preview}
+                onFile={(b, m, p) => { setImgFactura({ base64: b, mimeType: m }); setPreview(p); }}
+                onClear={() => { setImgFactura(null); setPreview(null); }}
+              />
+              <AiButton onClick={analizar} loading={analizando} disabled={!imgFactura} label="Analizar factura" />
+            </div>
+          )}
+
+          {lineas.length > 0 && (
+            <>
+              <div className={`text-sm px-3 py-2 rounded-lg font-medium ${
+                revisarManualmente
+                  ? "bg-red-50 text-red-700 border border-red-200"
+                  : "bg-green-50 text-green-700 border border-green-200"
+              }`}>
+                {revisarManualmente
+                  ? `⚠️ Revisar manualmente — Σ líneas ${fmtRD(sumaLineas)} vs. factura ${fmtRD(totales.valorTotal)} (dif. ${fmtRD(diferencia)})`
+                  : `✓ Los totales cuadran — Σ líneas ${fmtRD(sumaLineas)} = factura ${fmtRD(totales.valorTotal)}`}
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-600">
+                  Líneas de la factura ({lineas.length}):
+                </p>
+                {lineas.map((l, idx) => {
+                  const incompleta = lineaIncompleta(l);
+                  return (
+                    <div key={idx}
+                      className={incompleta
+                        ? "bg-red-50 border-2 border-red-300 rounded-xl px-3 py-2.5"
+                        : "bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5"}
+                    >
+                      <div className="flex gap-1.5 mb-1.5">
+                        <input
+                          value={l.codigo} onChange={(e) => editarLinea(idx, "codigo", e.target.value)}
+                          placeholder="Código"
+                          className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                        />
+                        <input
+                          value={l.descripcion} onChange={(e) => editarLinea(idx, "descripcion", e.target.value)}
+                          placeholder="Descripción"
+                          className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                        />
+                        <button
+                          onClick={() => quitarLinea(idx)}
+                          title="Quitar línea"
+                          className="text-red-400 hover:text-red-600 active:scale-95 transition-all
+                            text-xl leading-none w-7 flex-shrink-0"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      {incompleta && (
+                        <p className="text-[11px] font-bold text-red-700 mb-1.5">
+                          ⚠️ Línea incompleta — completa código/descripción
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-end gap-1.5">
+                        <label className="flex flex-col">
+                          <span className="text-[10px] text-gray-400 mb-0.5">cantidad</span>
+                          <input
+                            type="number" min="0" value={l.cantidad}
+                            onChange={(e) => editarLinea(idx, "cantidad", e.target.value)}
+                            className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                          />
+                        </label>
+                        <label className="flex flex-col">
+                          <span className="text-[10px] text-gray-400 mb-0.5">precio unit.</span>
+                          <input
+                            type="number" min="0" step="0.01" value={l.precioUnitario}
+                            onChange={(e) => editarLinea(idx, "precioUnitario", e.target.value)}
+                            className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                          />
+                        </label>
+                        <label className="flex flex-col">
+                          <span className="text-[10px] text-gray-400 mb-0.5">total c/ITBIS</span>
+                          <input
+                            type="number" min="0" step="0.01" value={l.valorTotalConItbis}
+                            onChange={(e) => editarLinea(idx, "valorTotalConItbis", e.target.value)}
+                            className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="text-xs font-semibold text-gray-600 mb-2">Resumen de totales</p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
+                  {CAMPOS_TOTALES.map(({ key, label }) => (
+                    <label key={key} className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-gray-500">{label}</span>
+                      <input
+                        type="number" min="0" step="0.01" value={totales[key]}
+                        onChange={(e) => setTotales(prev => ({ ...prev, [key]: parseFloat(e.target.value) || 0 }))}
+                        className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm text-right bg-white"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {msg && (
+            <div className={`text-sm px-3 py-2 rounded-lg ${
+              msg.type === "ok"
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : "bg-red-50 text-red-600 border border-red-200"
+            }`}>
+              {msg.text}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+            <span className="text-xs text-gray-400">Registrado por:</span>
+            <span className="text-sm font-medium text-gray-700">{profile?.nombre ?? "—"}</span>
+          </div>
+
+          {lineas.length > 0 && (
+            <>
+              <button
+                onClick={guardar}
+                disabled={guardando || hayIncompletas}
+                className="w-full bg-gradient-to-r from-emerald-600 to-emerald-800 hover:from-emerald-500
+                  hover:to-emerald-700 text-white font-bold py-3 rounded-xl text-sm transition-all
+                  duration-100 active:scale-95 disabled:opacity-60"
+              >
+                {guardando ? "Guardando…" : hayIncompletas ? "Resuelve las líneas incompletas para guardar" : "💾 Guardar factura"}
+              </button>
+              <button
+                type="button"
+                onClick={limpiarTodo}
+                disabled={guardando}
+                className="w-full py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500
+                  hover:bg-gray-50 hover:text-red-600 active:scale-95 transition-all duration-100 disabled:opacity-60"
+              >
+                Descartar
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {guardado && (
+        <div className="bg-white rounded-xl shadow-sm border border-emerald-200 overflow-hidden">
+          <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-3">
+            <span className="text-2xl">✅</span>
+            <div>
+              <p className="font-bold text-emerald-800">
+                Factura{guardado.numeroFactura ? ` ${guardado.numeroFactura}` : ""} registrada
+              </p>
+              <p className="text-xs text-emerald-600">
+                {guardado.revisarManualmente ? "⚠️ Marcada para revisar manualmente" : "Totales cuadraron correctamente"}
+              </p>
+            </div>
+          </div>
+          <div className="p-4">
+            <button
+              onClick={() => setGuardado(null)}
+              className="w-full py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600
+                hover:bg-gray-50 active:scale-95 transition-all duration-100"
+            >
+              Registrar otra factura
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

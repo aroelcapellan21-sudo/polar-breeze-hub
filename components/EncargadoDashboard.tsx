@@ -18,6 +18,7 @@ import ConsultarTablaModal from "@/components/shared/ConsultarTablaModal";
 import RolePill            from "@/components/shared/RolePill";
 import PWAInstallBanner    from "@/components/shared/PWAInstallBanner";
 import PolarBreezeHTML     from "@/components/encargado/PolarBreezeHTML";
+import FacturaProveedor    from "@/components/encargado/FacturaProveedor";
 import BuscadorGlobal      from "@/components/encargado/BuscadorGlobal";
 import AsistenteAI         from "@/components/shared/AsistenteAI";
 import SyncSheetsPanel     from "@/components/shared/SyncSheetsPanel";
@@ -25,7 +26,7 @@ import WelcomeBanner       from "@/components/shared/WelcomeBanner";
 import AvisoAreaBanner     from "@/components/shared/AvisoAreaBanner";
 import SideNavDrawer, { NavSection } from "@/components/shared/SideNavDrawer";
 
-type Tab = "lote" | "guardados" | "weight" | "stock" | "urgente" | "reposicion" | "choferes" | "vista";
+type Tab = "lote" | "guardados" | "weight" | "stock" | "urgente" | "reposicion" | "choferes" | "vista" | "facturaProveedor";
 
 // Gradiente tricolor Polar Breeze (aplicado en todos los dashboards)
 const HEADER_BG = "linear-gradient(90deg, rgba(245,200,0,0.55) 0% 33.33%, rgba(212,43,43,0.55) 33.33% 66.66%, rgba(30,140,58,0.55) 66.66% 100%), #1A1A1A";
@@ -176,6 +177,7 @@ export default function EncargadoDashboard() {
     { key: "reposicion", icon: "♻️", label: "Reposición" },
     { key: "choferes", icon: "👥", label: "Choferes" },
     { key: "vista",    icon: "🧊", label: "Vista"    },
+    { key: "facturaProveedor", icon: "🧾", label: "Factura Prov." },
   ];
 
   const BREADCRUMB: Record<Tab, string> = {
@@ -187,6 +189,7 @@ export default function EncargadoDashboard() {
     reposicion: "♻️ Reposición — sugerencias según stock vs. mínimo · pedido a BON",
     choferes: "👥 Inventario de Choferes — cierre del día · puntos quincena",
     vista:    "🧊 Vista — polar-breeze-final.html integrado",
+    facturaProveedor: "🧾 Factura de proveedor — recepción fiscal (registro, no afecta el loker)",
   };
 
   // Deep-link desde los shortcuts del manifest PWA (?tab=...) — comportamiento nativo
@@ -482,6 +485,7 @@ export default function EncargadoDashboard() {
 
         {/* Tab Vista — polar-breeze-final.html */}
         {tab === "vista" && <PolarBreezeHTML />}
+        {tab === "facturaProveedor" && <FacturaProveedor />}
       </main>
 
       {/* ── Menú lateral de navegación ── */}
