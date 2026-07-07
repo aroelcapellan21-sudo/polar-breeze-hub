@@ -12,6 +12,24 @@ const TOTALES_VACIOS: FacturaProveedorTotales = {
   totalItbis: 0, valorTotal: 0, valorAPagar: 0,
 };
 
+// Línea en edición: los campos numéricos se guardan como texto MIENTRAS SE EDITA
+// (nunca se fuerza a número en cada tecla) — así el campo no se "traba" en "0"
+// ni se come el primer dígito al borrar. Solo se convierte a número al calcular
+// (sumaLineas, validación) o al guardar. `uid` es una key estable, independiente
+// de la posición en el arreglo, para que React nunca pierda el foco al reordenar.
+interface LineaEdit {
+  uid:                string;
+  codigo:             string;
+  descripcion:        string;
+  cantidad:           string;
+  precioUnitario:     string;
+  valorTotalConItbis: string;
+}
+
+function numVal(s: string): number {
+  return parseFloat(s) || 0;
+}
+
 const CAMPOS_TOTALES: { key: keyof FacturaProveedorTotales; label: string }[] = [
   { key: "valorBruto",      label: "Valor bruto"       },
   { key: "totalDescuento",  label: "Total descuento"   },
@@ -27,7 +45,7 @@ function fmtRD(n: number): string {
 }
 
 // Fila incompleta = código Y descripción en blanco (aunque tenga cantidad/precio/total)
-function lineaIncompleta(l: FacturaProveedorLinea): boolean {
+function lineaIncompleta(l: LineaEdit): boolean {
   return !l.codigo.trim() && !l.descripcion.trim();
 }
 
@@ -42,11 +60,11 @@ export default function FacturaProveedor() {
 
   const [proveedor,     setProveedor]     = useState("");
   const [numeroFactura, setNumeroFactura] = useState("");
-  const [lineas,        setLineas]        = useState<FacturaProveedorLinea[]>([]);
+  const [lineas,        setLineas]        = useState<LineaEdit[]>([]);
   const [totales,       setTotales]       = useState<FacturaProveedorTotales>(TOTALES_VACIOS);
   const [guardado,      setGuardado]      = useState<{ numeroFactura?: string; revisarManualmente: boolean } | null>(null);
 
-  const sumaLineas = lineas.reduce((s, l) => s + (l.valorTotalConItbis || 0), 0);
+  const sumaLineas = lineas.reduce((s, l) => s + numVal(l.valorTotalConItbis), 0);
   const diferencia = Math.abs(sumaLineas - totales.valorTotal);
   const revisarManualmente = lineas.length > 0 && diferencia > 1;
   const hayIncompletas = lineas.some(lineaIncompleta);
@@ -68,13 +86,14 @@ export default function FacturaProveedor() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      const lin: FacturaProveedorLinea[] = Array.isArray(data.lineas)
-        ? data.lineas.map((l: Record<string, unknown>) => ({
+      const lin: LineaEdit[] = Array.isArray(data.lineas)
+        ? data.lineas.map((l: Record<string, unknown>, i: number) => ({
+            uid:                `${Date.now()}-${i}`,
             codigo:             String(l.codigo ?? ""),
             descripcion:        String(l.descripcion ?? ""),
-            cantidad:           Number(l.cantidad) || 0,
-            precioUnitario:     Number(l.precioUnitario) || 0,
-            valorTotalConItbis: Number(l.valorTotalConItbis) || 0,
+            cantidad:           String(Number(l.cantidad) || 0),
+            precioUnitario:     String(Number(l.precioUnitario) || 0),
+            valorTotalConItbis: String(Number(l.valorTotalConItbis) || 0),
           }))
         : [];
       if (lin.length === 0) {
@@ -103,16 +122,15 @@ export default function FacturaProveedor() {
     }
   }
 
-  function editarLinea(idx: number, campo: keyof FacturaProveedorLinea, valor: string) {
-    setLineas(prev => prev.map((l, i) => {
-      if (i !== idx) return l;
-      if (campo === "codigo" || campo === "descripcion") return { ...l, [campo]: valor };
-      return { ...l, [campo]: parseFloat(valor) || 0 };
-    }));
+  // Nunca se coacciona a número aquí — se guarda el texto tal cual se escribe,
+  // en cualquier campo (texto o numérico). La conversión a número pasa solo al
+  // calcular (sumaLineas/validación) o al guardar.
+  function editarLinea(uid: string, campo: keyof LineaEdit, valor: string) {
+    setLineas(prev => prev.map(l => l.uid === uid ? { ...l, [campo]: valor } : l));
   }
 
-  function quitarLinea(idx: number) {
-    setLineas(prev => prev.filter((_, i) => i !== idx));
+  function quitarLinea(uid: string) {
+    setLineas(prev => prev.filter(l => l.uid !== uid));
   }
 
   function limpiarTodo() {
@@ -133,10 +151,17 @@ export default function FacturaProveedor() {
     setGuardando(true);
     setMsg(null);
     try {
+      const lineasNumericas: FacturaProveedorLinea[] = lineas.map((l) => ({
+        codigo:             l.codigo,
+        descripcion:        l.descripcion,
+        cantidad:           numVal(l.cantidad),
+        precioUnitario:     numVal(l.precioUnitario),
+        valorTotalConItbis: numVal(l.valorTotalConItbis),
+      }));
       await addDoc(collection(db, "facturas_proveedor"), {
         ...(proveedor.trim()     ? { proveedor: proveedor.trim() } : {}),
         ...(numeroFactura.trim() ? { numeroFactura: numeroFactura.trim() } : {}),
-        lineas,
+        lineas: lineasNumericas,
         totales,
         sumaLineas,
         diferencia,
@@ -220,27 +245,27 @@ export default function FacturaProveedor() {
                 <p className="text-xs font-semibold text-gray-600">
                   Líneas de la factura ({lineas.length}):
                 </p>
-                {lineas.map((l, idx) => {
+                {lineas.map((l) => {
                   const incompleta = lineaIncompleta(l);
                   return (
-                    <div key={idx}
+                    <div key={l.uid}
                       className={incompleta
                         ? "bg-red-50 border-2 border-red-300 rounded-xl px-3 py-2.5"
                         : "bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5"}
                     >
                       <div className="flex gap-1.5 mb-1.5">
                         <input
-                          value={l.codigo} onChange={(e) => editarLinea(idx, "codigo", e.target.value)}
+                          value={l.codigo} onChange={(e) => editarLinea(l.uid, "codigo", e.target.value)}
                           placeholder="Código"
                           className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                         />
                         <input
-                          value={l.descripcion} onChange={(e) => editarLinea(idx, "descripcion", e.target.value)}
+                          value={l.descripcion} onChange={(e) => editarLinea(l.uid, "descripcion", e.target.value)}
                           placeholder="Descripción"
                           className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                         />
                         <button
-                          onClick={() => quitarLinea(idx)}
+                          onClick={() => quitarLinea(l.uid)}
                           title="Quitar línea"
                           className="text-red-400 hover:text-red-600 active:scale-95 transition-all
                             text-xl leading-none w-7 flex-shrink-0"
@@ -257,24 +282,27 @@ export default function FacturaProveedor() {
                         <label className="flex flex-col">
                           <span className="text-[10px] text-gray-400 mb-0.5">cantidad</span>
                           <input
-                            type="number" min="0" value={l.cantidad}
-                            onChange={(e) => editarLinea(idx, "cantidad", e.target.value)}
+                            type="text" inputMode="decimal" value={l.cantidad}
+                            onChange={(e) => editarLinea(l.uid, "cantidad", e.target.value)}
+                            onFocus={(e) => e.target.select()}
                             className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                           />
                         </label>
                         <label className="flex flex-col">
                           <span className="text-[10px] text-gray-400 mb-0.5">precio unit.</span>
                           <input
-                            type="number" min="0" step="0.01" value={l.precioUnitario}
-                            onChange={(e) => editarLinea(idx, "precioUnitario", e.target.value)}
+                            type="text" inputMode="decimal" value={l.precioUnitario}
+                            onChange={(e) => editarLinea(l.uid, "precioUnitario", e.target.value)}
+                            onFocus={(e) => e.target.select()}
                             className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                           />
                         </label>
                         <label className="flex flex-col">
                           <span className="text-[10px] text-gray-400 mb-0.5">total c/ITBIS</span>
                           <input
-                            type="number" min="0" step="0.01" value={l.valorTotalConItbis}
-                            onChange={(e) => editarLinea(idx, "valorTotalConItbis", e.target.value)}
+                            type="text" inputMode="decimal" value={l.valorTotalConItbis}
+                            onChange={(e) => editarLinea(l.uid, "valorTotalConItbis", e.target.value)}
+                            onFocus={(e) => e.target.select()}
                             className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                           />
                         </label>
