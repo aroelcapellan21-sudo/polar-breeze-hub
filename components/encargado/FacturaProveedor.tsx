@@ -75,7 +75,7 @@ export default function FacturaProveedor() {
   const [numeroFactura, setNumeroFactura] = useState("");
   const [lineas,        setLineas]        = useState<LineaEdit[]>([]);
   const [totales,       setTotales]       = useState<TotalesEdit>(TOTALES_VACIOS);
-  const [guardado,      setGuardado]      = useState<{ numeroFactura?: string; revisarManualmente: boolean } | null>(null);
+  const [guardado,      setGuardado]      = useState<{ numeroFactura?: string; revisarManualmente: boolean; totales: FacturaProveedorTotales } | null>(null);
 
   const sumaLineas = lineas.reduce((s, l) => s + numVal(l.valorTotalConItbis), 0);
   const diferencia = Math.abs(sumaLineas - numVal(totales.valorTotal));
@@ -192,7 +192,7 @@ export default function FacturaProveedor() {
         registradoPorId: profile?.uid    ?? "",
         timestamp:       Timestamp.now(),
       });
-      setGuardado({ numeroFactura: numeroFactura.trim() || undefined, revisarManualmente });
+      setGuardado({ numeroFactura: numeroFactura.trim() || undefined, revisarManualmente, totales: totalesNumericos });
       setLineas([]); setTotales(TOTALES_VACIOS); setProveedor(""); setNumeroFactura("");
       flash("ok", revisarManualmente ? "Factura guardada — ⚠️ marcada para revisar manualmente." : "Factura guardada correctamente.");
     } catch (e) {
@@ -413,7 +413,18 @@ export default function FacturaProveedor() {
               </p>
             </div>
           </div>
-          <div className="p-4">
+          <div className="p-4 space-y-1.5">
+            {CAMPOS_TOTALES.map(({ key, label }) => (
+              <div key={key} className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">{label}</span>
+                <span className={`font-semibold tabular-nums ${
+                  key === "valorTotal" || key === "valorAPagar" ? "text-emerald-800" : "text-gray-700"}`}>
+                  {fmtRD(guardado.totales[key])}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="p-4 pt-0">
             <button
               onClick={() => setGuardado(null)}
               className="w-full py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600
