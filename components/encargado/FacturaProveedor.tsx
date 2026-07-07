@@ -104,6 +104,27 @@ function lineaIncompleta(l: LineaEdit): boolean {
   return !l.codigo.trim() && !l.descripcion.trim();
 }
 
+// "＋ más detalles" debe abrirse solo cuando hay algo que revisar en esa línea:
+// descripción vacía, cantidad/precio en 0 o ausentes, el total no cuadra con
+// cantidad×precio (±RD$1), o hay descuento sin precio neto que lo respalde.
+function debeAbrirDetalle(l: LineaEdit): boolean {
+  const cantidad       = numVal(l.cantidad);
+  const precioUnitario = numVal(l.precioUnitario);
+  const totalConItbis  = numVal(l.valorTotalConItbis);
+  const tieneNeto       = l.precioNetoUnitario.trim() !== "" && numVal(l.precioNetoUnitario) !== 0;
+  const precioNeto      = numVal(l.precioNetoUnitario);
+
+  if (!l.descripcion.trim() || cantidad === 0 || precioUnitario === 0) return true;
+
+  const base = tieneNeto ? precioNeto : precioUnitario;
+  if (Math.abs(cantidad * base - totalConItbis) > 1) return true;
+
+  const tieneDescuento = numVal(l.descuentoD1) !== 0 || numVal(l.descuentoD2) !== 0;
+  if (tieneDescuento && !tieneNeto) return true;
+
+  return false;
+}
+
 export default function FacturaProveedor() {
   const { profile } = useAuth();
 
@@ -137,8 +158,8 @@ export default function FacturaProveedor() {
     setEncabezado(prev => ({ ...prev, [campo]: valor }));
   }
 
-  function toggleDetalle(uid: string) {
-    setDetalleAbierto(prev => ({ ...prev, [uid]: !prev[uid] }));
+  function toggleDetalle(uid: string, actual: boolean) {
+    setDetalleAbierto(prev => ({ ...prev, [uid]: !actual }));
   }
 
   const sumaLineas = lineas.reduce((s, l) => s + numVal(l.valorTotalConItbis), 0);
@@ -398,6 +419,7 @@ export default function FacturaProveedor() {
                 </p>
                 {lineas.map((l) => {
                   const incompleta = lineaIncompleta(l);
+                  const detalleVisible = detalleAbierto[l.uid] ?? debeAbrirDetalle(l);
                   return (
                     <div key={l.uid}
                       className={incompleta
@@ -462,12 +484,12 @@ export default function FacturaProveedor() {
 
                       <button
                         type="button"
-                        onClick={() => toggleDetalle(l.uid)}
+                        onClick={() => toggleDetalle(l.uid, detalleVisible)}
                         className="text-[11px] text-blue-600 font-semibold mt-1.5"
                       >
-                        {detalleAbierto[l.uid] ? "− menos detalles" : "＋ más detalles"}
+                        {detalleVisible ? "− menos detalles" : "＋ más detalles"}
                       </button>
-                      {detalleAbierto[l.uid] && (
+                      {detalleVisible && (
                         <div className="flex flex-wrap items-end gap-1.5 mt-1.5 pt-1.5 border-t border-gray-200">
                           <label className="flex flex-col">
                             <span className="text-[10px] text-gray-400 mb-0.5">% desc. D1</span>
