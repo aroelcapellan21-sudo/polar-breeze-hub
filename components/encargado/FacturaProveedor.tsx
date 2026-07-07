@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { FacturaProveedorLinea, FacturaProveedorTotales, PrecioProducto } from "@/lib/types";
 import { ImageUploader, AiButton } from "@/components/despachador/shared";
+import { coincide } from "@/components/shared/BuscadorArea";
 
 const TOTALES_VACIOS: TotalesEdit = {
   valorBruto: "0", totalDescuento: "0", royaltyHelado: "0", royaltyYogan: "0",
@@ -153,6 +154,9 @@ export default function FacturaProveedor() {
   const [detalleAbierto, setDetalleAbierto] = useState<Record<string, boolean>>({});
   const [encabezadoAbierto, setEncabezadoAbierto] = useState(false);
   const [totalesAbierto,    setTotalesAbierto]    = useState(false);
+  // uid de la línea cuya descripción se está editando ahora mismo — controla el
+  // dropdown de sugerencias Y el indicador fijo de "qué línea estoy editando".
+  const [editandoUid, setEditandoUid] = useState<string | null>(null);
   const [guardado,      setGuardado]      = useState<{ numeroFactura?: string; revisarManualmente: boolean; totales: FacturaProveedorTotales } | null>(null);
 
   function editarEncabezado(campo: keyof EncabezadoExtra, valor: string) {
@@ -161,6 +165,12 @@ export default function FacturaProveedor() {
 
   function toggleDetalle(uid: string, actual: boolean) {
     setDetalleAbierto(prev => ({ ...prev, [uid]: !actual }));
+  }
+
+  // Máximo 6 sugerencias visibles a la vez (con scroll) — nunca la lista completa
+  // del catálogo, que es lo que hacía que el dropdown nativo tapara la pantalla.
+  function sugerenciasPara(query: string): PrecioProducto[] {
+    return catalogoPrecios.filter(p => coincide(query, p.nombre)).slice(0, 6);
   }
 
   const sumaLineas = lineas.reduce((s, l) => s + numVal(l.valorTotalConItbis), 0);
@@ -233,6 +243,11 @@ export default function FacturaProveedor() {
         direccionCliente: String(data.direccionCliente ?? ""),
       });
       setImgFactura(null); setPreview(null);
+      // Abrir de una vez el encabezado y los totales recién leídos — son el
+      // resultado principal de analizar la factura, no algo secundario que
+      // haya que descubrir haciendo clic en un acordeón colapsado.
+      setEncabezadoAbierto(true);
+      setTotalesAbierto(true);
       flash("ok", `Factura analizada: ${lin.length} línea${lin.length !== 1 ? "s" : ""} leídas.`);
     } catch (e) {
       flash("err", e instanceof Error ? e.message : "Error al analizar la factura.");
@@ -382,12 +397,6 @@ export default function FacturaProveedor() {
                   : `✓ Los totales cuadran — Σ líneas ${fmtRD(sumaLineas)} = factura ${fmtRD(numVal(totales.valorTotal))}`}
               </div>
 
-              <datalist id="fp-sugerencias-producto">
-                {catalogoPrecios.map((p) => (
-                  <option key={p.producto_id} value={p.nombre} />
-                ))}
-              </datalist>
-
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <button
                   type="button"
@@ -433,12 +442,40 @@ export default function FacturaProveedor() {
                           placeholder="Código"
                           className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                         />
-                        <input
-                          value={l.descripcion} onChange={(e) => editarLinea(l.uid, "descripcion", e.target.value)}
-                          placeholder="Descripción"
-                          list="fp-sugerencias-producto"
-                          className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-                        />
+                        <div className="relative flex-1">
+                          <input
+                            value={l.descripcion}
+                            onChange={(e) => editarLinea(l.uid, "descripcion", e.target.value)}
+                            onFocus={() => setEditandoUid(l.uid)}
+                            onBlur={() => setTimeout(
+                              () => setEditandoUid(prev => (prev === l.uid ? null : prev)),
+                              150,
+                            )}
+                            onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }}
+                            placeholder="Descripción"
+                            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                          />
+                          {editandoUid === l.uid && sugerenciasPara(l.descripcion).length > 0 && (
+                            <div className="absolute z-30 left-0 right-0 mt-1 max-h-48 overflow-y-auto
+                              bg-white border border-gray-200 rounded-lg shadow-lg">
+                              {sugerenciasPara(l.descripcion).map((p) => (
+                                <button
+                                  key={p.producto_id}
+                                  type="button"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    editarLinea(l.uid, "descripcion", p.nombre);
+                                    setEditandoUid(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50
+                                    border-b border-gray-100 last:border-b-0"
+                                >
+                                  {p.nombre}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <button
                           onClick={() => quitarLinea(l.uid)}
                           title="Quitar línea"
@@ -652,6 +689,20 @@ export default function FacturaProveedor() {
           </div>
         </div>
       )}
+
+      {editandoUid && (() => {
+        const l = lineas.find(x => x.uid === editandoUid);
+        if (!l) return null;
+        return (
+          <div className="fixed bottom-0 inset-x-0 z-40 bg-blue-900 text-white shadow-lg
+            px-4 py-2.5 flex items-center gap-2 text-sm">
+            <span className="opacity-70 flex-shrink-0">✏️ Editando:</span>
+            <span className="font-semibold truncate">
+              {l.codigo || "(sin código)"} — {l.descripcion || "(sin descripción)"}
+            </span>
+          </div>
+        );
+      })()}
     </div>
   );
 }
