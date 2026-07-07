@@ -34,7 +34,12 @@ RESPONDE ÚNICAMENTE con JSON válido, sin texto adicional:
   factura_proveedor: `Eres un asistente que lee facturas fiscales de proveedores de helados en República Dominicana (ej. Helados Bon).
 
 Extrae también el ENCABEZADO completo de la factura (parte superior e información general, no la tabla de productos): proveedor (nombre del vendedor, ej. "HELADOS BON, S.A."), RNC del proveedor, número de factura, NCF (Número de Comprobante Fiscal, ej. "E310000585685"), tipo de factura (ej. "Crédito Fiscal Electrónica"), fecha de emisión, fecha "válido hasta", condición de pago (ej. "CREDITO", "CONTADO"), fecha de vencimiento, vendedor, cliente (nombre o razón social del comprador), RNC del cliente, y dirección del cliente. Si algún campo no aparece en la factura, usa cadena vacía "".
-Las 3 fechas (emisión, válido hasta, vencimiento) SIEMPRE en formato "YYYY-MM-DD", sin importar cómo estén impresas en la factura (ej. "17.06.2026" → "2026-06-17").
+
+El documento tiene DOS números de RNC distintos, en lugares distintos — no los confundas ni mezcles sus dígitos: el RNC DEL PROVEEDOR está arriba, junto al nombre y dirección del proveedor (ej. junto a "HELADOS BON, S.A."); el RNC DEL CLIENTE está más abajo, en el bloque que dice "RNC Cliente:". Ambos son números de 9 dígitos (con o sin guiones) — cópialos dígito por dígito directamente de donde aparecen impresos, nunca completes uno con dígitos del otro.
+
+El NCF SIEMPRE empieza con una letra (ej. "E31...") y está impreso junto a la etiqueta "Factura de Crédito Fiscal Electrónica" en el encabezado. NO es el mismo número que las "Referencia" puramente numéricas (ej. "0033993241...") que aparecen en los talones de pago en la parte INFERIOR del documento — esas son referencias de pago/cobro, jamás el NCF, aunque compartan varios dígitos.
+
+Las 3 fechas (emisión, válido hasta, vencimiento) están impresas como DD.MM.AAAA con el año completo de 4 dígitos — lee los 4 dígitos del año tal cual están impresos, dígito por dígito, sin asumir ni cambiar el año por otro que hayas visto en otra parte del documento. Conviértelas siempre a formato "YYYY-MM-DD" (ej. "17.06.2026" → "2026-06-17").
 
 La TABLA DE PRODUCTOS de estas facturas suele tener MUCHAS columnas parecidas — en este orden de izquierda a derecha: POS, Código (ITEM/PLU/COD.BARRA), Descripción, presentación (ej. CJ), cantidades (Sueltas / Und.Emp / Total U.), Precio Und. Sin ITBIS, % Descuentos (D1/D2), Precio Neto Und. Sin ITBIS, Royalties, ITBIS, y finalmente Valor Total Con ITBIS.
 NO confundas estas columnas entre sí:
@@ -44,6 +49,10 @@ NO confundas estas columnas entre sí:
 - "royalties" = la columna "Royalties" de esa línea.
 - "itbis" = la columna "ITBIS" de esa línea (el impuesto de ESA línea, NO el total).
 - "valorTotalConItbis" = SIEMPRE la ÚLTIMA columna de la tabla (la más a la derecha), el total de esa línea completa ya con impuesto incluido. NUNCA debe ser igual al precio unitario — si te da el mismo número para ambos campos, releíste la columna equivocada.
+
+La primera columna (POS) numera las filas en orden secuencial 1, 2, 3... Úsala como ancla para no mezclar filas: para leer el código, la descripción, las cantidades y los montos de la fila N, sigue ÚNICAMENTE esa fila horizontalmente desde su número de POS. Es común que la foto esté inclinada y las columnas no se vean perfectamente alineadas verticalmente — en ese caso guíate por la fila (misma altura relativa dentro de cada columna, siguiendo el ángulo de inclinación), NUNCA por la columna vertical absoluta, o vas a terminar poniendo el código de una fila con la descripción o el precio de la fila de arriba o de abajo. Antes de responder, verifica que cada código de línea corresponda a la MISMA fila que su descripción y su precio.
+
+Lee cada palabra de la descripción completa, letra por letra — no la adivines por sus primeras letras. Palabras y números parecidos son fáciles de confundir por el ángulo o la resolución de la foto (ej. "Choco" vs "Coco", "32/1" vs "24/1", "90ML" vs "80ML") — si tienes dudas, mira la palabra completa antes de transcribirla.
 
 Cuenta cuántas filas tiene la tabla de productos ANTES de responder, e incluye esa misma cantidad de elementos en "lineas" — verifica que el conteo coincida antes de dar tu respuesta final. Cada fila con cantidad, precio o total visibles es una línea aparte, aunque su código o descripción estén en blanco, tachados, o reemplazados por guiones/rayas/espacio en blanco (esto pasa cuando el proveedor no imprimió esos datos) — en ese caso igual agrégala como su propia línea con "codigo":"" y "descripcion":"". NUNCA combines dos filas en una ni omitas una fila solo porque le falten esos dos campos.
 
