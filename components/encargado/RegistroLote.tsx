@@ -178,6 +178,13 @@ export default function RegistroLote() {
     setUdsCajaStr(uds && uds > 1 ? String(uds) : "1");
   }, [prodEfectivo, convMap]);
 
+  // Bug #40: cuando el producto NO tiene conversión registrada en `codigos_cajas`,
+  // "Uds/caja" cae en "1" por defecto sin avisar — visualmente igual a un producto
+  // que de verdad se vende de a 1 por caja. Si el Encargado no corrige el campo a
+  // mano, 1 caja termina sumando 1 sola unidad al stock. Distinguimos ambos casos
+  // para poder advertir en vez de fallar en silencio.
+  const sinConversionConocida = !!prodEfectivo && !convMap[toProductoId(prodEfectivo)];
+
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
     if (!showDrop) return;
@@ -842,10 +849,15 @@ export default function RegistroLote() {
                   onChange={(e) => setUdsCajaStr(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && agregar()}
                   placeholder="Uds/caja" min="1"
-                  className="w-full border border-blue-300 bg-blue-50/40 rounded-lg px-3 py-2 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className={`w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                    sinConversionConocida
+                      ? "border-2 border-amber-400 bg-amber-50 focus:ring-amber-400"
+                      : "border border-blue-300 bg-blue-50/40 focus:ring-blue-400"
+                  }`}
                 />
-                <p className="text-xs text-gray-400 mt-0.5 text-center">uds/caja</p>
+                <p className={`text-xs mt-0.5 text-center ${sinConversionConocida ? "text-amber-600 font-semibold" : "text-gray-400"}`}>
+                  uds/caja
+                </p>
               </div>
               <div className="flex items-start pt-2.5 text-gray-400 font-bold">+</div>
               <div className="flex-1 min-w-[64px]">
@@ -893,6 +905,16 @@ export default function RegistroLote() {
                 )}
               </p>
             )}
+            {sinConversionConocida && (parseInt(cajasStr) || 0) > 0 && (
+              <p className="text-xs text-amber-700 font-semibold mt-1 flex items-start gap-1">
+                <span>⚠️</span>
+                <span>
+                  "{prodEfectivo}" no tiene una conversión caja→unidades registrada — "uds/caja" quedó en{" "}
+                  {Math.max(1, parseInt(udsCajaStr) || 1)} por defecto. Confirma el número real antes de agregar
+                  (o pide a Admin → Gestión de Códigos que lo registre para la próxima vez).
+                </span>
+              </p>
+            )}
           </div>
 
           {/* ── Lista de productos del lote (editable inline) ── */}
@@ -901,7 +923,12 @@ export default function RegistroLote() {
               <p className="text-xs font-semibold text-gray-600">
                 Productos en este lote ({items.length}) · toca los campos para editar:
               </p>
-              {items.map((it, idx) => (
+              {items.map((it, idx) => {
+                // Bug #40: mismo caso que el selector de arriba, pero para ítems ya
+                // agregados — incluye los que llegaron por "Escanear factura BON (IA)",
+                // que nunca pasan por el aviso del selector manual.
+                const itemSinConversion = it.cajas > 0 && it.unidadesPorCaja === 1 && !convMap[it.producto_id];
+                return (
                 <div key={it.producto_id}
                   className={it.reconocido
                     ? "bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5"
@@ -929,6 +956,12 @@ export default function RegistroLote() {
                       <span className="pb-icon-pulse inline-block">⚠️</span> No reconocido
                     </span>
                   )}
+                  {itemSinConversion && (
+                    <span className="inline-block text-[11px] font-bold text-amber-700 bg-amber-100
+                      border border-amber-200 rounded-full px-2 py-0.5 mt-1">
+                      ⚠️ Sin conversión — confirma "uds/caja", quedó en 1 por defecto
+                    </span>
+                  )}
                   <div className="flex flex-wrap items-end gap-1.5 mt-2">
                     <label className="flex flex-col">
                       <span className="text-[10px] text-gray-400 mb-0.5">cajas</span>
@@ -945,8 +978,11 @@ export default function RegistroLote() {
                       <input
                         type="number" min="1" value={it.unidadesPorCaja}
                         onChange={(e) => editarItem(idx, "unidadesPorCaja", e.target.value)}
-                        className="w-16 border border-emerald-300 bg-emerald-50/40 rounded-lg px-2 py-1.5 text-sm
-                          focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        className={`w-16 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${
+                          itemSinConversion
+                            ? "border-2 border-amber-400 bg-amber-50 focus:ring-amber-400"
+                            : "border border-emerald-300 bg-emerald-50/40 focus:ring-emerald-400"
+                        }`}
                       />
                     </label>
                     <span className="text-gray-400 font-bold pb-1.5">+</span>
@@ -1081,7 +1117,8 @@ export default function RegistroLote() {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
