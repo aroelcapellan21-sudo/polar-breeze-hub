@@ -32,10 +32,19 @@ RESPONDE ÚNICAMENTE con JSON válido, sin texto adicional:
 }`,
 
   factura_proveedor: `Eres un asistente que lee facturas fiscales de proveedores de helados en República Dominicana (ej. Helados Bon).
-La factura tiene una TABLA DE PRODUCTOS con columnas como Código / Descripción / Cantidad / Precio Unitario / Valor Total con ITBIS, y al final un RESUMEN DE TOTALES separado con campos como Valor Bruto, Total Descuento, Subtotal Gravado, Subtotal Exento, Total ITBIS, Valor Total y Valor a Pagar.
-Extrae AMBOS niveles por separado. IMPORTANTE: incluye TODAS las filas de la tabla de productos, incluso si el código o la descripción vienen en blanco — nunca omitas una fila que tenga cantidad, precio o total visibles.
 
-RESPONDE ÚNICAMENTE con JSON válido, sin texto adicional:
+La TABLA DE PRODUCTOS de estas facturas suele tener MUCHAS columnas parecidas — en este orden de izquierda a derecha: POS, Código (ITEM/PLU/COD.BARRA), Descripción, presentación (ej. CJ), cantidades (Sueltas / Und.Emp / Total U.), Precio Und. Sin ITBIS, % Descuentos (D1/D2), Precio Neto Und. Sin ITBIS, Royalties, ITBIS, y finalmente Valor Total Con ITBIS.
+NO confundas estas columnas entre sí:
+- "precioUnitario" = la columna "Precio Und. Sin ITBIS" (o "Precio Neto Und. Sin ITBIS" si son iguales) — el precio de UNA unidad, sin impuesto.
+- "valorTotalConItbis" = SIEMPRE la ÚLTIMA columna de la tabla (la más a la derecha), el total de esa línea completa ya con impuesto incluido (cantidad × precio + ITBIS de esa línea). NUNCA debe ser igual al precio unitario — si te da el mismo número para ambos campos, releíste la columna equivocada.
+
+Cuenta cuántas filas tiene la tabla de productos ANTES de responder, e incluye esa misma cantidad de elementos en "lineas" — verifica que el conteo coincida antes de dar tu respuesta final. Cada fila con cantidad, precio o total visibles es una línea aparte, aunque su código o descripción estén en blanco, tachados, o reemplazados por guiones/rayas/espacio en blanco (esto pasa cuando el proveedor no imprimió esos datos) — en ese caso igual agrégala como su propia línea con "codigo":"" y "descripcion":"". NUNCA combines dos filas en una ni omitas una fila solo porque le falten esos dos campos.
+
+Para el RESUMEN DE TOTALES (Valor Bruto, Total Descuento, Subtotal Gravado, Subtotal Exento, Total ITBIS, Valor Total, Valor a Pagar): son cifras oficiales ya impresas en la factura — LÉELAS tal cual aparecen, no las calcules ni las derives a partir de las líneas.
+
+Formato de números: el separador decimal es el símbolo (coma o punto) seguido de EXACTAMENTE 2 dígitos al final del número; cualquier otro separador antes de eso (seguido de grupos de 3 dígitos) es de miles. Ejemplos: "1,014.33" → 1014.33. "20.083,74" → 20083.74. Un mismo documento puede mezclar ambas convenciones en distintas columnas — identifica el separador decimal por su posición en cada número, no por una convención fija para todo el documento. Devuelve siempre números planos con punto decimal.
+
+RESPONDE ÚNICAMENTE con JSON válido, sin texto adicional, sin explicaciones, sin bloques de código markdown. Tu respuesta debe empezar directo con { y terminar con }:
 {
   "lineas": [
     { "codigo": "", "descripcion": "", "cantidad": 0, "precioUnitario": 0, "valorTotalConItbis": 0 }
