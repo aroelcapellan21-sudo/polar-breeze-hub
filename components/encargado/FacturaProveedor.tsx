@@ -151,6 +151,10 @@ export default function FacturaProveedor() {
   const [encabezado,    setEncabezado]    = useState<EncabezadoExtra>(ENCABEZADO_VACIO);
   const [lineas,        setLineas]        = useState<LineaEdit[]>([]);
   const [totales,       setTotales]       = useState<TotalesEdit>(TOTALES_VACIOS);
+  // Total Cajas/Cnts + Total Unidades Sueltas impresos al pie de la factura — texto
+  // vacío si la factura no los trae, así el chequeo cruzado no dispara por defecto.
+  const [totalCajas,           setTotalCajas]           = useState("");
+  const [totalUnidadesSueltas, setTotalUnidadesSueltas] = useState("");
   const [detalleAbierto, setDetalleAbierto] = useState<Record<string, boolean>>({});
   const [encabezadoAbierto, setEncabezadoAbierto] = useState(false);
   const [totalesAbierto,    setTotalesAbierto]    = useState(false);
@@ -175,7 +179,20 @@ export default function FacturaProveedor() {
 
   const sumaLineas = lineas.reduce((s, l) => s + numVal(l.valorTotalConItbis), 0);
   const diferencia = Math.abs(sumaLineas - numVal(totales.valorTotal));
-  const revisarManualmente = lineas.length > 0 && diferencia > 1;
+
+  // Chequeo cruzado de CANTIDADES (no de RD$) — Σ líneas vs. factura puede cuadrar
+  // perfecto aunque una línea tenga el código equivocado con la cantidad/precio de
+  // otra fila (la suma en RD$ no cambia con solo reordenar). Total Cajas/Cnts +
+  // Total Unidades Sueltas es un conteo impreso independiente de esos montos, así
+  // que si no cuadra contra Σ cantidad, es una señal de fila corrida que el banner
+  // de RD$ no puede ver.
+  const hayTotalCajasImpreso = totalCajas.trim() !== "" || totalUnidadesSueltas.trim() !== "";
+  const sumaCantidades       = lineas.reduce((s, l) => s + numVal(l.cantidad), 0);
+  const totalCajasImpreso    = numVal(totalCajas) + numVal(totalUnidadesSueltas);
+  const diferenciaCantidades = Math.abs(sumaCantidades - totalCajasImpreso);
+  const cantidadesNoCuadran  = hayTotalCajasImpreso && lineas.length > 0 && diferenciaCantidades > 0.5;
+
+  const revisarManualmente = lineas.length > 0 && (diferencia > 1 || cantidadesNoCuadran);
   const hayIncompletas = lineas.some(lineaIncompleta);
 
   const flash = (type: "ok" | "err", text: string) => {
@@ -229,6 +246,10 @@ export default function FacturaProveedor() {
       });
       if (data.proveedor && typeof data.proveedor === "string" && !proveedor.trim()) setProveedor(data.proveedor);
       if (data.numeroFactura && typeof data.numeroFactura === "string" && !numeroFactura.trim()) setNumeroFactura(data.numeroFactura);
+      // Texto tal cual (no Number(...)||0) — "" real significa "la factura no lo imprime",
+      // distinto de "0" real (Total Unidades Sueltas: 0 es un valor impreso válido).
+      setTotalCajas(String(data.totalCajas ?? ""));
+      setTotalUnidadesSueltas(String(data.totalUnidadesSueltas ?? ""));
       setEncabezado({
         rncProveedor:     String(data.rncProveedor ?? ""),
         ncf:              String(data.ncf ?? ""),
@@ -271,6 +292,7 @@ export default function FacturaProveedor() {
     if (lineas.length > 0 && !window.confirm("¿Descartar esta factura sin guardar?")) return;
     setLineas([]); setTotales(TOTALES_VACIOS); setDetalleAbierto({});
     setProveedor(""); setNumeroFactura(""); setEncabezado(ENCABEZADO_VACIO); setMsg(null); setGuardado(null);
+    setTotalCajas(""); setTotalUnidadesSueltas("");
   }
 
   async function guardar() {
@@ -320,6 +342,12 @@ export default function FacturaProveedor() {
         totales: totalesNumericos,
         sumaLineas,
         diferencia,
+        ...(hayTotalCajasImpreso ? {
+          totalCajas:           numVal(totalCajas),
+          totalUnidadesSueltas: numVal(totalUnidadesSueltas),
+          sumaCantidades,
+          diferenciaCantidades,
+        } : {}),
         revisarManualmente,
         registradoPor:   profile?.nombre ?? "Encargado",
         registradoPorId: profile?.uid    ?? "",
@@ -328,6 +356,7 @@ export default function FacturaProveedor() {
       setGuardado({ numeroFactura: numeroFactura.trim() || undefined, revisarManualmente, totales: totalesNumericos });
       setLineas([]); setTotales(TOTALES_VACIOS); setDetalleAbierto({});
       setProveedor(""); setNumeroFactura(""); setEncabezado(ENCABEZADO_VACIO);
+      setTotalCajas(""); setTotalUnidadesSueltas("");
       flash("ok", revisarManualmente ? "Factura guardada — ⚠️ marcada para revisar manualmente." : "Factura guardada correctamente.");
     } catch (e) {
       flash("err", e instanceof Error ? e.message : "Error al guardar la factura.");
@@ -388,13 +417,51 @@ export default function FacturaProveedor() {
           {lineas.length > 0 && (
             <>
               <div className={`text-sm px-3 py-2 rounded-lg font-medium ${
-                revisarManualmente
+                diferencia > 1
                   ? "bg-red-50 text-red-700 border border-red-200"
                   : "bg-green-50 text-green-700 border border-green-200"
               }`}>
-                {revisarManualmente
+                {diferencia > 1
                   ? `⚠️ Revisar manualmente — Σ líneas ${fmtRD(sumaLineas)} vs. factura ${fmtRD(numVal(totales.valorTotal))} (dif. ${fmtRD(diferencia)})`
                   : `✓ Los totales cuadran — Σ líneas ${fmtRD(sumaLineas)} = factura ${fmtRD(numVal(totales.valorTotal))}`}
+              </div>
+
+              {/* Chequeo cruzado de cantidades — Σ líneas en RD$ puede cuadrar aunque una
+                  línea tenga el código de un producto con la cantidad de otro (la suma en
+                  RD$ no cambia con solo reordenar). Total Cajas/Cnts es un conteo impreso
+                  independiente que si no cuadra, delata ese tipo de error. */}
+              <div className="space-y-1.5">
+                <div className="flex gap-2">
+                  <label className="flex-1">
+                    <span className="block text-[11px] font-medium text-gray-500 mb-0.5">Total Cajas/Cnts (factura)</span>
+                    <input
+                      type="text" inputMode="numeric" value={totalCajas}
+                      onChange={(e) => setTotalCajas(e.target.value)}
+                      placeholder="Ej. 520"
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                    />
+                  </label>
+                  <label className="flex-1">
+                    <span className="block text-[11px] font-medium text-gray-500 mb-0.5">Total Unid. Sueltas</span>
+                    <input
+                      type="text" inputMode="numeric" value={totalUnidadesSueltas}
+                      onChange={(e) => setTotalUnidadesSueltas(e.target.value)}
+                      placeholder="Ej. 0"
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                    />
+                  </label>
+                </div>
+                {hayTotalCajasImpreso && (
+                  <div className={`text-sm px-3 py-2 rounded-lg font-medium ${
+                    cantidadesNoCuadran
+                      ? "bg-red-50 text-red-700 border border-red-200"
+                      : "bg-green-50 text-green-700 border border-green-200"
+                  }`}>
+                    {cantidadesNoCuadran
+                      ? `⚠️ Revisar cantidades — Σ cantidad líneas ${sumaCantidades} vs. Total Cajas/Cnts+Sueltas ${totalCajasImpreso} (dif. ${diferenciaCantidades})`
+                      : `✓ Las cantidades cuadran — Σ líneas ${sumaCantidades} = Total Cajas/Cnts+Sueltas ${totalCajasImpreso}`}
+                  </div>
+                )}
               </div>
 
               <div className="border border-gray-200 rounded-lg overflow-hidden">

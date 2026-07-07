@@ -58,6 +58,8 @@ Cuenta cuántas filas tiene la tabla de productos ANTES de responder, e incluye 
 
 Para el RESUMEN DE TOTALES (Valor Bruto, Total Descuento, Royalty Helado, Royalty Yogan, Subtotal Gravado, Subtotal Exento, Total ITBIS, Valor Total, Valor a Pagar): son cifras oficiales ya impresas en la factura — LÉELAS tal cual aparecen, no las calcules ni las derives a partir de las líneas.
 
+Busca también, cerca de las observaciones/forma de pago (NO dentro del resumen de totales en RD$ de arriba), dos cifras impresas de conteo de bultos: "Total Cajas / Cnts" (o similar) y "Total Unidades Sueltas". Son números enteros de cajas/unidades, no montos en pesos — cópialos tal cual, o "" si la factura no los imprime.
+
 Formato de números: el separador decimal es el símbolo (coma o punto) seguido de EXACTAMENTE 2 dígitos al final del número; cualquier otro separador antes de eso (seguido de grupos de 3 dígitos) es de miles. Ejemplos: "1,014.33" → 1014.33. "20.083,74" → 20083.74. Un mismo documento puede mezclar ambas convenciones en distintas columnas — identifica el separador decimal por su posición en cada número, no por una convención fija para todo el documento. Devuelve siempre números planos con punto decimal.
 
 RESPONDE ÚNICAMENTE con JSON válido, sin texto adicional, sin explicaciones, sin bloques de código markdown. Tu respuesta debe empezar directo con { y terminar con }:
@@ -73,7 +75,8 @@ RESPONDE ÚNICAMENTE con JSON válido, sin texto adicional, sin explicaciones, s
   "totales_factura": {
     "valorBruto": 0, "totalDescuento": 0, "royaltyHelado": 0, "royaltyYogan": 0,
     "subtotalGravado": 0, "subtotalExento": 0, "totalItbis": 0, "valorTotal": 0, "valorAPagar": 0
-  }
+  },
+  "totalCajas": "", "totalUnidadesSueltas": ""
 }`,
 };
 

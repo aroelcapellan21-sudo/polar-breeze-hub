@@ -425,6 +425,14 @@ export interface FacturaProveedor {
   totales:             FacturaProveedorTotales;
   sumaLineas:          number;
   diferencia:          number;
+  // Total Cajas/Cnts + Total Unidades Sueltas impresos al pie de la factura (distintos
+  // del resumen de totales en RD$) — chequeo cruzado independiente contra Σ cantidad
+  // de las líneas, para detectar cantidades mal leídas que la validación de RD$ no ve
+  // (una fila puede tener el monto correcto pero la cantidad/código de otra fila).
+  totalCajas?:            number;
+  totalUnidadesSueltas?:  number;
+  sumaCantidades?:        number;
+  diferenciaCantidades?:  number;
   revisarManualmente:  boolean;
   registradoPor:       string;
   registradoPorId:     string;
