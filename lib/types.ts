@@ -381,16 +381,23 @@ export interface LoteWeight {
 // Registro fiscal solamente — NO afecta movimientos_loker/lotes_loker.
 
 export interface FacturaProveedorLinea {
-  codigo:             string;
-  descripcion:        string;
-  cantidad:           number;
-  precioUnitario:     number;
-  valorTotalConItbis: number;
+  codigo:              string;
+  descripcion:         string;
+  cantidad:            number;
+  precioUnitario:      number;   // precio unitario SIN ITBIS
+  descuentoD1?:        number;   // % descuento 1 (Bon trae D1/D2 separados)
+  descuentoD2?:        number;   // % descuento 2
+  precioNetoUnitario?: number;   // precio neto unitario sin ITBIS (tras descuento)
+  royalties?:          number;   // royalties de esta línea
+  itbis?:              number;   // ITBIS de esta línea (distinto del total con ITBIS)
+  valorTotalConItbis:  number;
 }
 
 export interface FacturaProveedorTotales {
   valorBruto:      number;
   totalDescuento:  number;
+  royaltyHelado?:  number;
+  royaltyYogan?:   number;
   subtotalGravado: number;
   subtotalExento:  number;
   totalItbis:      number;
@@ -399,15 +406,27 @@ export interface FacturaProveedorTotales {
 }
 
 export interface FacturaProveedor {
-  id?:                string;
-  proveedor?:         string;
-  numeroFactura?:     string;
-  lineas:             FacturaProveedorLinea[];
-  totales:            FacturaProveedorTotales;
-  sumaLineas:         number;
-  diferencia:         number;
-  revisarManualmente: boolean;
-  registradoPor:      string;
-  registradoPorId:    string;
-  timestamp:          Date | { seconds: number };
+  id?:                 string;
+  proveedor?:          string;
+  rncProveedor?:       string;
+  numeroFactura?:      string;
+  ncf?:                string;   // ej. "E310000585685"
+  tipoFactura?:        string;   // ej. "Crédito Fiscal Electrónica"
+  fecha?:              string;   // fecha de emisión, como texto (YYYY-MM-DD)
+  validoHasta?:        string;
+  condicionPago?:      string;   // ej. "CREDITO"
+  fechaVencimiento?:   string;   // texto (YYYY-MM-DD), para mostrar
+  fechaVencimientoTs?: Date | { seconds: number } | null; // parseada, para filtrar/ordenar (Cuentas por Pagar)
+  vendedor?:           string;
+  cliente?:            string;
+  rncCliente?:         string;
+  direccionCliente?:   string;
+  lineas:              FacturaProveedorLinea[];
+  totales:             FacturaProveedorTotales;
+  sumaLineas:          number;
+  diferencia:          number;
+  revisarManualmente:  boolean;
+  registradoPor:       string;
+  registradoPorId:     string;
+  timestamp:           Date | { seconds: number };
 }
