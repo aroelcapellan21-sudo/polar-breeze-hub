@@ -30,6 +30,23 @@ RESPONDE ÚNICAMENTE con JSON válido, sin texto adicional:
   "total": null,
   "observaciones": ""
 }`,
+
+  factura_proveedor: `Eres un asistente que lee facturas fiscales de proveedores de helados en República Dominicana (ej. Helados Bon).
+La factura tiene una TABLA DE PRODUCTOS con columnas como Código / Descripción / Cantidad / Precio Unitario / Valor Total con ITBIS, y al final un RESUMEN DE TOTALES separado con campos como Valor Bruto, Total Descuento, Subtotal Gravado, Subtotal Exento, Total ITBIS, Valor Total y Valor a Pagar.
+Extrae AMBOS niveles por separado. IMPORTANTE: incluye TODAS las filas de la tabla de productos, incluso si el código o la descripción vienen en blanco — nunca omitas una fila que tenga cantidad, precio o total visibles.
+
+RESPONDE ÚNICAMENTE con JSON válido, sin texto adicional:
+{
+  "lineas": [
+    { "codigo": "", "descripcion": "", "cantidad": 0, "precioUnitario": 0, "valorTotalConItbis": 0 }
+  ],
+  "totales_factura": {
+    "valorBruto": 0, "totalDescuento": 0, "subtotalGravado": 0, "subtotalExento": 0,
+    "totalItbis": 0, "valorTotal": 0, "valorAPagar": 0
+  },
+  "proveedor": "",
+  "numeroFactura": ""
+}`,
 };
 
 function extractJSON(text: string): unknown {
@@ -57,7 +74,7 @@ async function notifyTelegram(message: string) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as {
-      tipo: "cuarto_frio" | "factura";
+      tipo: "cuarto_frio" | "factura" | "factura_proveedor";
       imageBase64?: string;
       mimeType?: string;
       texto?: string;

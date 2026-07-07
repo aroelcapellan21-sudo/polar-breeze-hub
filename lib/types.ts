@@ -376,3 +376,38 @@ export interface LoteWeight {
   estado:            "activo" | "cerrado";
   notas?:            string;
 }
+
+// ─── Factura de proveedor (recepción fiscal, Encargado) ────────────────────────
+// Registro fiscal solamente — NO afecta movimientos_loker/lotes_loker.
+
+export interface FacturaProveedorLinea {
+  codigo:             string;
+  descripcion:        string;
+  cantidad:           number;
+  precioUnitario:     number;
+  valorTotalConItbis: number;
+}
+
+export interface FacturaProveedorTotales {
+  valorBruto:      number;
+  totalDescuento:  number;
+  subtotalGravado: number;
+  subtotalExento:  number;
+  totalItbis:      number;
+  valorTotal:      number;
+  valorAPagar:     number;
+}
+
+export interface FacturaProveedor {
+  id?:                string;
+  proveedor?:         string;
+  numeroFactura?:     string;
+  lineas:             FacturaProveedorLinea[];
+  totales:            FacturaProveedorTotales;
+  sumaLineas:         number;
+  diferencia:         number;
+  revisarManualmente: boolean;
+  registradoPor:      string;
+  registradoPorId:    string;
+  timestamp:          Date | { seconds: number };
+}
