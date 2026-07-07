@@ -1,19 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { useState, useEffect } from "react";
+import { collection, addDoc, doc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
-import { FacturaProveedorLinea, FacturaProveedorTotales } from "@/lib/types";
+import { FacturaProveedorLinea, FacturaProveedorTotales, PrecioProducto } from "@/lib/types";
 import { ImageUploader, AiButton } from "@/components/despachador/shared";
 
-const TOTALES_VACIOS: FacturaProveedorTotales = {
-  valorBruto: 0, totalDescuento: 0, subtotalGravado: 0, subtotalExento: 0,
-  totalItbis: 0, valorTotal: 0, valorAPagar: 0,
+const TOTALES_VACIOS: TotalesEdit = {
+  valorBruto: "0", totalDescuento: "0", subtotalGravado: "0", subtotalExento: "0",
+  totalItbis: "0", valorTotal: "0", valorAPagar: "0",
 };
 
-// Línea en edición: los campos numéricos se guardan como texto MIENTRAS SE EDITA
-// (nunca se fuerza a número en cada tecla) — así el campo no se "traba" en "0"
+// Línea/totales en edición: los campos numéricos se guardan como texto MIENTRAS SE
+// EDITA (nunca se fuerza a número en cada tecla) — así el campo no se "traba" en "0"
 // ni se come el primer dígito al borrar. Solo se convierte a número al calcular
 // (sumaLineas, validación) o al guardar. `uid` es una key estable, independiente
 // de la posición en el arreglo, para que React nunca pierda el foco al reordenar.
@@ -26,11 +26,13 @@ interface LineaEdit {
   valorTotalConItbis: string;
 }
 
+type TotalesEdit = { [K in keyof FacturaProveedorTotales]: string };
+
 function numVal(s: string): number {
   return parseFloat(s) || 0;
 }
 
-const CAMPOS_TOTALES: { key: keyof FacturaProveedorTotales; label: string }[] = [
+const CAMPOS_TOTALES: { key: keyof TotalesEdit; label: string }[] = [
   { key: "valorBruto",      label: "Valor bruto"       },
   { key: "totalDescuento",  label: "Total descuento"   },
   { key: "subtotalGravado", label: "Subtotal gravado"  },
@@ -52,6 +54,17 @@ function lineaIncompleta(l: LineaEdit): boolean {
 export default function FacturaProveedor() {
   const { profile } = useAuth();
 
+  // Catálogo (config/precios) — solo para sugerir mientras se escribe la
+  // descripción (datalist nativo). No ancla ni bloquea nada todavía — eso
+  // es alcance de la mejora #36 (reconocido/vincular/registrar nuevo).
+  const [catalogoPrecios, setCatalogoPrecios] = useState<PrecioProducto[]>([]);
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "precios")).then((snap) => {
+      if (snap.exists()) setCatalogoPrecios((snap.data().productos as PrecioProducto[]) ?? []);
+    }).catch(() => { /* sin catálogo → el campo sigue siendo texto libre normal */ });
+  }, []);
+
   const [imgFactura,    setImgFactura]    = useState<{ base64: string; mimeType: string } | null>(null);
   const [preview,       setPreview]       = useState<string | null>(null);
   const [analizando,    setAnalizando]    = useState(false);
@@ -61,11 +74,11 @@ export default function FacturaProveedor() {
   const [proveedor,     setProveedor]     = useState("");
   const [numeroFactura, setNumeroFactura] = useState("");
   const [lineas,        setLineas]        = useState<LineaEdit[]>([]);
-  const [totales,       setTotales]       = useState<FacturaProveedorTotales>(TOTALES_VACIOS);
+  const [totales,       setTotales]       = useState<TotalesEdit>(TOTALES_VACIOS);
   const [guardado,      setGuardado]      = useState<{ numeroFactura?: string; revisarManualmente: boolean } | null>(null);
 
   const sumaLineas = lineas.reduce((s, l) => s + numVal(l.valorTotalConItbis), 0);
-  const diferencia = Math.abs(sumaLineas - totales.valorTotal);
+  const diferencia = Math.abs(sumaLineas - numVal(totales.valorTotal));
   const revisarManualmente = lineas.length > 0 && diferencia > 1;
   const hayIncompletas = lineas.some(lineaIncompleta);
 
@@ -103,13 +116,13 @@ export default function FacturaProveedor() {
       const t = data.totales_factura ?? {};
       setLineas(lin);
       setTotales({
-        valorBruto:      Number(t.valorBruto) || 0,
-        totalDescuento:  Number(t.totalDescuento) || 0,
-        subtotalGravado: Number(t.subtotalGravado) || 0,
-        subtotalExento:  Number(t.subtotalExento) || 0,
-        totalItbis:      Number(t.totalItbis) || 0,
-        valorTotal:      Number(t.valorTotal) || 0,
-        valorAPagar:     Number(t.valorAPagar) || 0,
+        valorBruto:      String(Number(t.valorBruto) || 0),
+        totalDescuento:  String(Number(t.totalDescuento) || 0),
+        subtotalGravado: String(Number(t.subtotalGravado) || 0),
+        subtotalExento:  String(Number(t.subtotalExento) || 0),
+        totalItbis:      String(Number(t.totalItbis) || 0),
+        valorTotal:      String(Number(t.valorTotal) || 0),
+        valorAPagar:     String(Number(t.valorAPagar) || 0),
       });
       if (data.proveedor && typeof data.proveedor === "string" && !proveedor.trim()) setProveedor(data.proveedor);
       if (data.numeroFactura && typeof data.numeroFactura === "string" && !numeroFactura.trim()) setNumeroFactura(data.numeroFactura);
@@ -158,11 +171,20 @@ export default function FacturaProveedor() {
         precioUnitario:     numVal(l.precioUnitario),
         valorTotalConItbis: numVal(l.valorTotalConItbis),
       }));
+      const totalesNumericos: FacturaProveedorTotales = {
+        valorBruto:      numVal(totales.valorBruto),
+        totalDescuento:  numVal(totales.totalDescuento),
+        subtotalGravado: numVal(totales.subtotalGravado),
+        subtotalExento:  numVal(totales.subtotalExento),
+        totalItbis:      numVal(totales.totalItbis),
+        valorTotal:      numVal(totales.valorTotal),
+        valorAPagar:     numVal(totales.valorAPagar),
+      };
       await addDoc(collection(db, "facturas_proveedor"), {
         ...(proveedor.trim()     ? { proveedor: proveedor.trim() } : {}),
         ...(numeroFactura.trim() ? { numeroFactura: numeroFactura.trim() } : {}),
         lineas: lineasNumericas,
-        totales,
+        totales: totalesNumericos,
         sumaLineas,
         diferencia,
         revisarManualmente,
@@ -237,9 +259,15 @@ export default function FacturaProveedor() {
                   : "bg-green-50 text-green-700 border border-green-200"
               }`}>
                 {revisarManualmente
-                  ? `⚠️ Revisar manualmente — Σ líneas ${fmtRD(sumaLineas)} vs. factura ${fmtRD(totales.valorTotal)} (dif. ${fmtRD(diferencia)})`
-                  : `✓ Los totales cuadran — Σ líneas ${fmtRD(sumaLineas)} = factura ${fmtRD(totales.valorTotal)}`}
+                  ? `⚠️ Revisar manualmente — Σ líneas ${fmtRD(sumaLineas)} vs. factura ${fmtRD(numVal(totales.valorTotal))} (dif. ${fmtRD(diferencia)})`
+                  : `✓ Los totales cuadran — Σ líneas ${fmtRD(sumaLineas)} = factura ${fmtRD(numVal(totales.valorTotal))}`}
               </div>
+
+              <datalist id="fp-sugerencias-producto">
+                {catalogoPrecios.map((p) => (
+                  <option key={p.producto_id} value={p.nombre} />
+                ))}
+              </datalist>
 
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-gray-600">
@@ -262,6 +290,7 @@ export default function FacturaProveedor() {
                         <input
                           value={l.descripcion} onChange={(e) => editarLinea(l.uid, "descripcion", e.target.value)}
                           placeholder="Descripción"
+                          list="fp-sugerencias-producto"
                           className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                         />
                         <button
@@ -319,8 +348,9 @@ export default function FacturaProveedor() {
                     <label key={key} className="flex items-center justify-between gap-2">
                       <span className="text-xs text-gray-500">{label}</span>
                       <input
-                        type="number" min="0" step="0.01" value={totales[key]}
-                        onChange={(e) => setTotales(prev => ({ ...prev, [key]: parseFloat(e.target.value) || 0 }))}
+                        type="text" inputMode="decimal" value={totales[key]}
+                        onChange={(e) => setTotales(prev => ({ ...prev, [key]: e.target.value }))}
+                        onFocus={(e) => e.target.select()}
                         className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm text-right bg-white"
                       />
                     </label>
