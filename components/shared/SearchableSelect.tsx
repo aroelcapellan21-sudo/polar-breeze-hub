@@ -15,6 +15,7 @@ export interface SearchableOption {
   id:       string;
   label:    string;
   sublabel?: string;
+  disabled?: boolean;
 }
 
 interface Props {
@@ -95,17 +96,24 @@ export default function SearchableSelect({
                 <button
                   key={o.id}
                   type="button"
+                  disabled={o.disabled}
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => { onChange(o.id); setShowDrop(false); setBusqueda(""); }}
+                  onClick={() => { if (o.disabled) return; onChange(o.id); setShowDrop(false); setBusqueda(""); }}
                   className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-100 last:border-0
                     transition-colors ${
-                    o.id === value ? "bg-blue-50 text-blue-800 font-semibold" : "text-gray-800 hover:bg-blue-50 active:bg-blue-100"
+                    o.disabled
+                      ? "text-gray-400 cursor-not-allowed opacity-60"
+                      : o.id === value ? "bg-blue-50 text-blue-800 font-semibold" : "text-gray-800 hover:bg-blue-50 active:bg-blue-100"
                   }`}
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="flex-1 min-w-0">
                       <span className="block truncate">{o.label}</span>
-                      {o.sublabel && <span className="block text-xs text-gray-400 font-normal truncate">{o.sublabel}</span>}
+                      {o.sublabel && (
+                        <span className={`block text-xs font-normal truncate ${o.disabled ? "text-red-500" : "text-gray-400"}`}>
+                          {o.sublabel}
+                        </span>
+                      )}
                     </span>
                     {o.id === value && <span className="text-blue-500 flex-shrink-0">✓</span>}
                   </span>

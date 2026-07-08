@@ -38,7 +38,11 @@ export default function SalidaPicking() {
     return unsub;
   }, []);
 
-  // Saldo por producto; solo se puede sacar lo que tiene stock disponible (> 0)
+  // Saldo por producto — Mejora #46: antes se filtraba a saldo > 0, así que un
+  // producto que se agotaba (por un despacho grande, otra salida, etc.)
+  // desaparecía de la lista sin ninguna explicación visible. Ahora se muestran
+  // TODOS los productos con historial, y los que están en 0 o negativo quedan
+  // deshabilitados con el motivo a la vista ("sin stock") en vez de esfumarse.
   const saldo = useMemo<SaldoItem[]>(() => {
     const map = new Map<string, { nombre: string; saldo: number }>();
     for (const m of movs) {
@@ -47,8 +51,7 @@ export default function SalidaPicking() {
     }
     return Array.from(map.entries())
       .map(([pid, d]) => ({ pid, ...d }))
-      .filter((p) => p.saldo > 0)
-      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+      .sort((a, b) => (b.saldo > 0) === (a.saldo > 0) ? a.nombre.localeCompare(b.nombre, "es") : (b.saldo > 0 ? 1 : -1));
   }, [movs]);
 
   const saldoMap = useMemo(
@@ -69,7 +72,7 @@ export default function SalidaPicking() {
   function agregar() {
     const prod = saldoMap[sel];
     const n = Number(qty);
-    if (!prod || !n || n <= 0) return;
+    if (!prod || prod.saldo <= 0 || !n || n <= 0) return;
     setItems((prev) => {
       const idx = prev.findIndex((i) => i.pid === sel);
       if (idx >= 0) {
@@ -184,7 +187,11 @@ export default function SalidaPicking() {
               <SearchableSelect
                 value={sel}
                 onChange={setSel}
-                options={saldo.map((p) => ({ id: p.pid, label: p.nombre, sublabel: `disponible: ${p.saldo}` }))}
+                options={saldo.map((p) => ({
+                  id: p.pid, label: p.nombre,
+                  sublabel: p.saldo > 0 ? `disponible: ${p.saldo}` : `sin stock (${p.saldo})`,
+                  disabled: p.saldo <= 0,
+                }))}
                 placeholder="Buscar producto…"
                 emptyLabel="Elegir…"
               />
