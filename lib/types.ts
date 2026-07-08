@@ -111,6 +111,48 @@ export interface PuntosConfig {
   meta?:     number;
 }
 
+// ─── WhatsApp de facturación por día (config/whatsapp_facturacion) ────────────
+// Fase 5 del plan de conexión (REGLAS.md, Regla 4). El chofer envía su reporte
+// diario al número de este documento según el día de la semana — una persona
+// cubre 6 días, otra el día libre de la primera. Claves en ASCII sin tildes;
+// cada valor es el número en formato internacional sin "+" ni espacios
+// (ej. "18091234567"). Lo lee app-chofer (api/index.js, server-side, zona
+// America/Santo_Domingo) — este documento es la única fuente, editable acá.
+export interface WhatsappFacturacionConfig {
+  lunes?:     string;
+  martes?:    string;
+  miercoles?: string;
+  jueves?:    string;
+  viernes?:   string;
+  sabado?:    string;
+  domingo?:   string;
+}
+
+export const DIAS_FACTURACION: { key: keyof WhatsappFacturacionConfig; label: string }[] = [
+  { key: "lunes",     label: "Lunes"     },
+  { key: "martes",    label: "Martes"    },
+  { key: "miercoles", label: "Miércoles" },
+  { key: "jueves",    label: "Jueves"    },
+  { key: "viernes",   label: "Viernes"   },
+  { key: "sabado",    label: "Sábado"    },
+  { key: "domingo",   label: "Domingo"   },
+];
+
+// Día de hoy (clave ASCII) en zona America/Santo_Domingo — mismo cálculo que
+// app-chofer/api/index.js:numeroWhatsappHoy(), para mostrar en el Hub cuál
+// número está activo ahora mismo sin duplicar la lógica de enrutamiento real
+// (esa sigue viviendo server-side en app-chofer, esto es solo de lectura/UI).
+export function diaFacturacionHoy(): keyof WhatsappFacturacionConfig {
+  const en = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Santo_Domingo", weekday: "long",
+  }).format(new Date()).toLowerCase();
+  const map: Record<string, keyof WhatsappFacturacionConfig> = {
+    sunday: "domingo", monday: "lunes", tuesday: "martes", wednesday: "miercoles",
+    thursday: "jueves", friday: "viernes", saturday: "sabado",
+  };
+  return map[en] ?? "lunes";
+}
+
 // ─── Precios de venta (config/precios) ────────────────────────────────────────
 
 export interface PrecioProducto {

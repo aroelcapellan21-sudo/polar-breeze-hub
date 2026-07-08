@@ -6,6 +6,7 @@ import { db, auth } from "@/lib/firebase";
 import { reauthenticateWithCredential, EmailAuthProvider, updatePassword } from "firebase/auth";
 import {
   FsConfig, PuntoProducto, PuntosConfig, PrecioProducto, PreciosConfig, toProductoId,
+  WhatsappFacturacionConfig, DIAS_FACTURACION, diaFacturacionHoy,
 } from "@/lib/types";
 import PasswordInput from "@/components/shared/PasswordInput";
 
@@ -28,7 +29,7 @@ async function restUpdatePassword(idToken: string, newPassword: string) {
   return r.json() as Promise<{ error?: { message: string } }>;
 }
 
-type Section = "passwords" | "config" | "puntos" | "precios" | "telegram" | "correo";
+type Section = "passwords" | "config" | "puntos" | "precios" | "telegram" | "correo" | "facturacion";
 
 export default function ConfigModal({ onClose }: { onClose: () => void }) {
   const [section, setSection] = useState<Section>("passwords");
@@ -88,6 +89,41 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
       flashPuntos("ok", "Puntos guardados ✓");
     } catch (e) {
       flashPuntos("err", e instanceof Error ? e.message : "Error");
+    }
+  };
+
+  // ── WhatsApp Facturación por día (config/whatsapp_facturacion — Fase 5) ───────
+  const [waFact,      setWaFact]      = useState<WhatsappFacturacionConfig>({});
+  const [waFactLoad,  setWaFactLoad]  = useState(false);
+  const [waFactMsg,   setWaFactMsg]   = useState<{ type: "ok"|"err"; text: string }|null>(null);
+
+  useEffect(() => {
+    getDoc(doc(db, "config", "whatsapp_facturacion")).then((snap) => {
+      if (snap.exists()) setWaFact(snap.data() as WhatsappFacturacionConfig);
+    });
+  }, []);
+
+  const flashWaFact = (type: "ok"|"err", text: string) => {
+    setWaFactMsg({ type, text });
+    setTimeout(() => setWaFactMsg(null), 4000);
+  };
+
+  const saveWaFact = async () => {
+    setWaFactLoad(true);
+    try {
+      // Solo dígitos por campo — Regla 4: formato internacional sin "+" ni espacios.
+      const limpio: WhatsappFacturacionConfig = {};
+      for (const { key } of DIAS_FACTURACION) {
+        const v = (waFact[key] ?? "").replace(/\D/g, "");
+        if (v) limpio[key] = v;
+      }
+      await setDoc(doc(db, "config", "whatsapp_facturacion"), limpio);
+      setWaFact(limpio);
+      flashWaFact("ok", "Números guardados ✓");
+    } catch (e) {
+      flashWaFact("err", e instanceof Error ? e.message : "Error");
+    } finally {
+      setWaFactLoad(false);
     }
   };
 
@@ -399,6 +435,7 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
     { key: "config",    label: "Config",       icon: "🏢" },
     { key: "puntos",    label: "Puntos",       icon: "⭐" },
     { key: "precios",   label: "Precios",      icon: "💵" },
+    { key: "facturacion", label: "Facturación", icon: "🧾" },
     { key: "telegram",  label: "Telegram",     icon: "🤖" },
     { key: "correo",    label: "Correo",        icon: "📧" },
   ];
@@ -714,6 +751,57 @@ export default function ConfigModal({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Facturación: WhatsApp por día (Fase 5) ── */}
+          {section === "facturacion" && (
+            <div className="space-y-4">
+              <div>
+                <p className="font-semibold text-gray-700 text-sm">🧾 WhatsApp de Facturación por día</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Número al que cada chofer envía su reporte de venta del día, según el día de la
+                  semana — una persona cubre 6 días, otra el día libre de la primera. Formato
+                  internacional sin <code className="bg-gray-100 px-1 rounded">+</code> ni espacios,
+                  ej. <code className="bg-gray-100 px-1 rounded">18091234567</code>.
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
+                Hoy corresponde: <strong>{DIAS_FACTURACION.find((d) => d.key === diaFacturacionHoy())?.label}</strong>
+                {" — "}
+                {waFact[diaFacturacionHoy()]
+                  ? <span className="font-mono">{waFact[diaFacturacionHoy()]}</span>
+                  : <span className="text-red-600">sin número configurado para hoy</span>}
+              </div>
+
+              <div className="space-y-2.5">
+                {DIAS_FACTURACION.map(({ key, label }) => (
+                  <Field
+                    key={key}
+                    label={label}
+                    value={waFact[key] ?? ""}
+                    onChange={(v) => setWaFact((p) => ({ ...p, [key]: v }))}
+                    placeholder="18091234567"
+                  />
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={saveWaFact}
+                  disabled={waFactLoad}
+                  className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-lg text-sm font-semibold transition-all duration-100 disabled:opacity-60"
+                >
+                  {waFactLoad ? "Guardando..." : "🧾 Guardar Facturación"}
+                </button>
+                {waFactMsg && (
+                  <span className={`text-sm px-3 py-1.5 rounded-lg ${
+                    waFactMsg.type === "ok" ? "bg-green-50 text-green-700 border border-green-200"
+                                             : "bg-red-50 text-red-700 border border-red-200"
+                  }`}>{waFactMsg.text}</span>
+                )}
+              </div>
             </div>
           )}
 
