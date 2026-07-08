@@ -181,19 +181,13 @@ export default function SalidaPicking() {
           <div className="no-print flex flex-wrap items-end gap-2">
             <label className="flex-1 min-w-[160px]">
               <span className="block text-xs font-semibold text-gray-500 mb-1">Producto</span>
-              <select
+              <SearchableSelect
                 value={sel}
-                onChange={(e) => setSel(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800
-                  bg-white focus:outline-none focus:ring-2 focus:ring-[#1E8C3A]/30"
-              >
-                <option value="">Elegir…</option>
-                {saldo.map((p) => (
-                  <option key={p.pid} value={p.pid}>
-                    {p.nombre} (disp. {p.saldo})
-                  </option>
-                ))}
-              </select>
+                onChange={setSel}
+                options={saldo.map((p) => ({ id: p.pid, label: p.nombre, sublabel: `disponible: ${p.saldo}` }))}
+                placeholder="Buscar producto…"
+                emptyLabel="Elegir…"
+              />
             </label>
             <label className="w-24">
               <span className="block text-xs font-semibold text-gray-500 mb-1">Cantidad</span>

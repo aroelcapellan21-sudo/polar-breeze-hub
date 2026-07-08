@@ -20,6 +20,7 @@ import {
 import RegistrarInventario from "@/components/encargado/RegistrarInventario";
 import DespachoChofer      from "@/components/encargado/DespachoChofer";
 import BuscadorArea, { coincide } from "@/components/shared/BuscadorArea";
+import SearchableSelect    from "@/components/shared/SearchableSelect";
 
 // ─── Tipos locales ────────────────────────────────────────────────────────────
 
@@ -880,13 +881,14 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
                                 </div>
                               )}
                               <div className="flex gap-1.5">
-                                <select value={nuevoProdId} onChange={(e) => setNuevoProdId(e.target.value)}
-                                  className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white outline-none focus:ring-2 focus:ring-blue-400">
-                                  <option value="">Producto…</option>
-                                  {precios.map((p) => (
-                                    <option key={p.producto_id} value={p.producto_id}>{p.nombre}</option>
-                                  ))}
-                                </select>
+                                <SearchableSelect
+                                  value={nuevoProdId}
+                                  onChange={setNuevoProdId}
+                                  options={precios.map((p) => ({ id: p.producto_id, label: p.nombre }))}
+                                  placeholder="Buscar producto…"
+                                  emptyLabel="Producto…"
+                                  className="flex-1 min-w-0"
+                                />
                                 <input type="number" min={1} value={nuevoCant}
                                   onChange={(e) => setNuevoCant(Number(e.target.value) || 1)}
                                   className="w-14 px-2 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-400" />

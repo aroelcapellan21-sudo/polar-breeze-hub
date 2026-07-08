@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { PrecioProducto, LoteLoker, ProductoItem, toProductoId, toDate, resolverProductoEnCatalogo } from "@/lib/types";
 import CameraScanner from "@/components/shared/CameraScanner";
 import { ImageUploader, AiButton } from "@/components/despachador/shared";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 
 interface ProductoLote {
   nombre:          string;
@@ -1040,19 +1041,16 @@ export default function RegistroLote() {
 
                       {panelAbierto[it.producto_id] === "vincular" && (
                         <div className="space-y-1.5">
-                          <select
-                            defaultValue=""
-                            onChange={(e) => {
-                              const elegido = catalogo.find(p => p.producto_id === e.target.value);
+                          <SearchableSelect
+                            value=""
+                            onChange={(pid) => {
+                              const elegido = catalogo.find(p => p.producto_id === pid);
                               if (elegido) vincularExistente(it, elegido);
                             }}
-                            className="w-full border border-red-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-                          >
-                            <option value="" disabled>Selecciona el producto correcto…</option>
-                            {catalogo.map(p => (
-                              <option key={p.producto_id} value={p.producto_id}>{p.nombre}</option>
-                            ))}
-                          </select>
+                            options={catalogo.map(p => ({ id: p.producto_id, label: p.nombre }))}
+                            placeholder="Buscar producto…"
+                            emptyLabel="Selecciona el producto correcto…"
+                          />
                           <button
                             type="button"
                             onClick={() => cerrarPanel(it)}
