@@ -4,6 +4,7 @@ export interface InventarioBaseItem {
   nombre:      string;
   producto_id: string;
   cantidad:    number;
+  codigo?:     number;  // lo agrega BON (api/index.js) al despachar — preservar, nunca soltar en el Hub
 }
 
 export interface UserProfile {

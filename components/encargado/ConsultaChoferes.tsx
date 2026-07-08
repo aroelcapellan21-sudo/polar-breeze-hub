@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { collection, query, where, onSnapshot, getDoc, setDoc, doc, Timestamp } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDoc, setDoc, doc, Timestamp, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   UserProfile, TalonarioDoc, MovimientoLoker,
@@ -113,6 +113,11 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
 
   const [editandoBase, setEditandoBase] = useState<string | null>(null); // uid del chofer en edición
   const [filasBase,    setFilasBase]    = useState<InventarioBaseItem[]>([]);
+  // Foto de inventario_base tal como estaba al abrir el editor — NUNCA se edita.
+  // Sirve para detectar en guardarBase() si BON (u otra sesión) lo cambió mientras
+  // Oliver editaba (P7, auditoría 2026-07-04): sin esto, el setDoc de acá pisaba en
+  // silencio lo que BON ya había despachado con su propia transacción.
+  const [filasBaseOriginal, setFilasBaseOriginal] = useState<InventarioBaseItem[]>([]);
   const [nuevoProdId,  setNuevoProdId]  = useState("");
   const [nuevoCant,    setNuevoCant]    = useState(1);
   const [guardandoBase, setGuardandoBase] = useState(false);
@@ -120,7 +125,9 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
 
   const abrirEdicionBase = (c: UserProfile) => {
     setEditandoBase(c.uid);
-    setFilasBase(c.inventario_base ?? []);
+    const actual = c.inventario_base ?? [];
+    setFilasBase(actual);
+    setFilasBaseOriginal(actual);
     setNuevoProdId(""); setNuevoCant(1);
   };
 
@@ -154,20 +161,53 @@ export default function ConsultaChoferes({ onPendientesChange }: Props) {
     setFilasBase((prev) => prev.filter((f) => f.producto_id !== producto_id));
   };
 
+  // ¿Mismo inventario? Comparación insensible al orden — BON y el Hub pueden
+  // escribir las filas en distinto orden sin que eso cuente como un cambio real.
+  const mismoInventario = (a: InventarioBaseItem[], b: InventarioBaseItem[]): boolean => {
+    if (a.length !== b.length) return false;
+    const norm = (arr: InventarioBaseItem[]) =>
+      [...arr].sort((x, y) => x.producto_id.localeCompare(y.producto_id))
+        .map((f) => `${f.producto_id}:${f.cantidad}`).join("|");
+    return norm(a) === norm(b);
+  };
+
+  const CONFLICTO_BASE = "conflicto_base";
+
   const guardarBase = async (uid: string) => {
     setGuardandoBase(true);
+    let esConflicto = false;
     try {
-      await setDoc(doc(db, "usuarios", uid), {
-        inventario_base: filasBase,
-        inventarioBaseDate: Timestamp.now(),
-      }, { merge: true });
+      const userRef = doc(db, "usuarios", uid);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(userRef);
+        const actualEnFirestore: InventarioBaseItem[] = snap.exists()
+          ? (snap.data().inventario_base as InventarioBaseItem[] | undefined) ?? []
+          : [];
+        // P7: si lo que hay ahora mismo en Firestore ya no es lo que Oliver vio al
+        // abrir el editor, algo más lo cambió mientras tanto (típicamente BON
+        // despachando) — abortamos SIN escribir en vez de pisarlo en silencio.
+        if (!mismoInventario(actualEnFirestore, filasBaseOriginal)) {
+          throw new Error(CONFLICTO_BASE);
+        }
+        tx.set(userRef, {
+          inventario_base: filasBase,
+          inventarioBaseDate: Timestamp.now(),
+        }, { merge: true });
+      });
       setBaseMsg({ uid, type: "ok", text: "Base declarada ✓" });
       setEditandoBase(null);
     } catch (e) {
-      setBaseMsg({ uid, type: "err", text: e instanceof Error ? e.message : "Error al guardar" });
+      esConflicto = e instanceof Error && e.message === CONFLICTO_BASE;
+      setBaseMsg({
+        uid,
+        type: "err",
+        text: esConflicto
+          ? "El inventario de este chofer cambió mientras editabas (probablemente BON despachó algo). Cerrá y volvé a abrir para ver los valores actuales antes de guardar."
+          : e instanceof Error ? e.message : "Error al guardar",
+      });
     } finally {
       setGuardandoBase(false);
-      setTimeout(() => setBaseMsg(null), 4000);
+      setTimeout(() => setBaseMsg(null), esConflicto ? 8000 : 4000);
     }
   };
 
