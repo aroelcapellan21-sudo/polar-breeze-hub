@@ -13,6 +13,7 @@ import CuartoFrio    from "@/components/despachador/CuartoFrio";
 import Choferes      from "@/components/despachador/Choferes";
 import Comparar      from "@/components/despachador/Comparar";
 import Historial     from "@/components/despachador/Historial";
+import InventarioDespachador from "@/components/despachador/InventarioDespachador";
 import InformeCierre         from "@/components/despachador/InformeCierre";
 import AvisoBon              from "@/components/despachador/AvisoBon";
 import AnomaliasDespachador  from "@/components/admin/AnomaliasDespachador";
@@ -23,7 +24,7 @@ import PWAInstallBanner     from "@/components/shared/PWAInstallBanner";
 import AsistenteAI          from "@/components/shared/AsistenteAI";
 import WelcomeBanner        from "@/components/shared/WelcomeBanner";
 
-type Tab = "cuartofrio" | "choferes" | "comparar" | "historial" | "cierre" | "anomalias";
+type Tab = "cuartofrio" | "choferes" | "comparar" | "historial" | "cierre" | "anomalias" | "inventario";
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: "cuartofrio", icon: "🥶", label: "Cuarto Frío" },
@@ -32,6 +33,7 @@ const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: "historial",  icon: "📅", label: "Historial"   },
   { key: "cierre",     icon: "📋", label: "Cierre"      },
   { key: "anomalias",  icon: "⚠️", label: "Anomalías"   },
+  { key: "inventario", icon: "📦", label: "Inventario"  },
 ];
 
 export default function DespachadorDashboard() {
@@ -221,6 +223,7 @@ export default function DespachadorDashboard() {
               {tab === "historial"  && "Historial — registros del día por tipo"}
               {tab === "cierre"     && "Cierre — informe final del día de despacho"}
             {tab === "anomalias"  && "Anomalías — registrar productos faltantes en el despacho"}
+              {tab === "inventario" && "Inventario — entradas/salidas del Loker · asignar a chofer"}
             </button>
             {/* Chofer breadcrumb */}
             {tab === "choferes" && selChofer && (
@@ -284,6 +287,7 @@ export default function DespachadorDashboard() {
         {tab === "anomalias"  && (
           <AnomaliasDespachador mode="despachador" registradorNombre={despNombre} />
         )}
+        {tab === "inventario" && <InventarioDespachador />}
       </main>
 
       {/* ── Modal: ¿Quién despacha? ── */}

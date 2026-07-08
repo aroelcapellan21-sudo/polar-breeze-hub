@@ -178,8 +178,8 @@ export async function POST(req: NextRequest) {
   }
 
   const rol = await rolDe(callerUid, saToken);
-  if (rol !== "admin" && rol !== "encargado") {
-    return NextResponse.json({ error: "Solo Admin o Encargado pueden registrar productos nuevos." }, { status: 403 });
+  if (rol !== "admin" && rol !== "encargado" && rol !== "despachador") {
+    return NextResponse.json({ error: "Solo Admin, Encargado o Despachador pueden registrar productos nuevos." }, { status: 403 });
   }
 
   const producto_id = toProductoId(nombre);

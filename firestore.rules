@@ -72,8 +72,10 @@ service cloud.firestore {
       // inventario_base del chofer. Acotado por campo — Encargado NUNCA
       // puede tocar role/email/activo ni ningún otro campo de este doc,
       // solo estos dos (el resto de la escritura sigue admin-only vía
-      // el catch-all de arriba).
-      allow write: if esEncargado() &&
+      // el catch-all de arriba). Mejora #41 (2026-07-08): Despachador
+      // (Oliver) comparte este mismo permiso acotado — reutiliza
+      // InventarioChoferesAjuste.tsx desde su propio dashboard.
+      allow write: if (esEncargado() || esDespacha()) &&
                       request.resource.data.diff(resource.data).affectedKeys()
                         .hasOnly(['inventario_base', 'inventarioBaseDate']);
     }
@@ -110,17 +112,21 @@ service cloud.firestore {
     }
 
     // ── Encargado + Admin: lotes_loker · codigos_cajas · weight_alerts · pedidos_bon ───────
-    match /lotes_loker/{id}       { allow read, write: if esAdmin() || esEncargado(); }
+    // lotes_loker y codigos_cajas: Despachador también (mejora #41, 2026-07-08) —
+    // Oliver reutiliza RegistroLote.tsx desde su propio dashboard para registrar
+    // entradas. weight_alerts/pedidos_bon quedan Encargado-only, no los toca esa mejora.
+    match /lotes_loker/{id}       { allow read, write: if esAdmin() || esEncargado() || esDespacha(); }
     match /lotes_weight/{id}      { allow read, write: if esAdmin() || esEncargado(); }
-    match /codigos_cajas/{codigo} { allow read, write: if esAdmin() || esEncargado(); }
+    match /codigos_cajas/{codigo} { allow read, write: if esAdmin() || esEncargado() || esDespacha(); }
     match /weight_alerts/{id}     { allow read, write: if esAdmin() || esEncargado(); }
     match /pedidos_bon/{id}       { allow read, write: if esAdmin() || esEncargado(); }
 
     // alias_productos: diccionario inteligente de Registro de Lote (mejora #30/#34) —
-    // el Encargado vincula un texto no reconocido de la IA a un producto_id existente;
-    // config/precios en sí sigue admin-only (se escribe vía /api/registrar-producto-nuevo
-    // con service account, no desde el cliente).
-    match /alias_productos/{clave} { allow read, write: if esAdmin() || esEncargado(); }
+    // vincula un texto no reconocido de la IA a un producto_id existente; Despachador
+    // también (mejora #41) porque reutiliza el mismo RegistroLote.tsx. config/precios
+    // en sí sigue admin-only (se escribe vía /api/registrar-producto-nuevo con service
+    // account, no desde el cliente).
+    match /alias_productos/{clave} { allow read, write: if esAdmin() || esEncargado() || esDespacha(); }
 
     // facturas_proveedor: recepción de factura fiscal de proveedor (Encargado) —
     // registro fiscal solamente, no toca movimientos_loker/lotes_loker.
