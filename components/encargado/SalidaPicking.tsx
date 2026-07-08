@@ -5,6 +5,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, Timestamp } from "fireb
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { MovimientoLoker } from "@/lib/types";
+import SearchableSelect from "@/components/shared/SearchableSelect";
 
 type PickItem = { pid: string; nombre: string; cantidad: number };
 type SaldoItem = { pid: string; nombre: string; saldo: number };
