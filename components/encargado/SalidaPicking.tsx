@@ -194,7 +194,6 @@ export default function SalidaPicking() {
                 }))}
                 placeholder="Buscar producto…"
                 emptyLabel="Elegir…"
-                panelMaxHeightPx={512}
               />
             </label>
             <label className="w-24">
