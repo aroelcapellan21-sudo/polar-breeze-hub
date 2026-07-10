@@ -29,7 +29,7 @@ export default function SalidaPicking() {
       (err) => {
         setError(
           err?.code === "permission-denied"
-            ? "No se pudo leer el stock: sin permiso sobre movimientos_loker."
+            ? "No se pudo leer el stock: sin permiso sobre movimientos_loker. Revisa/despliega las reglas Firestore."
             : "No se pudo leer el stock del loker."
         );
         setCargado(true);
@@ -194,6 +194,7 @@ export default function SalidaPicking() {
                 }))}
                 placeholder="Buscar producto…"
                 emptyLabel="Elegir…"
+                panelMaxHeightPx={512}
               />
             </label>
             <label className="w-24">
