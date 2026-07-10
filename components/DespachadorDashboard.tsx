@@ -172,7 +172,6 @@ export default function DespachadorDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <BandejaDespachoBanner pendientes={bandejaPendientes} onVerBandeja={() => setTab("bandeja")} />
 
       {/* ── Header — gradiente tricolor Polar Breeze ── */}
       <header
@@ -267,6 +266,7 @@ export default function DespachadorDashboard() {
       </header>
 
       <WelcomeBanner nombre={profile?.nombre ?? ""} area="Despacho" acento="#D42B2B" />
+      <BandejaDespachoBanner pendientes={bandejaPendientes} onVerBandeja={() => setTab("bandeja")} />
 
       {/* ── Barra de identidad del despachador ── */}
       <div className={`border-b ${despNombre ? "bg-[#FFFBE6] border-[#F5C800]/30" : "bg-[#FFFBE6] border-[#F5C800]/50"}`}>
