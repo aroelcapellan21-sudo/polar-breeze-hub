@@ -135,6 +135,11 @@ service cloud.firestore {
     // ── notas_credito: gestionadas desde el Hub Admin (Inventario) ───────────
     match /notas_credito/{id}     { allow read, write: if esAdmin(); }
 
+    // bandeja_despacho: bandeja general del Despachador (Oliver). Encargado/Admin
+    // crean notas (y a futuro correcciones de reporte); Despachador las lee y
+    // marca leída/resuelta. Sin acceso de Chofer.
+    match /bandeja_despacho/{id}  { allow read, write: if esAdmin() || esDespacha() || esEncargado(); }
+
     // Colecciones no listadas (alertas, logs, etc.) → solo Admin vía catch-all
   }
 }

@@ -481,3 +481,26 @@ export interface FacturaProveedor {
   registradoPorId:     string;
   timestamp:           Date | { seconds: number };
 }
+
+// ─── Bandeja de Despacho (colección bandeja_despacho) ────────────────────────
+// Sub-mejora 1 de PLAN-CORRECCION-CHOFER-2026-07-09: bandeja general del
+// Despachador (Oliver). Encargado/Admin crean tipo='nota'; correcciones de
+// reporte (tipo='correccion_reporte') y avisos de reposición
+// (tipo='reposicion_disponible') se suman en sub-mejoras futuras — el shape ya
+// las contempla para no migrar la colección después.
+
+export interface BandejaDespachoItem {
+  id?:      string;
+  tipo:     "nota" | "correccion_reporte" | "reposicion_disponible";
+  estado:   "pendiente" | "leida" | "resuelta";
+  ficha?:   string | null;   // chofer asociado; null/ausente = nota general
+  texto?:   string;          // para tipo='nota'
+  productos?: { codigo: number; producto_id: string; nombre: string; cantidad: number }[]; // productos del catálogo adjuntos a la nota
+  payload?: Record<string, unknown>; // shape libre por tipo (correccion_reporte, reposicion_disponible — futuro)
+  creadoPor: { uid: string; nombre: string; rol: string };
+  timestamp: Date | { seconds: number };
+  leidaPor?:    string;
+  leidaEn?:     Date | { seconds: number };
+  resueltaPor?: string;
+  resueltaEn?:  Date | { seconds: number };
+}

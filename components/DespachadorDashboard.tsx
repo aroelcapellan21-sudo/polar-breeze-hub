@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import PasswordInput from "@/components/shared/PasswordInput";
 import SideNavDrawer, { NavSection } from "@/components/shared/SideNavDrawer";
 import {
-  collection, getDocs, doc, setDoc, updateDoc, Timestamp, getDoc,
+  collection, getDocs, doc, setDoc, updateDoc, Timestamp, getDoc, onSnapshot, query, where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
@@ -16,6 +16,8 @@ import Historial     from "@/components/despachador/Historial";
 import InventarioDespachador from "@/components/despachador/InventarioDespachador";
 import InformeCierre         from "@/components/despachador/InformeCierre";
 import AvisoBon              from "@/components/despachador/AvisoBon";
+import BandejaDespacho       from "@/components/shared/BandejaDespacho";
+import BandejaDespachoBanner from "@/components/shared/BandejaDespachoBanner";
 import AnomaliasDespachador  from "@/components/admin/AnomaliasDespachador";
 import FloatingFAB          from "@/components/shared/FloatingFAB";
 import ConsultarTablaModal  from "@/components/shared/ConsultarTablaModal";
@@ -24,7 +26,7 @@ import PWAInstallBanner     from "@/components/shared/PWAInstallBanner";
 import AsistenteAI          from "@/components/shared/AsistenteAI";
 import WelcomeBanner        from "@/components/shared/WelcomeBanner";
 
-type Tab = "cuartofrio" | "choferes" | "comparar" | "historial" | "cierre" | "anomalias" | "inventario";
+type Tab = "cuartofrio" | "choferes" | "comparar" | "historial" | "cierre" | "anomalias" | "inventario" | "bandeja";
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: "cuartofrio", icon: "🥶", label: "Cuarto Frío" },
@@ -34,17 +36,31 @@ const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: "cierre",     icon: "📋", label: "Cierre"      },
   { key: "anomalias",  icon: "⚠️", label: "Anomalías"   },
   { key: "inventario", icon: "📦", label: "Inventario"  },
+  { key: "bandeja",    icon: "📨", label: "Bandeja"      },
 ];
 
 export default function DespachadorDashboard() {
   const { profile, logout } = useAuth();
   const [tab,        setTab]        = useState<Tab>("cuartofrio");
   const [selChofer,  setSelChofer]  = useState<UserProfile | null>(null);
+  const [bandejaPendientes, setBandejaPendientes] = useState(0);
 
   // Deep-link desde los shortcuts del manifest PWA (?tab=...) — comportamiento nativo
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
     if (t && TABS.some(x => x.key === t)) setTab(t as Tab);
+  }, []);
+
+  // Conteo de pendientes de la Bandeja de Despacho — montado siempre (no solo
+  // cuando se abre el tab), para que el badge del menú y el banner fijo sean
+  // confiables desde que se abre la página, no solo después de visitar el tab.
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, "bandeja_despacho"), where("estado", "==", "pendiente")),
+      (snap) => setBandejaPendientes(snap.size),
+      () => setBandejaPendientes(0),
+    );
+    return unsub;
   }, []);
 
   // Identidad del despachador activo
@@ -146,13 +162,17 @@ export default function DespachadorDashboard() {
         key: t.key,
         icon: t.icon,
         label: t.label,
-        badge: t.key === "choferes" && selChofer ? selChofer.nombre.split(" ")[0] : undefined,
+        badge:
+          t.key === "choferes" && selChofer ? selChofer.nombre.split(" ")[0]
+          : t.key === "bandeja" && bandejaPendientes > 0 ? (bandejaPendientes > 9 ? "9+" : String(bandejaPendientes))
+          : undefined,
       })),
     },
   ];
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <BandejaDespachoBanner pendientes={bandejaPendientes} onVerBandeja={() => setTab("bandeja")} />
 
       {/* ── Header — gradiente tricolor Polar Breeze ── */}
       <header
@@ -224,6 +244,7 @@ export default function DespachadorDashboard() {
               {tab === "cierre"     && "Cierre — informe final del día de despacho"}
             {tab === "anomalias"  && "Anomalías — registrar productos faltantes en el despacho"}
               {tab === "inventario" && "Inventario — entradas/salidas del Loker · asignar a chofer"}
+              {tab === "bandeja"    && "Bandeja — notas del Encargado, pendiente hasta atenderlas"}
             </button>
             {/* Chofer breadcrumb */}
             {tab === "choferes" && selChofer && (
@@ -288,6 +309,9 @@ export default function DespachadorDashboard() {
           <AnomaliasDespachador mode="despachador" registradorNombre={despNombre} />
         )}
         {tab === "inventario" && <InventarioDespachador />}
+        {tab === "bandeja"    && (
+          <BandejaDespacho puedeCrear={false} puedeResolver={true} />
+        )}
       </main>
 
       {/* ── Modal: ¿Quién despacha? ── */}
