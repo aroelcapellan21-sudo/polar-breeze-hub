@@ -12,14 +12,34 @@
 // principio del CONTRATO-IDENTIDAD-CANONICA.md (evita el caso P5 de la
 // auditoría: texto libre vs. código real).
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  collection, addDoc, doc, getDoc, getDocs, updateDoc, onSnapshot, query, where, orderBy, Timestamp,
+  collection, addDoc, doc, getDoc, getDocs, updateDoc, writeBatch, onSnapshot, query, where, orderBy, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { BandejaDespachoItem, PrecioProducto } from "@/lib/types";
 import SearchableSelect, { SearchableOption } from "@/components/shared/SearchableSelect";
+
+// Beep corto sintetizado (Web Audio API) — sin archivo de audio. Se usa para
+// alertar de tickets nuevos de discrepancia (una vez) y de deudas pendientes
+// (cada vez que se monta el componente mientras sigan sin saldar).
+function reproducirBeep() {
+  try {
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  } catch { /* best-effort, nunca rompe la UI si el navegador bloquea audio */ }
+}
 
 interface Props {
   puedeCrear: boolean;      // Encargado/Admin: escribe notas nuevas
@@ -43,10 +63,40 @@ export default function BandejaDespacho({ puedeCrear, puedeResolver }: Props) {
 
   const flash = (type: "ok" | "err", text: string) => { setMsg({ type, text }); setTimeout(() => setMsg(null), 3000); };
 
+  // IDs de tickets de discrepancia (creadoPor.rol==='sistema') ya vistos en esta
+  // sesión — para sonar SOLO en la llegada nueva, no en cada re-render. Las deudas
+  // pendientes (tipo='deuda_chofer') en cambio suenan una vez POR MONTAJE del
+  // componente mientras sigan sin saldar (recordatorio insistente, a propósito
+  // distinto de la discrepancia — así lo pidió Ariel).
+  const sistemaVistosRef = useRef<Set<string> | null>(null);
+  const deudaSonadaRef = useRef(false);
+
   useEffect(() => {
     const q = query(collection(db, "bandeja_despacho"), orderBy("timestamp", "desc"));
     const unsub = onSnapshot(q, (snap) => {
-      setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BandejaDespachoItem)));
+      const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() } as BandejaDespachoItem));
+      setItems(lista);
+
+      // Ticket nuevo de discrepancia (sistema) — suena solo la primera vez que aparece.
+      const idsSistema = new Set(
+        lista.filter((it) => it.tipo === "nota" && it.creadoPor?.rol === "sistema" && it.estado === "pendiente")
+          .map((it) => it.id!)
+      );
+      if (sistemaVistosRef.current === null) {
+        sistemaVistosRef.current = idsSistema; // primer snapshot: establece la base, no suena
+      } else {
+        const hayNuevo = [...idsSistema].some((id) => !sistemaVistosRef.current!.has(id));
+        if (hayNuevo) reproducirBeep();
+        sistemaVistosRef.current = idsSistema;
+      }
+
+      // Deuda pendiente — suena una vez por montaje (no en cada snapshot) mientras
+      // exista al menos una tipo='deuda_chofer' sin saldar.
+      const hayDeudaPendiente = lista.some((it) => it.tipo === "deuda_chofer" && it.estado !== "resuelta");
+      if (hayDeudaPendiente && !deudaSonadaRef.current) {
+        reproducirBeep();
+        deudaSonadaRef.current = true;
+      }
     });
     return () => unsub();
   }, []);
@@ -127,6 +177,29 @@ export default function BandejaDespacho({ puedeCrear, puedeResolver }: Props) {
     setBusy(false);
   };
 
+  // Saldar una deuda del chofer: a diferencia de marcarResuelta, toca DOS
+  // documentos (el ticket en bandeja_despacho Y el doc en deudas_chofer) — se
+  // usa un batch para que ambos queden consistentes. El chofer nunca llega
+  // acá (no tiene puedeCrear ni puedeResolver en su propia app).
+  const marcarSaldada = async (it: BandejaDespachoItem) => {
+    if (!it.id || !it.deuda?.deudaId) return;
+    setBusy(true);
+    try {
+      const ahora = Timestamp.now();
+      const quien = { uid: profile?.uid ?? "", nombre: profile?.nombre ?? "", rol: profile?.role ?? "" };
+      const batch = writeBatch(db);
+      batch.update(doc(db, "bandeja_despacho", it.id), {
+        estado: "resuelta", resueltaPor: quien.nombre, resueltaEn: ahora,
+      });
+      batch.update(doc(db, "deudas_chofer", it.deuda.deudaId), {
+        estado: "saldada", saldadaPor: quien, saldadaEn: ahora,
+      });
+      await batch.commit();
+      flash("ok", "Deuda saldada ✓");
+    } catch (e) { flash("err", e instanceof Error ? e.message : "Error"); }
+    setBusy(false);
+  };
+
   const estadoBadge = (estado: BandejaDespachoItem["estado"]) => {
     if (estado === "pendiente") return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 whitespace-nowrap">⏳ Pendiente</span>;
     if (estado === "leida")     return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 whitespace-nowrap">👀 Leída</span>;
@@ -134,7 +207,13 @@ export default function BandejaDespacho({ puedeCrear, puedeResolver }: Props) {
   };
 
   const tipoLabel = (tipo: BandejaDespachoItem["tipo"]) =>
-    tipo === "nota" ? "📝 Nota" : tipo === "correccion_reporte" ? "✏️ Corrección" : "📦 Reposición";
+    tipo === "nota" ? "📝 Nota"
+    : tipo === "correccion_reporte" ? "✏️ Corrección"
+    : tipo === "deuda_chofer" ? "💰 Deuda"
+    : "📦 Reposición";
+
+  // Formato compacto de un delta con signo — solo se muestra si es distinto de 0.
+  const fmtDelta = (n: number, sufijo: string) => n === 0 ? null : `${n > 0 ? "+" : ""}${n} ${sufijo}`;
 
   return (
     <div className="space-y-4">
@@ -217,20 +296,52 @@ export default function BandejaDespacho({ puedeCrear, puedeResolver }: Props) {
                   ))}
                 </ul>
               )}
-              <div className="text-[11px] text-gray-400 mt-1">De: {it.creadoPor?.nombre || "—"}</div>
-              {puedeResolver && (
-                <div className="flex gap-2 mt-2">
-                  {it.estado === "pendiente" && (
-                    <button onClick={() => it.id && marcarLeida(it.id)} disabled={busy} className="text-xs text-blue-600 font-semibold disabled:opacity-50">
-                      Marcar leída
-                    </button>
-                  )}
-                  {it.estado === "leida" && (
-                    <button onClick={() => it.id && marcarResuelta(it.id)} disabled={busy} className="text-xs text-green-600 font-semibold disabled:opacity-50">
-                      Marcar resuelta
-                    </button>
-                  )}
+              {it.tipo === "deuda_chofer" && it.deuda && (
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  {[
+                    fmtDelta(it.deuda.deltaUnidades, "uds"),
+                    fmtDelta(it.deuda.deltaRd, "RD$"),
+                    fmtDelta(it.deuda.deltaPuntos, "pts"),
+                  ].filter(Boolean).map((txt, i) => (
+                    <span key={i} className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                      {txt}
+                    </span>
+                  ))}
                 </div>
+              )}
+              <div className="text-[11px] text-gray-400 mt-1">De: {it.creadoPor?.nombre || "—"}</div>
+              {/* Deuda del chofer: Encargado U Despachador pueden saldarla (no solo puedeResolver) —
+                  el chofer generó la deuda pero nunca puede saldarla él mismo. */}
+              {it.tipo === "deuda_chofer" ? (
+                (puedeCrear || puedeResolver) && (
+                  <div className="flex gap-2 mt-2">
+                    {it.estado === "pendiente" && (
+                      <button onClick={() => it.id && marcarLeida(it.id)} disabled={busy} className="text-xs text-blue-600 font-semibold disabled:opacity-50">
+                        Marcar leída
+                      </button>
+                    )}
+                    {it.estado === "leida" && (
+                      <button onClick={() => marcarSaldada(it)} disabled={busy} className="text-xs text-green-600 font-semibold disabled:opacity-50">
+                        💰 Saldar deuda
+                      </button>
+                    )}
+                  </div>
+                )
+              ) : (
+                puedeResolver && (
+                  <div className="flex gap-2 mt-2">
+                    {it.estado === "pendiente" && (
+                      <button onClick={() => it.id && marcarLeida(it.id)} disabled={busy} className="text-xs text-blue-600 font-semibold disabled:opacity-50">
+                        Marcar leída
+                      </button>
+                    )}
+                    {it.estado === "leida" && (
+                      <button onClick={() => it.id && marcarResuelta(it.id)} disabled={busy} className="text-xs text-green-600 font-semibold disabled:opacity-50">
+                        Marcar resuelta
+                      </button>
+                    )}
+                  </div>
+                )
               )}
             </li>
           ))}

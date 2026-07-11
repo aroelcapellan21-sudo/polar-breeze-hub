@@ -488,14 +488,26 @@ export interface FacturaProveedor {
 // reporte (tipo='correccion_reporte') y avisos de reposición
 // (tipo='reposicion_disponible') se suman en sub-mejoras futuras — el shape ya
 // las contempla para no migrar la colección después.
+//
+// tipo='deuda_chofer' (2026-07-10, plan de deuda del chofer): a diferencia de
+// los demás tipos, el permiso de resolver ("saldar") es Encargado U Despachador
+// — cualquiera de los dos, no solo Despachador — porque el chofer generó la
+// deuda pero no puede saldarla él mismo. BandejaDespacho.tsx distingue este
+// caso especial por tipo, sin cambiar el permiso general de los demás tickets.
 
 export interface BandejaDespachoItem {
   id?:      string;
-  tipo:     "nota" | "correccion_reporte" | "reposicion_disponible";
+  tipo:     "nota" | "correccion_reporte" | "reposicion_disponible" | "deuda_chofer";
   estado:   "pendiente" | "leida" | "resuelta";
   ficha?:   string | null;   // chofer asociado; null/ausente = nota general
   texto?:   string;          // para tipo='nota'
   productos?: { codigo: number; producto_id: string; nombre: string; cantidad: number }[]; // productos del catálogo adjuntos a la nota
+  deuda?: {                  // para tipo='deuda_chofer' — ver colección deudas_chofer
+    deudaId:       string;   // id del doc en deudas_chofer
+    deltaUnidades: number;
+    deltaRd:       number;
+    deltaPuntos:   number;
+  };
   payload?: Record<string, unknown>; // shape libre por tipo (correccion_reporte, reposicion_disponible — futuro)
   creadoPor: { uid: string; nombre: string; rol: string };
   timestamp: Date | { seconds: number };
@@ -503,4 +515,27 @@ export interface BandejaDespachoItem {
   leidaEn?:     Date | { seconds: number };
   resueltaPor?: string;
   resueltaEn?:  Date | { seconds: number };
+}
+
+// ─── Deuda del chofer (colección deudas_chofer) ──────────────────────────────
+// Un documento por EVENTO (no un saldo que se sobreescribe) — mismo principio
+// de "huella permanente" del resto del ecosistema (movimientos_loker, etc.).
+// El total pendiente de un chofer = suma de los estado:'pendiente'. Se crea
+// desde app-chofer (Admin SDK, service account) cuando el chofer elige "Dejar
+// como deuda" en el banner de discrepancia — el chofer NUNCA la escribe ni la
+// salda directo; solo Encargado u Oliver (desde el Hub) la marcan 'saldada'.
+export interface DeudaChofer {
+  id?:                string;
+  ficha:              string;
+  fecha:              string;        // día del reporte que originó la deuda
+  reporteRef:         string;        // reportes_chofer/{ficha}/dias/{fecha}
+  bandejaDespachoRef: string;        // ticket de discrepancia original (trazabilidad)
+  deltaUnidades:      number;        // servidor.unidades - cliente.unidades
+  deltaRd:            number;        // servidor.rd - cliente.rd
+  deltaPuntos:        number;
+  estado:             "pendiente" | "saldada";
+  creadoPor:          { uid: string; nombre: string; rol: string };
+  timestamp:          Date | { seconds: number };
+  saldadaPor?:        { uid: string; nombre: string; rol: string };
+  saldadaEn?:         Date | { seconds: number };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { MovimientoLoker } from "@/lib/types";
@@ -25,6 +25,7 @@ import SyncSheetsPanel     from "@/components/shared/SyncSheetsPanel";
 import WelcomeBanner       from "@/components/shared/WelcomeBanner";
 import AvisoAreaBanner     from "@/components/shared/AvisoAreaBanner";
 import BandejaDespacho     from "@/components/shared/BandejaDespacho";
+import BandejaDespachoBanner from "@/components/shared/BandejaDespachoBanner";
 import SideNavDrawer, { NavSection } from "@/components/shared/SideNavDrawer";
 
 type Tab = "lote" | "guardados" | "weight" | "stock" | "urgente" | "reposicion" | "choferes" | "vista" | "facturaProveedor" | "bandeja";
@@ -106,6 +107,19 @@ export default function EncargadoDashboard() {
 
   // Badge del tab Choferes — recibe el conteo de ConsultaChoferes
   const [pendientesBadge, setPendientesBadge] = useState(0);
+
+  // Conteo de pendientes de la Bandeja de Despacho — montado siempre (no solo
+  // al abrir el tab), mismo patrón que DespachadorDashboard.tsx, para que el
+  // banner/badge sean confiables desde que se abre la página.
+  const [bandejaPendientes, setBandejaPendientes] = useState(0);
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, "bandeja_despacho"), where("estado", "==", "pendiente")),
+      (snap) => setBandejaPendientes(snap.size),
+      () => setBandejaPendientes(0),
+    );
+    return unsub;
+  }, []);
 
   // ── Stock (suscripción viva desde que abre el dashboard, para que el badge
   //    🚨 Urgente y la alarma estén siempre actualizados sin entrar al tab) ──
@@ -218,6 +232,8 @@ export default function EncargadoDashboard() {
             ? (pendientesBadge > 9 ? "9+" : String(pendientesBadge))
             : t.key === "urgente" && criticos.length > 0
             ? (criticos.length > 9 ? "9+" : String(criticos.length))
+            : t.key === "bandeja" && bandejaPendientes > 0
+            ? (bandejaPendientes > 9 ? "9+" : String(bandejaPendientes))
             : undefined,
       })),
     },
@@ -306,6 +322,7 @@ export default function EncargadoDashboard() {
       </header>
 
       <WelcomeBanner nombre={profile?.nombre ?? ""} area="Supervisor" acento="#1E8C3A" />
+      <BandejaDespachoBanner pendientes={bandejaPendientes} onVerBandeja={() => setTab("bandeja")} />
 
       {/* ══════════════════════════════════════════
           CONTENIDO

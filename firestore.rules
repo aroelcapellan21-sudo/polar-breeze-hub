@@ -140,6 +140,13 @@ service cloud.firestore {
     // marca leída/resuelta. Sin acceso de Chofer.
     match /bandeja_despacho/{id}  { allow read, write: if esAdmin() || esDespacha() || esEncargado(); }
 
+    // deudas_chofer: deuda registrada contra un chofer por discrepancia de reporte
+    // (plan de deuda del chofer, 2026-07-10). La crea app-chofer con service
+    // account (bypassa esta regla) — el chofer NUNCA la lee/escribe desde acá,
+    // siempre vía su propio backend. Encargado/Despachador la leen y la marcan
+    // 'saldada'. Sin acceso de Chofer.
+    match /deudas_chofer/{id}     { allow read, write: if esAdmin() || esDespacha() || esEncargado(); }
+
     // Colecciones no listadas (alertas, logs, etc.) → solo Admin vía catch-all
   }
 }
